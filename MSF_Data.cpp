@@ -6,7 +6,6 @@
 #include <fstream>
 #include <algorithm>
 
-
 std::vector<AmmoData> MSF_MainData::ammoData;
 std::vector<SingleModPair> MSF_MainData::singleModPairs;
 std::vector<ModPairArray> MSF_MainData::modPairArrays;
@@ -16,9 +15,10 @@ std::vector<FireAnimData> MSF_MainData::fireAnimData;
 
 std::vector<HUDFiringModeData> MSF_MainData::fmDisplayData;
 std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
-//std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
+std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
 
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
+BGSKeyword* MSF_MainData::hasSwitchedSecAmmoKW;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
@@ -38,9 +38,13 @@ BGSAction* MSF_MainData::ActionDraw;
 BGSAction* MSF_MainData::ActionGunDown;
 
 bool MSF_MainData::IsInitialized = false;
+int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
 std::vector<KeybindData> MSF_MainData::keybinds;
 std::vector<MCMfloatData> MSF_MainData::MCMfloats;
+GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
+ModSelectionMenu* MSF_MainData::widgetMenu;
+int MSF_MainData::numberOfOpenedMenus = 0;
 
 SwitchData MSF_MainData::switchData;
 std::vector<BurstMode> MSF_MainData::burstMode;
@@ -100,7 +104,7 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = 0xF7F;
+		MSF_MainData::MCMSettingFlags = 0x77F;
 		AddFloatSetting("fSliderMainX", 950.0);
 		AddFloatSetting("fSliderMainY", 565.0);
 		AddFloatSetting("fPowerArmorOffsetX", 0.0);
@@ -218,9 +222,9 @@ namespace MSF_Data
 					Json::Reader reader;
 					reader.parse(file, json);
 
-					if (json["version"].asFloat() < (PLUGIN_VERSION/10))
+					if (json["version"].asInt() < MIN_SUPPORTED_KB_VERSION)
 					{
-						_ERROR("Unsupported json version: %s", keybindFiles[i].cFileName);
+						_ERROR("Unsupported keybind version: %s", keybindFiles[i].cFileName);
 						continue;
 					}
 
@@ -241,39 +245,50 @@ namespace MSF_Data
 						{
 							if (itKb->functionID == id)
 							{
-								std::string swfPath = keybind["swfPath"].asString();
-								std::string menuScriptPath = keybind["scriptPath"].asString();
-								UInt8 isAmmo = keybind["keyfunction"].asInt();
-								if ((menuScriptPath == "" || swfPath == "") && (isAmmo & KeybindData::bHUDselection))
-									break;
-								//if (isAmmo & KeybindData::bHUDselection)
+								std::string menuName = keybind["menuName"].asString();
+								std::string swfFilename = keybind["swfFilename"].asString();
+								UInt8 flags = keybind["keyfunction"].asInt();
+								//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
+								//	break;
+								//if (flags & KeybindData::bHUDselection)
 								//{
-								//	if (!RegisterScaleform(swfPath, menuScriptPath))
-								//		break;
+								//	if (itKb->selectMenu)
+								//	{
+								//		itKb->selectMenu->scaleformID = menuName;
+								//		itKb->selectMenu->swfFilename = swfFilename;
+								//	}
+								//	else
+								//		itKb->selectMenu = new ModSelectionMenu(menuName, swfFilename);
 								//}
-								itKb->menuScriptPath = menuScriptPath;
-								itKb->type = isAmmo;
+								//else
+								itKb->selectMenu = nullptr;
+								itKb->type = flags;
 								break;
 							}
+							//BSReadAndWriteLocker locker(&g_customMenuLock);
+							//g_customMenuData[menuName.c_str()].menuPath = menuPath;
+							//g_customMenuData[menuName.c_str()].rootPath = rootPath;
+							//g_customMenuData[menuName.c_str()].menuFlags = menuFlags;
+							//g_customMenuData[menuName.c_str()].movieFlags = movieFlags;
+							//g_customMenuData[menuName.c_str()].extFlags = extFlags;
+							//g_customMenuData[menuName.c_str()].depth = depth;
 						}
 						if (itKb == MSF_MainData::keybinds.end())
 						{
-							std::string swfPath = keybind["swfPath"].asString();
-							std::string menuScriptPath = keybind["scriptPath"].asString();
-							UInt8 isAmmo = keybind["keyfunction"].asInt();
-							if ((menuScriptPath == "" || swfPath == "") && (isAmmo & KeybindData::bHUDselection))
-								continue;
-							//if (isAmmo & KeybindData::bHUDselection)
-							//{
-							//	if (!RegisterScaleform(swfPath, menuScriptPath))
-							//		continue;
-							//}
+							std::string menuName = keybind["menuName"].asString();
+							std::string swfFilename = keybind["swfFilename"].asString();
+							UInt8 flags = keybind["keyfunction"].asInt();
+							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
+							//	continue;
 							KeybindData kb = {};
 							kb.functionID = id;
-							kb.type = isAmmo;
+							kb.type = flags;
 							kb.keyCode = 0;
 							kb.modifiers = 0;
-							kb.menuScriptPath = menuScriptPath;
+							//if (flags & KeybindData::bHUDselection)
+							//	kb.selectMenu = new ModSelectionMenu(menuName, swfFilename);
+							//else
+							kb.selectMenu = nullptr;
 							MSF_MainData::keybinds.push_back(kb);
 						}
 					}
@@ -357,20 +372,51 @@ namespace MSF_Data
 	{
 		if (section == "Gameplay" || section == "Display")
 		{
-			auto delimiter = settingName.find_first_of('_');
-			if (delimiter == -1)
-				return false;
-			std::string flagStr = settingName.substr(0, delimiter);
-			if (flagStr == "")
-				return false;
-			UInt16 flagType = std::stoi(flagStr);
-			if (flagType == 0)
-				return false;
+			//auto delimiter = settingName.find_first_of('_');
+			//if (delimiter == -1)
+			//	return false;
+			//std::string flagStr = settingName.substr(0, delimiter);
+			//if (flagStr == "")
+			//	return false;
+			//UInt16 flagType = std::stoi(flagStr);
+			//if (flagType == 0)
+			//	return false;
+			//bool flagValue = settingValue != "0";
+			//_MESSAGE("Setting read: %04X, %02X", flagType, flagValue);
+			//if (flagValue)
+			//	MSF_MainData::MCMSettingFlags |= (1 << flagType);
+			//else
+			//	MSF_MainData::MCMSettingFlags &= ~(1 << flagType);
+			//return true;
 			bool flagValue = settingValue != "0";
+			UInt16 flag = 0;
+			if (settingName == "bWidgetAlwaysVisible")
+				flag = MSF_MainData::bWidgetAlwaysVisible;
+			else if (settingName == "bShowAmmoIcon")
+				flag = MSF_MainData::bShowAmmoIcon;
+			else if (settingName == "bShowMuzzleIcon")
+				flag = MSF_MainData::bShowMuzzleIcon;
+			else if (settingName == "bShowAmmoName")
+				flag = MSF_MainData::bShowAmmoName;
+			else if (settingName == "bShowMuzzleName")
+				flag = MSF_MainData::bShowMuzzleName;
+			else if (settingName == "bShowFiringMode")
+				flag = MSF_MainData::bShowFiringMode;
+			else if (settingName == "bShowZoomData")
+				flag = MSF_MainData::bShowScopeData;
+			else if (settingName == "bReloadEnabled")
+				flag = MSF_MainData::bReloadEnabled;
+			else if (settingName == "bDrawEnabled")
+				flag = MSF_MainData::bDrawEnabled;
+			else if (settingName == "bCustomAnimEnabled")
+				flag = MSF_MainData::bCustomAnimEnabled;
+			else if (settingName == "bRequireAmmoToSwitch")
+				flag = MSF_MainData::bRequireAmmoToSwitch;
+
 			if (flagValue)
-				MSF_MainData::MCMSettingFlags |= flagType;
+				MSF_MainData::MCMSettingFlags |= flag;
 			else
-				MSF_MainData::MCMSettingFlags &= ~flagType;
+				MSF_MainData::MCMSettingFlags &= ~flag;
 			return true;
 		}
 		else if (section == "Position")
@@ -431,9 +477,9 @@ namespace MSF_Data
 				Json::Reader reader;
 				reader.parse(file, json);
 
-				if (json["version"].asFloat() < (PLUGIN_VERSION / 10))
+				if (json["version"].asInt() < MIN_SUPPORTED_DATA_VERSION)
 				{
-					_ERROR("Unsupported json version: %s", fileName.c_str());
+					_ERROR("Unsupported data version: %s", fileName.c_str());
 					return true;
 				}
 				
@@ -953,14 +999,6 @@ namespace MSF_Data
 						if (!keyword)
 							continue;
 						str = scaleformData["displayString"].asString();
-						//if (MSF_MainData::fmDisplayData.empty()) //////////////////////////////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						//{
-						//	HUDFiringModeData displayData;
-						//	displayData.modeKeyword = keyword;
-						//	displayData.displayString = str;
-						//	MSF_MainData::fmDisplayData.push_back(displayData);
-						//	continue;
-						//}
 						std::vector<HUDFiringModeData>::iterator itData = MSF_MainData::fmDisplayData.begin();
 						for (itData; itData != MSF_MainData::fmDisplayData.end(); itData++)
 						{
@@ -1008,6 +1046,38 @@ namespace MSF_Data
 							displayData.scopeKeyword = keyword;
 							displayData.displayString = str;
 							MSF_MainData::scopeDisplayData.push_back(displayData);
+						}
+					}
+				}
+
+				data1 = json["muzzleScaleform"];
+				if (data1.isArray())
+				{
+					for (int i = 0; i < data1.size(); i++)
+					{
+						const Json::Value& scaleformData = data1[i];
+						std::string str = scaleformData["keyword"].asString();
+						if (str == "")
+							continue;
+						BGSKeyword* keyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+						if (!keyword)
+							continue;
+						str = scaleformData["displayString"].asString();
+						std::vector<HUDMuzzleData>::iterator itData = MSF_MainData::muzzleDisplayData.begin();
+						for (itData; itData != MSF_MainData::muzzleDisplayData.end(); itData++)
+						{
+							if (itData->muzzleKeyword == keyword)
+							{
+								itData->displayString = str;
+								break;
+							}
+						}
+						if (itData == MSF_MainData::muzzleDisplayData.end())
+						{
+							HUDMuzzleData displayData;
+							displayData.muzzleKeyword = keyword;
+							displayData.displayString = str;
+							MSF_MainData::muzzleDisplayData.push_back(displayData);
 						}
 					}
 				}
@@ -1267,9 +1337,11 @@ namespace MSF_Data
 		auto data = modData->data;
 		if (!data || !data->forms)
 			return false;
-		for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++)
+		_MESSAGE("checkOK");
+		for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++) //HasMod->next
 		{
 			UInt8 type = (*itData)->GetType();
+			_MESSAGE("type: %i", type);
 			if (type == 0x1)
 			{
 				SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
@@ -1319,14 +1391,17 @@ namespace MSF_Data
 				MultipleMod* mods = static_cast<MultipleMod*>(*itData);
 				if (Utilities::HasObjectMod(modData, mods->parentMod))
 				{
+					_MESSAGE("parentOK");
 					if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
 					{
+						_MESSAGE("hasKW");
 						BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
 						std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(mods->functionMods.begin(), mods->functionMods.end(), oldMod);
 						BGSMod::Attachment::Mod* currMod = *itMod;
 						itMod++;
 						if (itMod != mods->functionMods.end())
 						{
+							_MESSAGE("hasOldModNotEnd");
 							if (mods->flags & ModAssociationData::bRequireLooseMod)
 							{
 								TESObjectMISC* looseMod;
@@ -1461,6 +1536,7 @@ namespace MSF_Data
 				ModPairArray* mods = static_cast<ModPairArray*>(*itData);
 				if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
 				{
+					_MESSAGE("hasOldMod");
 					BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
 					std::vector<ModAssociationData::ModPair>::iterator itHelper = mods->modPairs.begin();
 					bool selectNext = false;
@@ -1470,6 +1546,7 @@ namespace MSF_Data
 						{
 							if (Utilities::HasObjectMod(modData, itMod->parentMod))
 							{
+								_MESSAGE("hasParent: %08X", itMod->parentMod->formID);
 								if (mods->flags & ModAssociationData::bRequireLooseMod)
 								{
 									TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
@@ -1502,6 +1579,7 @@ namespace MSF_Data
 					}
 					if (mods->flags & ModAssociationData::bCanHaveNullMod)
 					{
+						_MESSAGE("NullMod");
 						MSF_MainData::switchData.ModToAttach = nullptr;
 						MSF_MainData::switchData.ModToRemove = oldMod;
 						MSF_MainData::switchData.LooseModToRemove = nullptr;
@@ -1547,8 +1625,10 @@ namespace MSF_Data
 				{
 					for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
 					{
+						_MESSAGE("itP");
 						if (Utilities::HasObjectMod(modData, itMod->parentMod))
 						{
+							_MESSAGE("parentOK");
 							if (mods->flags & ModAssociationData::bRequireLooseMod)
 							{
 								TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
@@ -1613,12 +1693,13 @@ namespace MSF_Data
 						isSwitchedAmmo = true;
 				}
 			}
-			if (!isSwitchedAmmo)
+			if (!isSwitchedAmmo && currModAmmo)
 			{
 				ammoConverted = currModAmmo;
 				priority = currPriority;
 			}
 		}
+
 		if (!ammoConverted)
 			return weapBase->weapData.ammo;
 		return ammoConverted;
@@ -1699,15 +1780,15 @@ namespace MSF_Data
 	{
 		if (!instanceData)
 			return "";
-		//for (std::vector<HUDMuzzleData>::iterator it = MSF_MainData::muzzleDisplayData.begin(); it != MSF_MainData::muzzleDisplayData.end(); it++)
-		//{
-		//	if (!it->muzzleKeyword)
-		//		continue;
-		//	if (Utilities::WeaponInstanceHasKeyword(instanceData, it->muzzleKeyword))
-		//	{
-		//		return it->displayString;
-		//	}
-		//}
+		for (std::vector<HUDMuzzleData>::iterator it = MSF_MainData::muzzleDisplayData.begin(); it != MSF_MainData::muzzleDisplayData.end(); it++)
+		{
+			if (!it->muzzleKeyword)
+				continue;
+			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->muzzleKeyword))
+			{
+				return it->displayString;
+			}
+		}
 		return "";
 	}
 
@@ -1731,3 +1812,4 @@ namespace MSF_Data
 		return nullptr;*/
 	}
 }
+

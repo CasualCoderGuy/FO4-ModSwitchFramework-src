@@ -13,9 +13,8 @@
 #include "MSF_Base.h"
 #include "MSF_Data.h"
 #include "MSF_Scaleform.h"
+#include "MSF_Events.h"
 #include "MSF_Papyrus.h"
-//#include "PapyrusStack.h"
-//#include "PapyrusInstanceData.h"
 #include "MSF_Test.h"
 
 
@@ -24,223 +23,6 @@ PluginHandle			g_pluginHandle =	kPluginHandle_Invalid;
 F4SEPapyrusInterface	*g_papyrus   =		NULL;
 F4SEMessagingInterface	*g_messaging =		NULL;
 F4SEScaleformInterface	*g_scaleform =		NULL;
-
-//==================== Events =========================
-BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName)
-{
-	for (int i = 0; i < globalEvents->eventSources.count; i++) {
-		const char* name = GetObjectClassName(globalEvents->eventSources[i]) + 15;    // ?$EventSource@V
-		if (strstr(name, dispatcherName) == name) {
-			return &globalEvents->eventSources[i]->eventDispatcher;
-		}
-	}
-	return nullptr;
-}
-#define GET_EVENT_DISPATCHER(EventName) (BSTEventDispatcher<EventName>*) GetGlobalEventDispatcher(*g_globalEvents, #EventName);
-
-//Anim Event
-class BSAnimationGraphEvent
-{
-public:
-	TESForm* unk00;
-	BSFixedString eventName;
-	//etc
-};
-typedef UInt8(*_tf1)(void * thissink, BSAnimationGraphEvent* evnstruct, void** dispatcher);
-RelocAddr <_tf1> tf1_HookTarget(0x2D442E0);
-_tf1 tf1_Original;
-
-struct BGSOnPlayerUseWorkBenchEvent
-{
-};
-class BGSOnPlayerUseWorkBenchEventSink : public BSTEventSink<BGSOnPlayerUseWorkBenchEvent>
-{
-public:
-	virtual	EventResult	ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher) override
-	{
-		_MESSAGE("Workbench evn");
-		return kEvent_Continue;
-	}
-};
-BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
-DECLARE_EVENT_DISPATCHER(BGSOnPlayerUseWorkBenchEvent, 0x0441A10);
-
-//Player Mod Event
-struct BGSOnPlayerModArmorWeaponEvent
-{
-	TESBoundObject*						object;			// 00 TESObjectWEAP or TESObjectARMO
-	BGSMod::Attachment::Mod*			mod;			// 08
-};
-class BGSOnPlayerModArmorWeaponEventSink : public BSTEventSink<BGSOnPlayerModArmorWeaponEvent>
-{
-public:
-	virtual	EventResult	ReceiveEvent(BGSOnPlayerModArmorWeaponEvent * evn, void * dispatcher) override
-	{
-		TESObjectWEAP* moddedWeap = DYNAMIC_CAST(evn->object, TESBoundObject, TESObjectWEAP);
-		if (moddedWeap)
-			delayTask delay(100, true, &MSF_Base::ReevalModdedWeapon, moddedWeap);
-		return kEvent_Continue;
-	}
-};
-BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
-DECLARE_EVENT_DISPATCHER(BGSOnPlayerModArmorWeaponEvent, 0x0441790);
-
-//Cell Load Event
-struct TESCellFullyLoadedEvent
-{
-	TESObjectCELL*				cell;			// 00
-};
-class TESCellFullyLoadedEventSink : public BSTEventSink<TESCellFullyLoadedEvent>
-{
-public:
-	virtual	EventResult	ReceiveEvent(TESCellFullyLoadedEvent * evn, void * dispatcher) override
-	{
-		//MSF_Base::SpawnRandomMods(evn->cell);
-		//MSF_Base::CreateRandomWeaponHealth(evn->cell);
-		_MESSAGE("Cell evn");
-		return kEvent_Continue;
-	}
-};
-TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
-DECLARE_EVENT_DISPATCHER(TESCellFullyLoadedEvent, 0x00442050);
-
-//Equip event
-struct PlayerAmmoCountEvent
-{
-	UInt32							ammoCount;        // 00
-	UInt32							totalAmmoCount;    // 04
-	UInt64							unk08;            // 08
-	TESObjectWEAP*					weapon;            // 10
-	TESObjectWEAP::InstanceData*    weaponInstance;
-	//...
-};
-STATIC_ASSERT(offsetof(PlayerAmmoCountEvent, weapon) == 0x10);
-class PlayerAmmoCountEventSink : public BSTEventSink<PlayerAmmoCountEvent>
-{
-public:
-	virtual ~PlayerAmmoCountEventSink() { };
-
-	virtual    EventResult    ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher) override
-	{
-		_MESSAGE("ammoC");
-		if ((*g_player)->equipData->slots[41].instanceData)
-		{
-			if (evn->weaponInstance && evn->weaponInstance != MSF_MainData::switchData.equippedInstanceData)
-			{
-				MSF_MainData::switchData.equippedInstanceData = evn->weaponInstance;
-				//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::APbaseMod))
-				//{
-				//	MSF_MainData::switchData.ClearData();
-				//	MSF_MainData::switchData.SwitchFlags = SwitchData::bNeedInit;
-				//	if (!(*g_ui)->IsMenuOpen(BSFixedString("pipboyMenu"))) //(!(*g_ui)->IsMenuOpen(BSFixedString("CursorMenu"))
-				//		MSF_Base::InitWeapon();
-				//}
-				//MSF_Scaleform::UpdateWidget(127);
-			}
-		}
-		else
-		{
-			MSF_MainData::switchData.equippedInstanceData = nullptr;
-			MSF_MainData::switchData.ClearData();
-			//MSF_Scaleform::UpdateWidget(127);
-		}
-		
-		return kEvent_Continue;
-	}
-};
-PlayerAmmoCountEventSink playerAmmoCountEventSink;
-
-//Menu OpenClose Event
-class MenuOpenCloseSink : public BSTEventSink<MenuOpenCloseEvent>
-{
-public:
-	virtual	EventResult	ReceiveEvent(MenuOpenCloseEvent * evn, void * dispatcher) override
-	{
-		const char* name = evn->menuName.c_str();
-		//if (!_strcmpi("pipboyMenu", name))
-		//{
-		//	if (!evn->isOpen && (MSF_MainData::switchData.SwitchFlags & SwitchData::bNeedInit))
-		//		MSF_Base::InitWeapon();
-		//}
-		if (!_strcmpi("pauseMenu", name) && !evn->isOpen)
-		{
-			MSF_Data::ReadMCMKeybindData();
-			MSF_Data::ReadUserSettings();
-		}
-		
-		return kEvent_Continue;
-	}
-};
-MenuOpenCloseSink menuOpenCloseSink;
-
-//volatile short count = 3;
-//Animation event hook
-UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3) //on abort?
-{
-	const char* name = arg2->eventName.c_str();
-	if (!_strcmpi("reloadComplete", name))
-	{
-		_MESSAGE("reloadCOMP %02X", MSF_MainData::switchData.SwitchFlags);
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadInProgress)
-		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bReloadInProgress;
-			MSF_Base::SwitchMod();
-		}
-	}
-	if (!_strcmpi("reloadEnd", name))
-	{
-		_MESSAGE("reloadEnd");
-		MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bReloadNotFinished;
-	}
-	else if (!_strcmpi("weaponDraw", name))
-	{
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bDrawInProgress)
-		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bDrawInProgress;
-			if ((MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadNeeded))
-			{
-				MSF_MainData::switchData.SwitchFlags = (MSF_MainData::switchData.SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-				if (!MSF_Base::ReloadWeapon())
-					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bReloadInProgress | SwitchData::bReloadNotFinished);
-			}
-			else if (SwitchData::bAnimNeeded)
-			{
-				MSF_MainData::switchData.SwitchFlags = (MSF_MainData::switchData.SwitchFlags & ~SwitchData::bAnimNeeded) | SwitchData::bAnimInProgress; //| SwitchData::bAnimNotFinished
-				if (!MSF_Base::PlayAnim())
-					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
-			}
-		}
-	}
-	else if (!_strcmpi("weaponFire", name))
-	{
-		MSF_Base::DamageEquippedWeapon(*g_player);
-		if (MSF_MainData::tmr.IsRunning())
-		{
-			if (MSF_MainData::tmr.stop() < 1000)
-				MSF_Base::FireBurst(*g_player);
-		}
-		//InterlockedDecrement16(&count);
-		//if (count)
-		//	Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
-		//else
-		//	InterlockedExchange16(&count, 3);
-		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
-	}
-	else if (!_strcmpi("switchMod", name))
-	{
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bAnimInProgress)
-		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bAnimInProgress;
-			MSF_Base::SwitchMod();
-		}
-		//_MESSAGE("Anim: switch");
-	}
-	else if (!_strcmpi("customAnimEnd", name))
-	{
-		MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bAnimNotFinished;
-	}
-	return tf1_Original(arg1, arg2, arg3);
-}
 
 bool RegisterAfterLoadEvents()
 {
@@ -262,31 +44,8 @@ bool RegisterAfterLoadEvents()
 		//return false;
 	}
 
-	//BGSOnPlayerModArmorWeaponEvent_Dispatcher_address = RVA <BSTEventDispatcher<BGSOnPlayerModArmorWeaponEvent>*>(
-	//	"BGSOnPlayerModArmorWeaponEvent_Dispatcher_address", {
-	//		{ RUNTIME_VERSION_1_10_50, 0x00441610 },//{ RUNTIME_VERSION_1_10_163, 0x00441610 },
-	//	}, "E8 ? ? ? ? 49 8B 0F 49 8D 56 10", BASIC_EVENT_HANDLER_INDIRECTIONS(0x2C3)); //.text:0000000141371568                 call    sub_141376150
-	//if (BGSOnPlayerModArmorWeaponEvent_Dispatcher_address.GetUIntPtr() != 0)
-	//{
 	REGISTER_EVENT(BGSOnPlayerModArmorWeaponEvent, modArmorWeaponEventSink);
 	REGISTER_EVENT(BGSOnPlayerUseWorkBenchEvent, useWorkbenchEventSink);
-	//	_MESSAGE("ModEvent dispatcher address: %08X", BGSOnPlayerModArmorWeaponEvent_Dispatcher_address.GetUIntPtr());
-	//}
-	//else
-	//{
-	//	_MESSAGE("cant register BGSOnPlayerModArmorWeaponEvent:");
-	//	//return false;
-	//}
-
-	//auto eventDispatcher6 = GET_EVENT_DISPATCHER(BGSOnPlayerModArmorWeaponEvent);
-	//if (eventDispatcher6)
-	//	eventDispatcher6->AddEventSink(&modArmorWeaponEventSink);
-	//else
-	//{
-	//	_MESSAGE("MSF was unable to register for BGSOnPlayerModArmorWeaponEvent");
-	//	//return false;
-	//}
-	//REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
 
 	return true;
 }
@@ -309,25 +68,36 @@ public:
 		{
 			MSF_MainData::switchData.ClearData();
 			MSF_MainData::switchData.equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+			_MESSAGE("Registering MSF menus.");
+			MSFWidgetMenu::RegisterMenu();
+			MSFAmmoMenu::RegisterMenu();
+			MSFModMenu::RegisterMenu();
+			MSFWidgetMenu::OpenMenu();
+			//MSFMenu::OpenMenu();
 			//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::APbaseMod))
 			//{
 			//	MSF_MainData::switchData.SwitchFlags = SwitchData::bNeedInit;
 			//	//MSF_Base::InitWeapon();
 			//}
-			//MSF_Scaleform::UpdateWidget(127);
+			delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData);
+			//MSF_Scaleform::UpdateWidgetData();
+			// Inject translations
+			//BSScaleformTranslator * translator = (BSScaleformTranslator*)(*g_scaleformManager)->stateBag->GetStateAddRef(GFxState::kInterface_Translator);
+			//if (translator) {
+			//	SSWTranslator::LoadTranslations(translator);
+			//}
+			//MSFMenu::RegisterMenu();
+			//static BSFixedString menuName("MSFMenu");
+			//BSReadAndWriteLocker locker(&g_customMenuLock);
+			//g_customMenuData[menuName.c_str()].menuPath = menuName;
+			//g_customMenuData[menuName.c_str()].rootPath = "root1";
+			//g_customMenuData[menuName.c_str()].menuFlags = 2050;
+			//g_customMenuData[menuName.c_str()].movieFlags = 0;
+			//g_customMenuData[menuName.c_str()].extFlags = 0;
+			//g_customMenuData[menuName.c_str()].depth = 6;
+			//(*g_ui)->Register(menuName.c_str(), CreateCustomMenu);
+			//_MESSAGE("RegisterMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 		}
-		return kEvent_Continue;
-	}
-};
-
-class CombatEvnHandler : public BSTEventSink<TESCombatEvent>
-{
-public:
-	virtual ~CombatEvnHandler() { };
-	virtual    EventResult    ReceiveEvent(TESCombatEvent * evn, void * dispatcher) override
-	{
-		//instance midprocess ammo count!
-		_MESSAGE("combat started");
 		return kEvent_Continue;
 	}
 };
@@ -354,35 +124,25 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				MSF_Data::LoadPluginData();
 				_MESSAGE("Plugin Data Loading Time: %llu ms.", tmr.stop());
 
-				//TESCellFullyLoadedEvent_Dispatcher_address = RVA <BSTEventDispatcher<TESCellFullyLoadedEvent>*>(
-				//	"TESCellFullyLoadedEvent_Dispatcher_address", {
-				//		{ RUNTIME_VERSION_1_10_50, 0x00441E30 },
-				//	}, "E8 ? ? ? ? 49 8B 0F 49 8D 56 10", BASIC_EVENT_HANDLER_INDIRECTIONS1(0xA0));
-				//if (TESCellFullyLoadedEvent_Dispatcher_address.GetUIntPtr() != 0)
-				//{
-				//	//REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
-				//	_MESSAGE("CellEvent dispatcher address: %08X", TESCellFullyLoadedEvent_Dispatcher_address.GetUIntPtr());
-				//}
-				//else
-				//{
-				//	_ERROR("cant register TESCellFullyLoadedEvent:");
-				//	//return false;
-				//}
-				//static auto pCombatHandler = new CombatEvnHandler();
-				//GetEventDispatcher<TESCombatEvent>()->AddEventSink(pCombatHandler);
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
-				//REGISTER_EVENT(TESCellAttachDetachEvent, cellAttachDetachEventSink);
 			}
 		}
 	}
 }
 
 bool InitPlugin(UInt32 runtimeVersion = 0) {
-	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, PLUGIN_VERSION_STRING);
+	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
 	_MESSAGE("runtime version: %08X", runtimeVersion);
 #ifdef DEBUG
 	_MESSAGE("DevMode enabled!");
 #endif
+
+	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
+	{
+		_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
+		return false;
+	}
+
 	Globals::Init();
 	RVAManager::UpdateAddresses(runtimeVersion);
 
@@ -404,8 +164,16 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 	_MESSAGE("Base address: %p", reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
 	tf1_Original = HookUtil::SafeWrite64(tf1_HookTarget.GetUIntPtr(), &tf1_Hook);
+	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 
-	InitializeCriticalSection(switchCriticalSection);
+	if (!MSF_Data::ReadKeybindData())
+	{
+		_FATALERROR("Fatal Error - MSF was unable to initialize keybinds");
+		return false;
+	}
+
+	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformCallback))
+	//	_MESSAGE("MSF widget scaleform registration failed");
 
 	return true;
 }
@@ -419,7 +187,7 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 
 	info->infoVersion = PluginInfo::kInfoVersion;
 	info->name =		PLUGIN_NAME_SHORT;
-	info->version =		PLUGIN_VERSION;
+	info->version =		MSF_VERSION;
 	
 	g_pluginHandle =	f4se->GetPluginHandle();
 	
@@ -469,12 +237,6 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 		return false;
 	}
 
-	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
-	{
-		_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
-		return false;
-	}
-
 	return true;
 }
 
@@ -483,28 +245,14 @@ bool F4SEPlugin_Load(const F4SEInterface *f4se)
 	if (g_messaging) 
 	{
 		g_messaging->RegisterListener(g_pluginHandle, "F4SE", F4SEMessageHandler);
-//		g_messaging->RegisterListener(g_pluginHandle, "F4SE", OnF4SEMessage);
 	}
 
 	if (g_papyrus) 
 	{
 		g_papyrus->Register(MSF_Papyrus::RegisterPapyrus);
-//		g_papyrus->Register(PapyrusStack::RegisterPapyrus);
-//		g_papyrus->Register(PapyrusInstanceData::RegisterPapyrus);
-
 #ifdef DEBUG
 		g_papyrus->Register(MSF_Test::RegisterPapyrus);
 #endif
-	}
-
-	if (g_scaleform)
-	{
-		if (!MSF_Data::ReadKeybindData())
-		{
-			_FATALERROR("MSF was unable to initialize keybinds");
-			return false;
-		}
-		g_scaleform->Register("msf", MSF_Scaleform::RegisterMSFScaleform);
 	}
 	
 	return InitPlugin(f4se->runtimeVersion);

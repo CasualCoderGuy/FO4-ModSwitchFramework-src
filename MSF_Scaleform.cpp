@@ -1,7 +1,7 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Test.h"
 
-GFxMovieRoot* msfRoot;
+RelocPtr <BSScaleformManager *> g_scaleformManager(0x058DE410);
 
 void HandleInputEvent(ButtonEvent * inputEvent)
 {
@@ -48,7 +48,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//MSF_Base::FireBurst(*g_player);
-				MSF_MainData::tmr.start();
+				//MSF_MainData::tmr.start();
 				//_MESSAGE("fire input");
 			}
 		}
@@ -58,8 +58,16 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 		{
 			if ((*g_ui)->numPauseGame == 0)
 			{
-				MSF_Test::ListModTable(*g_player);
+				//MSF_Test::ListModTable(*g_player);
 				//MSF_Test::PrintStoredData();
+				//MSF_Scaleform::GetInterfaceVersion();
+				//MSF_Scaleform::UpdateWidgetData(nullptr);
+				//MSF_Scaleform::SetWidgetVisibility(true);
+				//MSFMenu::OpenMenu();
+				//static BSFixedString menuName("MSFMenu");
+				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
+				MSFAmmoMenu::OpenMenu();
+				MSFModMenu::OpenMenu();
 				//MSF_Test::ListEquippedItemTypes();
 				//MSF_Test::ArmorAttachTest();
 				//MSF_Test::RemapAnimTest(); //sub_141387BE0
@@ -112,19 +120,22 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				KeybindData* keyFn = MSF_Data::GetKeyFunctionID(keyCode, modifiers);
 				if (!keyFn)
 					break;
-				if (keyFn->type & KeybindData::bIsAmmo)
+				_MESSAGE("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
+				if (keyFn->type & KeybindData::bCancel)
+					MSF_MainData::switchData.ClearData();
+				else if(keyFn->type & KeybindData::bIsAmmo)
 				{
 					if (keyFn->type & KeybindData::bHUDselection)
-						MSF_Scaleform::ToggleAmmoMenu(keyFn->menuScriptPath);
+						MSF_Scaleform::ToggleAmmoMenu(keyFn->selectMenu);
 					else
-						MSF_Base::SwitchAmmoHotkey(keyFn->type & 0x0F);
+						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
 				}
 				else if (keyFn->type & KeybindData::bHUDselection)
-					MSF_Scaleform::ToggleModMenu(keyFn->menuScriptPath, &keyFn->modAssociations);
+					MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, &keyFn->modAssociations);
 				else if (keyFn->type & KeybindData::bToggle)
 					MSF_Base::ToggleModHotkey(&keyFn->modAssociations);
 				else
-					MSF_Base::SwitchModHotkey(keyFn->type & 0x0F, &keyFn->modAssociations);
+					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mNumMask, &keyFn->modAssociations);
 			}
 		}
 			break;
@@ -169,6 +180,68 @@ namespace MSF_Scaleform
 		}
 	};
 
+	class SendF4SEVersion : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetInt(0);
+			if (args->numArgs != 0) return;
+			args->result->SetInt(110163);
+		}
+	};
+
+	class SendGameVersion : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetInt(0);
+			if (args->numArgs != 0) return;
+			args->result->SetInt(110163);
+		}
+	};
+
+	class SendMSFVersion : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetInt(0);
+			if (args->numArgs != 0) return;
+			args->result->SetInt(110163);
+		}
+	};
+
+	class SendWidgetUpdate : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetBool(1);
+			UpdateWidgetData();
+		}
+	};
+
+	class SendWidgetSettings : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetBool(1);
+			UpdateWidgetSettings();
+		}
+	};
+
+	class MenuClosedEventSink : public GFxFunctionHandler { //also:onmenuopencloseevent:hudmenu
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetBool(1);
+			//std::string menu = args->args[0].data.string;
+			MSF_MainData::switchData.openedMenu = nullptr;
+		}
+	};
+
+	class MenuOpenedEventSink : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetBool(1);
+			//std::string menu = args->args[0].data.string;
+			//findmenu
+			//MSF_MainData::switchData.openedMenu = nullptr;
+		}
+	};
+
 	// SendBackSelectedAmmo(ammo:Pointer):Boolean;
 	class ReceiveSelectedAmmo : public GFxFunctionHandler {
 	public:
@@ -176,7 +249,7 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 1) return;
-			MSF_MainData::switchData.openedMenu = "";
+			MSF_MainData::switchData.openedMenu = nullptr;
 			if (args->args[0].data.obj)
 				MSF_Base::SwitchToSelectedAmmo(args->args[0].data.obj, args->args[1].data.boolean);
 
@@ -190,9 +263,30 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 2) return;
-			MSF_MainData::switchData.openedMenu = "";
+			MSF_MainData::switchData.openedMenu = nullptr;
 			MSF_Base::SwitchToSelectedMod(args->args[0].data.obj, args->args[1].data.obj);
 
+			args->result->SetBool(true);
+		}
+	};
+
+	class ReceiveWidgetProperties : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetBool(false);
+
+			if (args->numArgs != 3) return;
+			UInt8 type = args->args[1].data.u32 & 0x3;
+			UInt32 version = args->args[2].data.u32;
+			if (type == ModSelectionMenu::kType_Widget && version >= MIN_SUPPORTED_SWF_WIDGET_VERSION)
+				MSF_MainData::widgetMenu = nullptr; // = find args->args[0].data.string in array of Keybind; MSF_MainData::widgetMenu->type = type; MSF_MainData::widgetMenu->version = version;
+			else if ((type == ModSelectionMenu::kType_AmmoMenu && version >= MIN_SUPPORTED_SWF_AMMO_VERSION) || (type == ModSelectionMenu::kType_ModMenu && version >= MIN_SUPPORTED_SWF_MOD_VERSION))
+				version = version; // = find args->args[0].data.string in array of Keybind; MSF_MainData::widgetMenu->type = type; MSF_MainData::widgetMenu->version = version;
+			else
+			{
+				args->result->SetBool(false);
+				return;
+			}
 			args->result->SetBool(true);
 		}
 	};
@@ -252,116 +346,141 @@ namespace MSF_Scaleform
 		dst->SetMember(name, &fxValue);
 	}
 
-	bool UpdateWidget(UInt8 flags)
+	UInt32 GetInterfaceVersion() //ModSelectionMenu* customMenu
 	{
-		Actor* playerActor = *g_player;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(playerActor, 41);
-		if (!msfRoot)
+		IMenu * pHUD = nullptr;
+		static BSFixedString menuName("HUDMenu");
+		if ((*g_ui) != nullptr && (pHUD = (*g_ui)->GetMenu(menuName), pHUD))
+		{
+			GFxMovieRoot * movieRoot = pHUD->movie->movieRoot;
+			if (movieRoot != nullptr)
+			{
+				//GFxValue arrArgs[2];
+				//arrArgs[0].SetUInt(hp);
+				//arrArgs[1].SetUInt(dt);
+				//UInt32 a = arrArgs[0].GetUInt();
+				//UInt32 b = arrArgs[1].GetUInt();
+				_MESSAGE("calling");
+
+				GFxValue vis, ver, verfn;
+				movieRoot->GetVariable(&vis, "root.msf_loader.content.visible");
+				movieRoot->GetVariable(&ver, "root.msf_loader.content.InterfaceVersion");
+				movieRoot->Invoke("root.msf_loader.content.SendInterfaceVersion", &verfn, nullptr, 0);
+				_MESSAGE("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
+
+				//_MESSAGE("res type: %08X", GFxGlobaltest.GetType());
+				//_MESSAGE("res: %08X", GFxGlobaltest.GetInt());
+				//return GFxGlobaltest.GetInt();
+			}
+		}
+		return 0;
+	}
+
+	bool StartWidgetHideCountdown(UInt32 delayTime)
+	{
+		static BSFixedString menuName("MSFwidget");
+		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
+		if (!widgetMenu)
 			return false;
-		GFxValue arrArgs[6];
-		if (!instanceData)
-		{
-			arrArgs[0].SetString("");
-			arrArgs[1].SetString("");
-			arrArgs[2].SetString("");
-			arrArgs[3].SetString("");
-			arrArgs[4].SetInt(0); //muzzle
-			arrArgs[5].SetInt(0); //ammo id
-			
-		}
-		else if (flags == 125)
-		{
-			arrArgs[0].SetString("N/A");
-			arrArgs[1].SetString("N/A");
-			arrArgs[2].SetString("N/A");
-			if (!instanceData->ammo || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowAmmoName))
-				msfRoot->CreateString(&arrArgs[3], "");
-			else
-				msfRoot->CreateString(&arrArgs[3], instanceData->ammo->fullName.name.c_str());
-			arrArgs[4].SetInt(-1); //muzzle
-			arrArgs[5].SetInt(0); //ammo id
-		}
-		else if (flags == 124)
-		{
-			arrArgs[0].SetString("N/A");
-			arrArgs[1].SetString("N/A");
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowFiringMode))
-				msfRoot->CreateString(&arrArgs[2], "");
-			else
-				msfRoot->CreateString(&arrArgs[2], MSF_Data::GetFMString(instanceData).c_str());
-			arrArgs[3].SetString("N/A");
-			arrArgs[4].SetInt(-1); //muzzle
-			arrArgs[5].SetInt(-1); //ammo id
-		}
-		else if (flags == 123)
-		{
-			arrArgs[0].SetString("N/A");
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowScopeData))
-				msfRoot->CreateString(&arrArgs[1], "");
-			else
-				msfRoot->CreateString(&arrArgs[1], MSF_Data::GetScopeString(instanceData).c_str());
-			arrArgs[2].SetString("N/A");
-			arrArgs[3].SetString("N/A");
-			arrArgs[4].SetInt(-1); //muzzle
-			arrArgs[5].SetInt(-1); //ammo id
-		}
-		else if (flags == 122)
-		{
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowMuzzleName))
-				msfRoot->CreateString(&arrArgs[0], "");
-			else
-				msfRoot->CreateString(&arrArgs[0], MSF_Data::GetMuzzleString(instanceData).c_str());
-			arrArgs[1].SetString("N/A");
-			arrArgs[2].SetString("N/A");
-			arrArgs[3].SetString("N/A");
-			arrArgs[4].SetInt(0); //muzzle
-			arrArgs[5].SetInt(-1); //ammo id
-		}
-		else if (flags == 126 || flags == 0)
-		{
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowMuzzleName))
-				msfRoot->CreateString(&arrArgs[0], "");
-			else
-				msfRoot->CreateString(&arrArgs[0], MSF_Data::GetMuzzleString(instanceData).c_str());
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowScopeData))
-				msfRoot->CreateString(&arrArgs[1], "");
-			else
-				msfRoot->CreateString(&arrArgs[1], MSF_Data::GetScopeString(instanceData).c_str());
-			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowFiringMode))
-				msfRoot->CreateString(&arrArgs[2], "");
-			else
-				msfRoot->CreateString(&arrArgs[2], MSF_Data::GetFMString(instanceData).c_str());
-			if (!instanceData->ammo || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowAmmoName))
-				msfRoot->CreateString(&arrArgs[3], "");
-			else
-				msfRoot->CreateString(&arrArgs[3], instanceData->ammo->fullName.name.c_str());
-			arrArgs[4].SetInt(0); //muzzle
-			arrArgs[5].SetInt(0); //ammo id
-		}
-		msfRoot->Invoke("root.msf_loader.widget.updateWidget", nullptr, arrArgs, 6);
+		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
+		if (!movieRoot)
+			return false;
+		GFxValue arrArgs[4]; //obj?
+		arrArgs[0].SetUInt(delayTime);
+		movieRoot->Invoke("root.StartHideCountdown", nullptr, arrArgs, 1);
 		return true;
 	}
 
-	bool ToggleAmmoMenu(std::string path)
+	bool UpdateWidgetSettings()
 	{
-		if (!msfRoot || path == "")
+		static BSFixedString menuName("MSFwidget");
+		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
+		if (!widgetMenu)
 			return false;
-		//check conditions
+		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
+		if (!movieRoot)
+			return false;
+		GFxValue arrArgs[4]; //obj?
+		arrArgs[0].SetUInt(MSF_MainData::MCMSettingFlags);
+		arrArgs[1].SetUInt(0);
+		arrArgs[2].SetUInt(0);
+		arrArgs[3].SetUInt(0);
+		movieRoot->Invoke("root.UpdateWidgetSettings", nullptr, arrArgs, 4);
+		return true;
+	}
 
-		if (MSF_MainData::switchData.openedMenu == path)
+	bool UpdateWidgetData()
+	{
+		Actor* playerActor = *g_player;
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(playerActor, 41);
+		static BSFixedString menuName("MSFwidget");
+		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
+		if (!widgetMenu)
+			return false;
+		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
+		if (!movieRoot)
+			return false;
+		const char* ammoName = "";
+		std::string fmstr = MSF_Data::GetFMString(instanceData);
+		std::string muzzlestr = MSF_Data::GetMuzzleString(instanceData);
+		std::string scopestr = MSF_Data::GetScopeString(instanceData);
+		const char* firingMode = fmstr.c_str();
+		const char* muzzleName = muzzlestr.c_str();
+		const char* scopeName = scopestr.c_str();
+		UInt32 shapeID = 0; //baseAmmoID << 10 + ammoType + muzzleID << 20 + scopeID << 26
+		if (instanceData && instanceData->ammo)
+			ammoName = instanceData->ammo->GetFullName();
+		GFxValue arrArgs[5];
+		arrArgs[0].SetString(ammoName);
+		arrArgs[1].SetString(firingMode);
+		arrArgs[2].SetString(muzzleName);
+		arrArgs[3].SetString(scopeName);
+		arrArgs[4].SetUInt(shapeID);
+		//_MESSAGE("ammo: %s, fm: %s, muzzle: %s, sc: %s", ammoName, firingMode, muzzleName, scopeName);
+		movieRoot->Invoke("root.UpdateWidgetData", nullptr, arrArgs, 5);
+		return true;
+		//out of ammo, full (+1?)
+	}
+
+	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu)
+	{
+		//if (!MSF_MainData::MSFMenuRoot || !selectMenu)
+		//	return false;
+		//check conditions
+		//GFxMovieRoot* menuRoot = MSF_MainData::MSFMenuRoot;
+		
+		static BSFixedString menuName("MSFAmmoMenu");
+		IMenu* ammoMenu = (*g_ui)->GetMenu(menuName);
+		if (!ammoMenu)
+			return false;
+		GFxMovieRoot* menuRoot = ammoMenu->movie->movieRoot;
+		if (!menuRoot)
+			return false;
+
+		//if (MSF_MainData::switchData.openedMenu == selectMenu)
+		//{
+		//	std::string closePath = "root." + selectMenu->scaleformID + "_loader.content.close";
+		//	GFxValue result;
+		//	menuRoot->Invoke(closePath.c_str(), &result, nullptr, 0); //"root.msf_loader.ammoMenu.close"
+		//	if (result.GetBool())
+		//	{
+		//		MSF_MainData::switchData.openedMenu = nullptr;
+		//		return true;
+		//	}
+		//	return false;
+		//}
+		//else if (MSF_MainData::switchData.openedMenu != nullptr)
+		//	return false;
+
+		if (!(*g_ui)->IsMenuOpen(menuName))
 		{
-			std::string closePath = path + ".close";
-			GFxValue result;
-			msfRoot->Invoke(closePath.c_str(), &result, nullptr, 0); //"root.msf_loader.ammoMenu.close"
-			if (result.GetBool())
-			{
-				MSF_MainData::switchData.openedMenu = "";
-				return true;
-			}
-			return false;
+			MSFAmmoMenu::CloseMenu();
+			return true;
 		}
-		else if (MSF_MainData::switchData.openedMenu != "")
-			return false;
+		else if (!(*g_ui)->IsMenuOpen(BSFixedString("MSFModMenu")))
+		{
+			MSFModMenu::CloseMenu();
+		}
 
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
@@ -372,7 +491,7 @@ namespace MSF_Scaleform
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 		GFxValue ammoData;
-		msfRoot->CreateArray(&ammoData);
+		menuRoot->CreateArray(&ammoData);
 		if (baseAmmo)
 		{
 			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
@@ -380,30 +499,29 @@ namespace MSF_Scaleform
 			{
 				if (itAmmoData->baseAmmoData.ammo == baseAmmo)
 				{
-					GFxValue BammoArg;
-					msfRoot->CreateObject(&BammoArg);
-					RegisterString(&BammoArg, msfRoot, "ammoName", baseAmmo->fullName.name.c_str());
-					RegisterObject(&BammoArg, msfRoot, "ammoObj", &itAmmoData->baseAmmoData);
-					RegisterBool(&BammoArg, msfRoot, "isEquipped", instanceData->ammo == baseAmmo);
-					ammoData.PushBack(&BammoArg);
+					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
+					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
+					{
+						GFxValue BammoArg;
+						menuRoot->CreateObject(&BammoArg);
+						RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
+						RegisterObject(&BammoArg, menuRoot, "ammoObj", &itAmmoData->baseAmmoData);
+						RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
+						RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
+						ammoData.PushBack(&BammoArg);
+					}
 					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 					{
-						for (UInt32 i1 = 0; i1 < (*g_player)->inventoryList->items.count; i1++)
+						UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
+						if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
 						{
-							BGSInventoryItem inventoryItem;
-							(*g_player)->inventoryList->items.GetNthItem(i1, inventoryItem);
-							TESAmmo* ammo = (TESAmmo*)inventoryItem.form;
-							if (ammo && itAmmoMod->ammo == ammo)
-							{
-								GFxValue ammoArg;
-								msfRoot->CreateObject(&ammoArg);
-								RegisterString(&ammoArg, msfRoot, "ammoName", ammo->fullName.name.c_str());
-								RegisterObject(&ammoArg, msfRoot, "ammoObj", itAmmoMod._Ptr);
-								RegisterBool(&ammoArg, msfRoot, "isEquipped", instanceData->ammo == ammo);
-								RegisterInt(&ammoArg, msfRoot, "ammoCount", inventoryItem.stack->count);
-								ammoData.PushBack(&ammoArg);
-								break;
-							}
+							GFxValue ammoArg;
+							menuRoot->CreateObject(&ammoArg);
+							RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
+							RegisterObject(&ammoArg, menuRoot, "ammoObj", itAmmoMod._Ptr);
+							RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo);
+							RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
+							ammoData.PushBack(&ammoArg);
 						}
 					}
 					break;
@@ -414,18 +532,33 @@ namespace MSF_Scaleform
 			return false;
 
 		args[0].SetMember("ammoData", &ammoData);
-		std::string openPath = path + ".open";
-		MSF_MainData::switchData.openedMenu = path;
-		if (msfRoot->Invoke(openPath.c_str(), nullptr, args, 1))
+		//std::string openPath = "root." + selectMenu->scaleformID + "_loader.content.open";
+		//MSF_MainData::switchData.openedMenu = selectMenu;
+		MSFAmmoMenu::OpenMenu();
+		std::string openPath = "root.ReceiveAmmoData";
+		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 1))
 			return true;
-		MSF_MainData::switchData.openedMenu = "";
+		MSF_MainData::switchData.openedMenu = nullptr;
 		return false;
 	}
 
-	bool ToggleModMenu(std::string path, std::vector<ModAssociationData*>* modAssociations)
+	bool ToggleModMenu(ModSelectionMenu* selectMenu, std::vector<ModAssociationData*>* modAssociations)
 	{
-		if (!modAssociations || path == "")
+		//if (!MSF_MainData::MSFMenuRoot || !selectMenu)
+		//	return false;
+		if (!modAssociations)
 			return false;
+		//check conditions
+		//GFxMovieRoot* menuRoot = MSF_MainData::MSFMenuRoot
+
+		static BSFixedString menuName("MSFModMenu");
+		IMenu* ammoMenu = (*g_ui)->GetMenu(menuName);
+		if (!ammoMenu)
+			return false;
+		GFxMovieRoot* menuRoot = ammoMenu->movie->movieRoot;
+		if (!menuRoot)
+			return false;
+
 		BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
 		if (!modData)
 			return false;
@@ -433,24 +566,30 @@ namespace MSF_Scaleform
 		if (!data || !data->forms)
 			return false;
 
-		if (!msfRoot)
-			return false;
-		//check conditions
-		
-		if (MSF_MainData::switchData.openedMenu == path)
+		//if (MSF_MainData::switchData.openedMenu == selectMenu)
+		//{
+		//	std::string closePath = "root." + selectMenu->scaleformID + "_loader.content.close";
+		//	GFxValue result;
+		//	menuRoot->Invoke(closePath.c_str(), &result, nullptr, 0);
+		//	if (result.GetBool())
+		//	{
+		//		MSF_MainData::switchData.openedMenu = nullptr;
+		//		return true;
+		//	}
+		//	return false;
+		//}
+		//else if (MSF_MainData::switchData.openedMenu != nullptr)
+		//	return false;
+
+		if (!(*g_ui)->IsMenuOpen(menuName))
 		{
-			std::string closePath = path + ".close";
-			GFxValue result;
-			msfRoot->Invoke(closePath.c_str(), &result, nullptr, 0);
-			if (result.GetBool())
-			{
-				MSF_MainData::switchData.openedMenu = "";
-				return true;
-			}
-			return false;
+			MSFModMenu::CloseMenu();
+			return true;
 		}
-		else if (MSF_MainData::switchData.openedMenu != "")
-			return false;
+		else if (!(*g_ui)->IsMenuOpen(BSFixedString("MSFAmmoMenu")))
+		{
+			MSFAmmoMenu::CloseMenu();
+		}
 
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
@@ -458,9 +597,9 @@ namespace MSF_Scaleform
 
 		GFxValue args[2];
 		GFxValue modPtrs;
-		msfRoot->CreateArray(&modPtrs);
+		menuRoot->CreateArray(&modPtrs);
 		GFxValue bNull;
-		msfRoot->CreateObject(&bNull);
+		menuRoot->CreateObject(&bNull);
 		MSF_MainData::switchData.SwitchFlags &= ~(ModAssociationData::mBitTransferMask);
 		MSF_MainData::switchData.AnimToPlay1stP = nullptr;
 		MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
@@ -480,12 +619,12 @@ namespace MSF_Scaleform
 							break;
 					}
 					GFxValue modArg;
-					msfRoot->CreateObject(&modArg);
-					RegisterString(&modArg, msfRoot, "modName", modPair->modPair.functionMod->fullName.name.c_str());
-					RegisterObject(&modArg, msfRoot, "modObj", modPair->modPair.functionMod);
-					RegisterBool(&modArg, msfRoot, "isEquipped", Utilities::HasObjectMod(modData, modPair->modPair.functionMod));
+					menuRoot->CreateObject(&modArg);
+					RegisterString(&modArg, menuRoot, "modName", modPair->modPair.functionMod->fullName.name.c_str());
+					RegisterObject(&modArg, menuRoot, "modObj", modPair->modPair.functionMod);
+					RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, modPair->modPair.functionMod));
 					modPtrs.PushBack(&modArg);
-					RegisterBool(&bNull, msfRoot, "bNullMod", true);
+					RegisterBool(&bNull, menuRoot, "bNullMod", true);
 					MSF_MainData::switchData.SwitchFlags |= (modPair->flags & ModAssociationData::mBitTransferMask);
 					MSF_MainData::switchData.AnimToPlay1stP = modPair->animIdle_1stP;
 					MSF_MainData::switchData.AnimToPlay3rdP = modPair->animIdle_3rdP;
@@ -506,13 +645,13 @@ namespace MSF_Scaleform
 								continue;
 						}
 						GFxValue modArg;
-						msfRoot->CreateObject(&modArg);
-						RegisterString(&modArg, msfRoot, "modName", (*itMod)->fullName.name.c_str());
-						RegisterObject(&modArg, msfRoot, "modObj", *itMod);
-						RegisterBool(&modArg, msfRoot, "isEquipped", Utilities::HasObjectMod(modData, (*itMod)));
+						menuRoot->CreateObject(&modArg);
+						RegisterString(&modArg, menuRoot, "modName", (*itMod)->fullName.name.c_str());
+						RegisterObject(&modArg, menuRoot, "modObj", *itMod);
+						RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, (*itMod)));
 						modPtrs.PushBack(&modArg);
 					}
-					RegisterBool(&bNull, msfRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
+					RegisterBool(&bNull, menuRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
 					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
 					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
 					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
@@ -535,16 +674,16 @@ namespace MSF_Scaleform
 						}
 						found = true;
 						GFxValue modArg;
-						msfRoot->CreateObject(&modArg);
-						RegisterString(&modArg, msfRoot, "modName", itMod->functionMod->fullName.name.c_str());
-						RegisterObject(&modArg, msfRoot, "modObj", itMod->functionMod);
-						RegisterBool(&modArg, msfRoot, "isEquipped", Utilities::HasObjectMod(modData, itMod->functionMod));
+						menuRoot->CreateObject(&modArg);
+						RegisterString(&modArg, menuRoot, "modName", itMod->functionMod->fullName.name.c_str());
+						RegisterObject(&modArg, menuRoot, "modObj", itMod->functionMod);
+						RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, itMod->functionMod));
 						modPtrs.PushBack(&modArg);
 					}
 				}
 				if (found)
 				{
-					RegisterBool(&bNull, msfRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
+					RegisterBool(&bNull, menuRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
 					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
 					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
 					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
@@ -565,11 +704,13 @@ namespace MSF_Scaleform
 		
 		args[0].SetMember("modPtrs", &modPtrs);
 		args[1].SetMember("canHaveNullMod", &modPtrs);
-		std::string openPath = path + ".open";
-		MSF_MainData::switchData.openedMenu = path;
-		if (msfRoot->Invoke(openPath.c_str(), nullptr, args, 2))
+		//std::string openPath = "root." + selectMenu->scaleformID + "_loader.content.open";
+		//MSF_MainData::switchData.openedMenu = selectMenu;
+		MSFModMenu::OpenMenu();
+		std::string openPath = "root.ReceiveModData";
+		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 2))
 			return true;
-		MSF_MainData::switchData.openedMenu = "";
+		MSF_MainData::switchData.openedMenu = nullptr;
 		MSF_MainData::switchData.ClearData();
 		return false;
 	}
@@ -619,48 +760,87 @@ namespace MSF_Scaleform
 
 	void RegisterMSFScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot)
 	{
-		//getversion
+		RegisterFunction<SendF4SEVersion>(codeObj, movieRoot, "GetF4SEVersion");
+		RegisterFunction<SendGameVersion>(codeObj, movieRoot, "GetGameVersion");
+		RegisterFunction<SendMSFVersion>(codeObj, movieRoot, "GetMSFVersion");
+		RegisterFunction<SendWidgetUpdate>(codeObj, movieRoot, "RequestWidgetUpdate");
+		RegisterFunction<SendWidgetSettings>(codeObj, movieRoot, "RequestWidgetSettings");
+		RegisterFunction<ReceiveWidgetProperties>(codeObj, movieRoot, "SendInterfaceProperties");
+		RegisterFunction<MenuClosedEventSink>(codeObj, movieRoot, "MenuClosedEventDispatcher");
+		RegisterFunction<MenuOpenedEventSink>(codeObj, movieRoot, "MenuOpenedEventDispatcher");
 		RegisterFunction<ReceiveSelectedAmmo>(codeObj, movieRoot, "SendBackSelectedAmmo");
 		RegisterFunction<ReceiveSelectedMod>(codeObj, movieRoot, "SendBackSelectedMod");
 	}
 
-	bool RegisterMSFScaleform(GFxMovieView * view, GFxValue * f4se_root)
+	bool RegisterScaleformCallback(GFxMovieView * view, GFxValue * f4se_root)
 	{
-		msfRoot = view->movieRoot;
+		GFxMovieRoot* movieRoot = view->movieRoot;
 
 		GFxValue currentSWFPath;
 		const char* currentSWFPathString = nullptr;
 
-		if (msfRoot->GetVariable(&currentSWFPath, "root.loaderInfo.url")) {
+		if (movieRoot->GetVariable(&currentSWFPath, "root.loaderInfo.url")) {
 			currentSWFPathString = currentSWFPath.GetString();
-		}
-		else {
-			_MESSAGE("WARNING: MSF Scaleform registration failed.");
 		}
 
 		// Look for the menu that we want to inject into.
 		if (strcmp(currentSWFPathString, "Interface/HUDMenu.swf") == 0) {
-			GFxValue root; msfRoot->GetVariable(&root, "root");
+			GFxValue root; movieRoot->GetVariable(&root, "root");
+			MSF_MainData::MSFMenuRoot = movieRoot;
 
-			//for
 			// Register native code object
-			GFxValue msf; msfRoot->CreateObject(&msf);
+			GFxValue msf; movieRoot->CreateObject(&msf);
 			root.SetMember("msf", &msf);
-			RegisterMSFScaleformFuncs(&msf, msfRoot);
+			RegisterMSFScaleformFuncs(&msf, movieRoot);
+			_MESSAGE("MSF code object created in HUD menu.");
 
-			// Inject MCM menu
+			//for (std::vector<KeybindData>::iterator it = MSF_MainData::keybinds.begin(); it != MSF_MainData::keybinds.end(); it++)
+			//{
+			//	if (it->selectMenu)
+			//	{
+			//		// Inject swf
+			//		GFxValue loader, urlRequest;
+			//		movieRoot->CreateObject(&loader, "flash.display.Loader");
+			//		movieRoot->CreateObject(&urlRequest, "flash.net.URLRequest", &GFxValue(it->selectMenu->swfFilename.c_str()), 1);
+
+			//		std::string loadstring = it->selectMenu->scaleformID + "_loader";
+			//		root.SetMember(loadstring.c_str(), &loader);
+			//		bool injectionSuccess = movieRoot->Invoke("root.msf_loader.load", nullptr, &urlRequest, 1);
+
+			//		bool addSuccess = movieRoot->Invoke("root.addChild", nullptr, &loader, 1);
+
+			//		if (!injectionSuccess || !addSuccess) {
+			//			_MESSAGE("WARNING: MSF Scaleform injection failed for %s.", it->selectMenu->scaleformID.c_str());
+			//		}
+			//	}
+			//}
+
+			// Inject swf
 			GFxValue loader, urlRequest;
-			msfRoot->CreateObject(&loader, "flash.display.Loader");
-			msfRoot->CreateObject(&urlRequest, "flash.net.URLRequest", &GFxValue("anagy_ModSwitchFramework.swf"), 1);
+			movieRoot->CreateObject(&loader, "flash.display.Loader");
+			movieRoot->CreateObject(&urlRequest, "flash.net.URLRequest", &GFxValue("MSFwidget.swf"), 1);
 
 			root.SetMember("msf_loader", &loader);
-			bool injectionSuccess = msfRoot->Invoke("root.msf_loader.load", nullptr, &urlRequest, 1);
+			bool injectionSuccess = movieRoot->Invoke("root.msf_loader.load", nullptr, &urlRequest, 1);
 
-			msfRoot->Invoke("root.Menu_mc.addChild", nullptr, &loader, 1);
+			bool addSuccess = movieRoot->Invoke("root.addChild", nullptr, &loader, 1);
 
-			if (!injectionSuccess) {
+			if (!injectionSuccess || !addSuccess) {
 				_MESSAGE("WARNING: MSF Scaleform injection failed.");
 			}
+
+
+			/*GFxValue msf_loader; root.GetMember("msf_loader", &msf_loader);
+			GFxValue msfmsf; root.GetMember("msf", &msfmsf);
+			_MESSAGE("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
+			GFxValue vis, ver, verfn;
+			movieRoot->GetVariable(&vis, "root.msf_loader.content.visible");
+			movieRoot->GetVariable(&ver, "root.msf_loader.content.InterfaceVersion");
+			movieRoot->Invoke("root.msf_loader.content.SendInterfaceVersion", &verfn, nullptr, 0);
+			_MESSAGE("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
+			//GFxValue msf_loader_content; msf_loader.GetMember("content", &msf_loader_content);
+			//_MESSAGE("UpdateWidgetData: %02X, InterfaceVersion: %02X, MSFwidget: %02X", msf_loader_content.HasMember("UpdateWidgetData"), msf_loader_content.HasMember("InterfaceVersion"), msf_loader_content.HasMember("MSFwidget"));
+			*/
 		}
 
 		return true;

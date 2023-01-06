@@ -362,9 +362,9 @@ namespace MSF_Papyrus
 	}
 
 	//=====Version=====
-	float GetVersion(StaticFunctionTag* base)
+	UInt32 GetVersion(StaticFunctionTag* base)
 	{
-		return PLUGIN_VERSION;
+		return MSF_VERSION;
 	}
 }
 
@@ -415,7 +415,7 @@ void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 		new NativeFunction2 <StaticFunctionTag, TESAmmo*, Actor*, UInt32>("EquippedItemHasMod", SCRIPTNAME, GetEquippedBaseCaliber, vm));
 
 	vm->RegisterFunction(
-		new NativeFunction0 <StaticFunctionTag, float>("GetVersion", SCRIPTNAME, GetVersion, vm));
+		new NativeFunction0 <StaticFunctionTag, UInt32>("GetVersion", SCRIPTNAME, GetVersion, vm));
 
 
 	_MESSAGE("Native functions registered from MSF_Papyrus.cpp");

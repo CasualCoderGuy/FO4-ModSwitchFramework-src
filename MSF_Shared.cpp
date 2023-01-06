@@ -12,6 +12,7 @@ RelocAddr <_PlayIdle2> PlayIdleInternal2(0x13864C0);
 RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0 
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
+//RelocAddr <_HUDAmmoCounter__UpdateComponent> HUDAmmoCounter__UpdateComponent(0x000A0E580);
 
 RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
 RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
@@ -288,6 +289,31 @@ namespace Utilities
 			}
 		}
 		return nullptr;
+	}
+
+	std::vector<BGSMod::Attachment::Mod*> FindModsByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword)
+	{
+		std::vector<BGSMod::Attachment::Mod*> foundMods;
+		if (!modData)
+			return foundMods;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return foundMods;
+		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			for (UInt32 i4 = 0; i4 < objectMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
+			{
+				BGSMod::Container::Data * data = &objectMod->modContainer.data[i4];
+				if (data->target == 31 && data->value.form)
+				{
+					BGSKeyword* modKeyword = (BGSKeyword*)data->value.form;
+					if (modKeyword == keyword)
+						foundMods.push_back(objectMod);
+				}
+			}
+		}
+		return foundMods;
 	}
 
 	BGSMod::Attachment::Mod* GetFirstModWithPriority(BGSObjectInstanceExtra* modData, UInt8 priority)

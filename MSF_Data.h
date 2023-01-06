@@ -8,7 +8,7 @@ public:
 	{
 		TESAmmo* ammo;
 		BGSMod::Attachment::Mod* mod;
-		UInt8 ammoID;
+		UInt16 ammoID;
 		float spawnChance;
 	};
 	AmmoMod baseAmmoData;
@@ -28,7 +28,8 @@ public:
 	};
 	enum
 	{
-		bCanHaveNullMod = 0x0001,
+		bRequireAPmod = 0x0001,
+		bCanHaveNullMod = 0x0002,
 		bCanToggleSingle = 0x0004,
 		bCanToggleSingle_SkipFirst = 0x0008,
 		bThreadSafe = 0x0100,
@@ -36,7 +37,7 @@ public:
 		bRequireLooseMod = 0x2000,
 		bUpdateAnimGraph = 0x4000,
 		bIgnoreAnimations = 0x8000,
-		mBitTransferMask = 0xF000
+		mBitTransferMask = 0xF001
 	};
 	UInt16 flags;
 	BGSKeyword* funcKeyword; //!!!!
@@ -64,58 +65,6 @@ public:
 	MultipleMod() { type = 0x3; }
 	BGSMod::Attachment::Mod* parentMod;
 	std::vector<BGSMod::Attachment::Mod*> functionMods;
-};
-
-LPCRITICAL_SECTION switchCriticalSection;
-class ModSwitchManager
-{
-	UInt16 SwitchState;
-	SwitchData* threadUnsafeData;
-	std::string openedMenu;
-	TESObjectWEAP::InstanceData* equippedInstanceData;
-};
-
-class SwitchData
-{
-public:
-	enum
-	{
-		bNeedInit = 0x0001,
-		bSwitchingInProgress = 0x0002,
-		bDrawNeeded = 0x0004,
-		bDrawInProgress = 0x0008,
-		bReloadNeeded = 0x0010,
-		bReloadInProgress = 0x0020,
-		bReloadNotFinished = 0x0040,
-		bAnimNeeded = 0x0100,
-		bAnimInProgress = 0x0200,
-		bAnimNotFinished = 0x0400,
-		bDrawEnabled = 0x1000,
-		bSetLooseMods = 0x2000,
-		bUpdateAnimGraph = 0x4000,
-		bIgnoreAnimations = 0x8000
-	};
-	UInt16 SwitchFlags;
-	BGSMod::Attachment::Mod* ModToAttach;
-	BGSMod::Attachment::Mod* ModToRemove;
-	TESObjectMISC* LooseModToRemove;
-	TESObjectMISC* LooseModToAdd;
-	TESIdleForm* AnimToPlay1stP;
-	TESIdleForm* AnimToPlay3rdP;
-	TESObjectWEAP::InstanceData* equippedInstanceData;
-	std::string openedMenu;
-	void ClearData()
-	{
-		EnterCriticalSection(switchCriticalSection);
-		SwitchFlags = 0;
-		ModToAttach = nullptr;
-		ModToRemove = nullptr;
-		LooseModToRemove = nullptr;
-		LooseModToAdd = nullptr;
-		AnimToPlay1stP = nullptr;
-		AnimToPlay3rdP = nullptr;
-		LeaveCriticalSection(switchCriticalSection);
-	}
 };
 
 class ReloadAnimData //OR make class OR store as formID
@@ -164,12 +113,31 @@ public:
 	std::string displayString;
 };
 
-//class HUDMuzzleData
-//{
-//public:
-//	BGSKeyword* muzzleKeyword;
-//	std::string displayString;
-//};
+class HUDMuzzleData
+{
+public:
+	BGSKeyword* muzzleKeyword;
+	std::string displayString;
+};
+
+class ModSelectionMenu
+{
+public:
+	std::string scaleformID;
+	std::string swfFilename;
+	UInt32 type;
+	UInt32 version;
+	enum
+	{
+		kType_Unspecified = 0,
+		kType_AmmoMenu = 1,
+		kType_ModMenu = 2,
+		kType_Widget = 3
+	};
+	ModSelectionMenu(std::string id, std::string swf){
+		scaleformID = id; swfFilename = swf; type = 0; version = 0;
+	};
+};
 
 class KeybindData
 {
@@ -177,15 +145,19 @@ public:
 	enum
 	{
 		//lower 4 bits: Nth
+		bCancel = 0x10,
 		bToggle = 0x20,
 		bHUDselection = 0x40,
-		bIsAmmo = 0x80
+		bIsAmmo = 0x80,
+		mNumMask = 0x0F
 	};
 	std::string functionID;
 	UInt8 type;
 	UInt16 keyCode;
 	UInt8 modifiers;
-	std::string menuScriptPath;
+	ModSelectionMenu* selectMenu;
+	//std::string swfPath;
+	//std::string menuScriptPath;
 	std::vector<ModAssociationData*> modAssociations;
 };
 
@@ -196,13 +168,69 @@ public:
 	float value;
 };
 
+class SwitchData
+{
+public:
+	//SwitchData() { InitializeCriticalSection(switchCriticalSection); }
+	enum
+	{
+		bNeedInit = 0x0001,
+		bSwitchingInProgress = 0x0002,
+		bQueuedSwitch = 0x0004,
+		bDrawNeeded = 0x0080,
+		bDrawInProgress = 0x0800,
+		bReloadNeeded = 0x0010,
+		bReloadInProgress = 0x0020,
+		bReloadNotFinished = 0x0040,
+		bAnimNeeded = 0x0100,
+		bAnimInProgress = 0x0200,
+		bAnimNotFinished = 0x0400,
+		bDrawEnabled = 0x1000,
+		bSetLooseMods = 0x2000,
+		bUpdateAnimGraph = 0x4000,
+		bIgnoreAnimations = 0x8000
+	};
+	LPCRITICAL_SECTION switchCriticalSection;
+	UInt16 SwitchFlags;
+	BGSMod::Attachment::Mod* ModToAttach;
+	BGSMod::Attachment::Mod* ModToRemove;
+	TESObjectMISC* LooseModToRemove;
+	TESObjectMISC* LooseModToAdd;
+	TESIdleForm* AnimToPlay1stP;
+	TESIdleForm* AnimToPlay3rdP;
+	TESObjectWEAP::InstanceData* equippedInstanceData;
+	ModSelectionMenu* openedMenu;
+	void ClearData()
+	{
+		//EnterCriticalSection(switchCriticalSection);
+		SwitchFlags = 0;
+		ModToAttach = nullptr;
+		ModToRemove = nullptr;
+		LooseModToRemove = nullptr;
+		LooseModToAdd = nullptr;
+		AnimToPlay1stP = nullptr;
+		AnimToPlay3rdP = nullptr;
+		//LeaveCriticalSection(switchCriticalSection);
+	}
+};
 
+class ModSwitchManager
+{
+	UInt16 SwitchState;
+	SwitchData* threadUnsafeData;
+	std::string openedMenu;
+	TESObjectWEAP::InstanceData* equippedInstanceData;
+};
 
 class MSF_MainData
 {
 public:
 	static bool IsInitialized;
 	static RandomNumber rng;
+	static int iCheckDelayMS;
+	static GFxMovieRoot* MSFMenuRoot;
+	static ModSelectionMenu* widgetMenu;
+	static int numberOfOpenedMenus;
 
 	static SwitchData switchData;
 	static std::vector<BurstMode> burstMode;
@@ -218,10 +246,11 @@ public:
 
 	static std::vector<HUDFiringModeData> fmDisplayData;
 	static std::vector<HUDScopeData> scopeDisplayData;
-	//static std::vector<HUDMuzzleData> muzzleDisplayData;
+	static std::vector<HUDMuzzleData> muzzleDisplayData;
 
 	//Mandatory Data, filled during mod initialization
 	static BGSKeyword* hasSwitchedAmmoKW;
+	static BGSKeyword* hasSwitchedSecAmmoKW;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
@@ -246,7 +275,7 @@ public:
 		bReloadEnabled = 0x0100,
 		bDrawEnabled = 0x0200,
 		bCustomAnimEnabled = 0x0400,
-		bRequireAmmoToSwitch = 0x1000,
+		bRequireAmmoToSwitch = 0x0800,
 		bWidgetAlwaysVisible = 0x0001,
 		bShowAmmoIcon = 0x0002,
 		bShowMuzzleIcon = 0x0004,
@@ -282,5 +311,4 @@ namespace MSF_Data
 	std::string GetScopeString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetMuzzleString(TESObjectWEAP::InstanceData* instanceData);
 	KeybindData* GetKeyFunctionID(UInt16 keyCode, UInt8 modifiers);
-
 }

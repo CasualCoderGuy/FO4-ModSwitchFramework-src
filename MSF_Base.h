@@ -10,14 +10,13 @@ namespace MSF_Base
 	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove);
 	bool ToggleModHotkey(std::vector<ModAssociationData*>* modAssociations);
 	bool SwitchModHotkey(UInt8 key, std::vector<ModAssociationData*>* modAssociations);
-	bool HandlePendingAnimations();
+	bool HandlePendingAnimations(bool bDoQueueSwitch = false);
 	bool InitWeapon();
 	bool SwitchMod();
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modAmmoCount, bool updateAnimGraph);
 	bool ReevalModdedWeapon(TESObjectWEAP* weapon);
+	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod);
 	void SpawnRandomMods(TESObjectCELL* cell);
-	void CreateRandomWeaponHealth(TESObjectCELL* cell);
-	void DamageEquippedWeapon(Actor* actor);
 
 	bool ReloadWeapon();
 	bool DrawWeapon();

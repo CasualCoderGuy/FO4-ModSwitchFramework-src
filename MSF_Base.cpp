@@ -40,12 +40,13 @@ namespace MSF_Base
 
 		if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled || (*g_player)->actorState.IsWeaponDrawn())
 		{
-			MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadNeeded); //| SwitchData::bDrawInProgress
+			MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNeeded);
 			if (!MSF_Base::DrawWeapon())
 			{
+				MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bDrawInProgress | SwitchData::bReloadNeeded);
 				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 				{
-					MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress); // | SwitchData::bReloadInProgress | SwitchData::bReloadNotFinished
+					MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 					MSF_Base::ReloadWeapon();
 					return true;
 				}
@@ -112,6 +113,14 @@ namespace MSF_Base
 			if (!MSF_Base::HandlePendingAnimations())
 				return false;
 		}
+		if (SwitchData::bNeedInit)
+		{
+			if (!MSF_Base::InitWeapon())
+			{
+				MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bNeedInit;
+				return false;
+			}
+		}
 		MSF_MainData::switchData.ModToAttach = reinterpret_cast<BGSMod::Attachment::Mod*>(modToAttach);
 		MSF_MainData::switchData.ModToRemove = reinterpret_cast<BGSMod::Attachment::Mod*>(modToRemove);
 		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bSetLooseMods)
@@ -136,9 +145,15 @@ namespace MSF_Base
 			MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
 			if (!MSF_Base::DrawWeapon())
 			{
-				MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
-				if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled) && MSF_Base::PlayAnim())
-					return true;
+				MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
+				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)
+				{
+					MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress); // | SwitchData::bAnimNotFinished
+					if (MSF_Base::PlayAnim())
+						return true;
+					else
+						MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
+				}
 			}
 			else
 				return true;
@@ -152,12 +167,25 @@ namespace MSF_Base
 	//FROM HOTKEY:
 	bool ToggleModHotkey(std::vector<ModAssociationData*>* modAssociations)
 	{
+		_MESSAGE("swflags: %04X", MSF_MainData::switchData.SwitchFlags);
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
 		Actor* playerActor = *g_player;
 		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(playerActor, 41);
 		if (MSF_Data::GetNextMod(eqStack, modAssociations))
 		{
+			if (SwitchData::bNeedInit)
+			{
+				if (!MSF_Base::InitWeapon())
+				{
+					MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bNeedInit;
+					return false;
+				}
+			}
+			if (MSF_MainData::switchData.ModToAttach)
+				_MESSAGE("mod: %08X", MSF_MainData::switchData.ModToAttach->formID);
+			if (MSF_MainData::switchData.ModToRemove)
+				_MESSAGE("mod: %08X", MSF_MainData::switchData.ModToRemove->formID);
 			if (!(MSF_MainData::switchData.SwitchFlags & SwitchData::bIgnoreAnimations))
 			{
 				if (!MSF_Base::HandlePendingAnimations())
@@ -168,9 +196,15 @@ namespace MSF_Base
 				MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
 				if (!MSF_Base::DrawWeapon())
 				{
-					MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
-					if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled) && MSF_Base::PlayAnim())
-						return true;
+					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)
+					{
+						MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress); // | SwitchData::bAnimNotFinished
+						if (MSF_Base::PlayAnim())
+							return true;
+						else
+							MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
+					}
 				}
 				else
 					return true;
@@ -189,6 +223,14 @@ namespace MSF_Base
 			return false;
 		if (MSF_Data::GetNthMod(key, modAssociations))
 		{
+			if (SwitchData::bNeedInit)
+			{
+				if (!MSF_Base::InitWeapon())
+				{
+					MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bNeedInit;
+					return false;
+				}
+			}
 			if (!(MSF_MainData::switchData.SwitchFlags & SwitchData::bIgnoreAnimations))
 			{
 				if (!MSF_Base::HandlePendingAnimations())
@@ -199,9 +241,15 @@ namespace MSF_Base
 				MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
 				if (!MSF_Base::DrawWeapon())
 				{
-					MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
-					if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled) && MSF_Base::PlayAnim())
-						return true;
+					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)
+					{
+						MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress); // | SwitchData::bAnimNotFinished
+						if (MSF_Base::PlayAnim())
+							return true;
+						else
+							MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
+					}
 				}
 				else
 					return true;
@@ -214,22 +262,17 @@ namespace MSF_Base
 		return false;
 	}
 
-	bool HandlePendingAnimations() //delay!
+	bool HandlePendingAnimations(bool bDoQueueSwitch) //doqueueswitch; delay(not here, at anim)!
 	{
 		Actor* playerActor = *g_player;
-		if (playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing)) // | ActorStateFlags08::kActorState_Sprint
+		if ((playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing)) || // | ActorStateFlags08::kActorState_Sprint
+			(playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Reloading | ActorStateFlags0C::kWeaponState_Fire | ActorStateFlags0C::kWeaponState_Sheathing)) || // | ActorStateFlags0C::kWeaponState_Lowered | ActorStateFlags0C::kWeaponState_Aim
+			(!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && (playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Draw)))
 		{
-			MSF_MainData::switchData.ClearData();
-			return false;
-		}
-		if (playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Reloading | ActorStateFlags0C::kWeaponState_Fire | ActorStateFlags0C::kWeaponState_Sheathing)) // | ActorStateFlags0C::kWeaponState_Lowered | ActorStateFlags0C::kWeaponState_Aim
-		{
-			MSF_MainData::switchData.ClearData();
-			return false;
-		}
-		if (!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && (playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Draw))
-		{
-			MSF_MainData::switchData.ClearData();
+			if (!bDoQueueSwitch)
+				MSF_MainData::switchData.ClearData();
+			else
+				MSF_MainData::switchData.SwitchFlags |= MSF_MainData::switchData.bQueuedSwitch;
 			return false;
 		}
 		return true;
@@ -275,6 +318,7 @@ namespace MSF_Base
 				bUpdateAnimGraph = true;
 			if (!AttachModToEquippedWeapon(playerActor, modToRemove, false, 2, bUpdateAnimGraph))
 				return false;
+			ReevalSwitchedWeapon(playerActor, modToRemove);
 			if (looseModToAdd)
 				Utilities::AddItem(playerActor, looseModToAdd, 1, true);
 		}
@@ -287,12 +331,13 @@ namespace MSF_Base
 			if (looseModToRemove)
 				Utilities::RemoveItem(playerActor, looseModToRemove, 1, true);
 		}
-		//MSF_Scaleform::UpdateWidget(priority);
+		MSF_Scaleform::UpdateWidgetData();
 		return true;
 	}
 
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modLoadedAmmoCount, bool updateAnimGraph)
 	{
+		_MESSAGE("attach");
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(actor, 41);
 		if (!stack)
 			return false;
@@ -314,7 +359,7 @@ namespace MSF_Base
 		if (!item)
 			return false;
 
-
+		_MESSAGE("AcheckOK");
 		EquipWeaponData* eqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData->equippedData;
 		UInt64 loadedAmmoCount = eqData->loadedAmmoCount;
 		TESAmmo* ammoType = eqData->ammo;
@@ -410,9 +455,6 @@ namespace MSF_Base
 			for (BGSInventoryItem::Stack* stack = item->stack; stack; stack = stack->next)
 			{
 				BGSObjectInstanceExtra * objectModData = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-				auto data = objectModData->data;
-				if (!data || !data->forms)
-					continue;
 				ExtraInstanceData* extraInstance = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 				TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstance->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 				if (!instanceData)
@@ -420,6 +462,8 @@ namespace MSF_Base
 				if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::hasSwitchedAmmoKW))
 				{
 					BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
+					if (!mod)
+						continue;
 					TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 					bool found = false;
 					for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
@@ -463,6 +507,60 @@ namespace MSF_Base
 		return true;
 	}
 
+	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod)
+	{
+		if (!changedMod)
+			return false;
+		bool doCheck = false;
+		for (UInt32 i4 = 0; i4 < changedMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
+		{
+			BGSMod::Container::Data * data = &changedMod->modContainer.data[i4];
+			if (data->target == 61 && data->value.form && data->op == 128)
+			{
+				doCheck = true;
+			}
+		}
+		if (!doCheck)
+			return true;
+
+		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(owner, 41);
+		if (!stack)
+			return false;
+		BGSObjectInstanceExtra * objectModData = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+		ExtraInstanceData* extraInstance = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		if (!extraInstance)
+			return false;
+		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstance->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		if (!instanceData)
+			return false;
+		if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::hasSwitchedAmmoKW))
+		{
+			BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
+			if (!mod)
+				return false;
+			TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+			bool found = false;
+			for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+			{
+				if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+				{
+					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+					{
+						if (itAmmoMod->mod == mod)
+						{
+							found = true;
+							break;
+						}
+					}
+					break;
+				}
+			}
+			if (!found)
+				AttachModToEquippedWeapon(owner, mod, false, 2, false);
+		}
+		return true;
+	}
+
 	void SpawnRandomMods(TESObjectCELL* cell)
 	{
 		for (UInt32 i = 0; i < cell->objectList.count; i++)
@@ -496,83 +594,6 @@ namespace MSF_Base
 			}
 			//check mod association or inject to TESObjectWEAP at start
 		}
-	}
-
-	void CreateRandomWeaponHealth(TESObjectCELL* cell)
-	{
-		for (UInt32 i = 0; i < cell->objectList.count; i++)
-		{
-			Actor* nextActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
-			if (!nextActor)
-				continue;
-			UInt8 isPlayer = (nextActor == (*g_player));
-			if (!nextActor->inventoryList)
-				continue;
-			for (UInt32 i = 0; i < nextActor->inventoryList->items.count; i++)
-			{
-				TESObjectWEAP* nextWeap = DYNAMIC_CAST(nextActor->inventoryList->items[i].form, TESForm, TESObjectWEAP);
-				if (!nextWeap)
-					continue;
-				for (BGSInventoryItem::Stack* stack = nextActor->inventoryList->items[i].stack; stack; stack = stack->next)
-				{
-					if (!stack->extraData)
-						continue;
-					if (!stack->extraData->HasType(kExtraData_Health))
-						stack->extraData->Add(kExtraData_Health, ExtraHealth::Create(isPlayer*1.0 + (isPlayer ^ 1)*MSF_MainData::rng.RandomFloat(0.05, 1.0)));
-				}
-			}
-		}
-	}
-
-	void DamageEquippedWeapon(Actor* actor)
-	{
-		UInt8 slots[1] = { 41 };
-		TESObjectWEAP* weap = nullptr;
-		ExtraDataList* extraData = nullptr;
-		TESObjectWEAP::InstanceData* instanceData = nullptr;
-		for (UInt8 i = 0; i < sizeof(slots) / sizeof(UInt8); i++)
-		{
-			weap = (TESObjectWEAP*)actor->equipData->slots[slots[i]].item;
-			if (!weap) continue;
-			else 
-			{ 
-				actor->GetEquippedExtraData(slots[i], &extraData);
-				instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(actor->equipData->slots[slots[i]].instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-				break; 
-			}
-		}
-		if (!weap || !extraData || !instanceData)
-			return;
-		ExtraHealth* extraHealth = DYNAMIC_CAST(extraData->GetByType(kExtraData_Health), BSExtraData, ExtraHealth);
-		if (!extraHealth) //create
-		{
-			extraData->Add(kExtraData_Health, ExtraHealth::Create(1.0)); _MESSAGE("create");
-		}
-		else
-		//for (UInt32 i = 0; i < 1; i++) //keyword-multiplier struct iterator
-		{
-			BGSKeyword* kw = nullptr; float baseMultiplier = 0.001; float kwMultiplier = 1.0;
-			//if (Utilities::WeaponInstanceHasKeyword(instanceData, kw))
-			//{
-				extraHealth->health -= baseMultiplier * kwMultiplier;
-				_MESSAGE("health: %f", extraHealth->health);
-				if (extraHealth->health <= 0.0)
-				{
-					extraHealth->health = 0.0;
-					//set broken
-				}
-				//update widget
-			//}
-		}
-	}
-
-	void JamWeapon(Actor* actor)
-	{
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(actor->equipData->slots[41].instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!instanceData)
-			return;
-		//chance: more likely to jam when condition is lower
-		//jam weapon
 	}
 
 	//========================== Animation Functions ===========================

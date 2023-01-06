@@ -5,6 +5,8 @@
 #include "f4se/GameFormComponents.h"
 #include "f4se/GameObjects.h"
 #include "f4se/GameReferences.h"
+#include "f4se/ScaleformMovie.h"
+#include "f4se/GameMenus.h"
 #include "f4se/GameRTTI.h"
 #include "f4se/PapyrusNativeFunctions.h"
 #include "f4se/PapyrusUtilities.h"
@@ -20,7 +22,6 @@ UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 
 class TESIdleForm;
-
 
 class MSFAimModel : public TESForm //https://github.com/isathar/F4SE_AmmoTweaksExtension cast AimModel as MSFAimModel, edit result
 {
@@ -174,6 +175,7 @@ namespace Utilities
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod);
 	BGSMod::Attachment::Mod* FindModByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
+	std::vector<BGSMod::Attachment::Mod*> FindModsByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
 	BGSMod::Attachment::Mod* GetFirstModWithPriority(BGSObjectInstanceExtra* modData, UInt8 priority);
 	bool HasObjectMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
 	bool WeaponInstanceHasKeyword(TESObjectWEAP::InstanceData* instanceData, BGSKeyword* checkKW);
@@ -434,21 +436,6 @@ T* GetOffsetPtr(const void * baseObject, int offset)
 {
 	return reinterpret_cast<T*>((uintptr_t)baseObject + offset);
 }
-
-#define DECLARE_EVENT_DISPATCHER_EX(Event, address) \
-template<> inline BSTEventDispatcher<Event> * GetEventDispatcher() \
-{ \
-	typedef BSTEventDispatcher<Event> * (*_GetEventDispatcher)(); \
-	RelocAddr<_GetEventDispatcher> GetDispatcher(address.GetUIntPtr()-RelocationManager::s_baseAddr); \
-	return GetDispatcher(); \
-}
-#define GAME_VM_EVENTS_REG_SIG "E8 ? ? ? ? 49 8B 0F 49 8D 56 10"
-#define InventoryEventHandler_EVENTS_REG_SIG "48 89 5C 24 08 57 48 83 EC 20 33 FF 48 8B D9 48 85 C9 74 ? 48 83 C1 10 EB ?"
-#define InventoryEventHandler_INDIRECTIONS(_offset) { { _offset,1,5 },{ 0x9,1,5 } }
-#define BASIC_EVENT_HANDLER_INDIRECTIONS(_offset) { {0,1,5},{0x14,1,5},{ _offset,1,5 },{ 0x9,1,5 } }
-#define BASIC_EVENT_HANDLER_INDIRECTIONS1(_offset) { {0,1,5},{0x14,1,5},{ _offset,1,5 },{ 0x35,1,5 } }
-#define FRAGMENT_EVENT_HANDLER_INDIRECTIONS(_offset) { {0,1,5},{0x2C,1,5},{ _offset,1,5 },{ 0x9,1,5 } }
-#define REGISTER_EVENT(_event, _sink) GetEventDispatcher<_event>()->AddEventSink(&_sink);
 
 class Ammo : public TESBoundObject
 {
