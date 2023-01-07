@@ -495,36 +495,33 @@ namespace MSF_Scaleform
 		if (baseAmmo)
 		{
 			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
-			for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+			if (itAmmoData)
 			{
-				if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+				UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
+				if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
+				{
+					GFxValue BammoArg;
+					menuRoot->CreateObject(&BammoArg);
+					RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
+					RegisterObject(&BammoArg, menuRoot, "ammoObj", &itAmmoData->baseAmmoData);
+					RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
+					RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
+					ammoData.PushBack(&BammoArg);
+				}
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
 					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
 					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
 					{
-						GFxValue BammoArg;
-						menuRoot->CreateObject(&BammoArg);
-						RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
-						RegisterObject(&BammoArg, menuRoot, "ammoObj", &itAmmoData->baseAmmoData);
-						RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
-						RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
-						ammoData.PushBack(&BammoArg);
+						GFxValue ammoArg;
+						menuRoot->CreateObject(&ammoArg);
+						RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
+						RegisterObject(&ammoArg, menuRoot, "ammoObj", itAmmoMod._Ptr);
+						RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo);
+						RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
+						ammoData.PushBack(&ammoArg);
 					}
-					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-					{
-						UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
-						if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
-						{
-							GFxValue ammoArg;
-							menuRoot->CreateObject(&ammoArg);
-							RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
-							RegisterObject(&ammoArg, menuRoot, "ammoObj", itAmmoMod._Ptr);
-							RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo);
-							RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
-							ammoData.PushBack(&ammoArg);
-						}
-					}
-					break;
 				}
 			}
 		}

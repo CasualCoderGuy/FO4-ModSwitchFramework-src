@@ -7,7 +7,6 @@
 #include <algorithm>
 
 std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
-std::unordered_map<BGSMod::Attachment::Mod*, TESAmmo*> MSF_MainData::ammoModMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::fireAnimDataMap;
 
@@ -15,7 +14,6 @@ std::unordered_map<UInt64, KeybindData*> MSF_MainData::keybindMap;
 std::unordered_map<std::string, KeybindData*> MSF_MainData::keybindIDMap;
 std::unordered_map<std::string, float> MSF_MainData::MCMfloatSettingMap;
 
-std::vector<AmmoData> MSF_MainData::ammoData;
 std::vector<SingleModPair> MSF_MainData::singleModPairs;
 std::vector<ModPairArray> MSF_MainData::modPairArrays;
 std::vector<MultipleMod> MSF_MainData::multiModAssocs;
@@ -514,68 +512,12 @@ namespace MSF_Data
 						UInt16 ammoIDbase = ammoData["baseAmmoID"].asInt();
 						UInt8 spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
 
-						std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin();
-						for (itAmmoData; itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+						AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+						if (itAmmoData)
 						{
-							if (itAmmoData->baseAmmoData.ammo == baseAmmo)
-							{
-								itAmmoData->baseAmmoData.mod = baseMod;
-								itAmmoData->baseAmmoData.ammoID = ammoIDbase;
-								itAmmoData->baseAmmoData.spawnChance = spawnChanceBase;
-								data2 = ammoData["ammoTypes"];
-								if (data2.isArray())
-								{
-									for (int i2 = 0; i2 < data2.size(); i2++)
-									{
-										const Json::Value& ammoType = data2[i2];
-										std::string type = ammoType["ammo"].asString();
-										if (type == "")
-											continue;
-										TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
-										if (!ammo)
-											continue;
-										type = ammoType["mod"].asString();
-										if (type == "")
-											continue;
-										BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(type), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-										if (!mod)
-											continue;
-										if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-											continue;
-										UInt16 ammoID = ammoType["ammoID"].asInt();
-										UInt8 spawnChance = ammoType["spawnChance"].asInt();
-
-										std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin();
-										for (itAmmoMod; itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-										{
-											if (itAmmoMod->ammo == ammo)
-											{
-												itAmmoMod->mod = mod;
-												itAmmoMod->ammoID = ammoID;
-												itAmmoMod->spawnChance = spawnChance;
-											}
-										}
-										if (itAmmoMod == itAmmoData->ammoMods.end())
-										{
-											AmmoData::AmmoMod ammoMod;
-											ammoMod.ammo = ammo;
-											ammoMod.mod = mod;
-											ammoMod.ammoID = ammoID;
-											ammoMod.spawnChance = spawnChance;
-											itAmmoData->ammoMods.push_back(ammoMod);
-										}
-									}
-								}
-								break;
-							}
-						}
-						if (itAmmoData == MSF_MainData::ammoData.end())
-						{
-							AmmoData ammoDataStruct;
-							ammoDataStruct.baseAmmoData.ammo = baseAmmo;
-							ammoDataStruct.baseAmmoData.mod = baseMod;
-							ammoDataStruct.baseAmmoData.ammoID = ammoIDbase;
-							ammoDataStruct.baseAmmoData.spawnChance = spawnChanceBase;
+							itAmmoData->baseAmmoData.mod = baseMod;
+							itAmmoData->baseAmmoData.ammoID = ammoIDbase;
+							itAmmoData->baseAmmoData.spawnChance = spawnChanceBase;
 							data2 = ammoData["ammoTypes"];
 							if (data2.isArray())
 							{
@@ -599,8 +541,8 @@ namespace MSF_Data
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									UInt8 spawnChance = ammoType["spawnChance"].asInt();
 
-									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = ammoDataStruct.ammoMods.begin();
-									for (itAmmoMod; itAmmoMod != ammoDataStruct.ammoMods.end(); itAmmoMod++)
+									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin();
+									for (itAmmoMod; itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 									{
 										if (itAmmoMod->ammo == ammo)
 										{
@@ -609,19 +551,71 @@ namespace MSF_Data
 											itAmmoMod->spawnChance = spawnChance;
 										}
 									}
-									if (itAmmoMod == ammoDataStruct.ammoMods.end())
+									if (itAmmoMod == itAmmoData->ammoMods.end())
 									{
 										AmmoData::AmmoMod ammoMod;
 										ammoMod.ammo = ammo;
 										ammoMod.mod = mod;
 										ammoMod.ammoID = ammoID;
 										ammoMod.spawnChance = spawnChance;
-										ammoDataStruct.ammoMods.push_back(ammoMod);
+										itAmmoData->ammoMods.push_back(ammoMod);
 									}
 								}
 							}
-							if (ammoDataStruct.ammoMods.size() > 0)
-								MSF_MainData::ammoData.push_back(ammoDataStruct);
+						}
+						else
+						{
+							AmmoData* ammoDataStruct = new AmmoData;
+							ammoDataStruct->baseAmmoData.ammo = baseAmmo;
+							ammoDataStruct->baseAmmoData.mod = baseMod;
+							ammoDataStruct->baseAmmoData.ammoID = ammoIDbase;
+							ammoDataStruct->baseAmmoData.spawnChance = spawnChanceBase;
+							data2 = ammoData["ammoTypes"];
+							if (data2.isArray())
+							{
+								for (int i2 = 0; i2 < data2.size(); i2++)
+								{
+									const Json::Value& ammoType = data2[i2];
+									std::string type = ammoType["ammo"].asString();
+									if (type == "")
+										continue;
+									TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
+									if (!ammo)
+										continue;
+									type = ammoType["mod"].asString();
+									if (type == "")
+										continue;
+									BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(type), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+									if (!mod)
+										continue;
+									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+										continue;
+									UInt16 ammoID = ammoType["ammoID"].asInt();
+									UInt8 spawnChance = ammoType["spawnChance"].asInt();
+
+									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = ammoDataStruct->ammoMods.begin();
+									for (itAmmoMod; itAmmoMod != ammoDataStruct->ammoMods.end(); itAmmoMod++)
+									{
+										if (itAmmoMod->ammo == ammo)
+										{
+											itAmmoMod->mod = mod;
+											itAmmoMod->ammoID = ammoID;
+											itAmmoMod->spawnChance = spawnChance;
+										}
+									}
+									if (itAmmoMod == ammoDataStruct->ammoMods.end())
+									{
+										AmmoData::AmmoMod ammoMod;
+										ammoMod.ammo = ammo;
+										ammoMod.mod = mod;
+										ammoMod.ammoID = ammoID;
+										ammoMod.spawnChance = spawnChance;
+										ammoDataStruct->ammoMods.push_back(ammoMod);
+									}
+								}
+							}
+							if (ammoDataStruct->ammoMods.size() > 0)
+								MSF_MainData::ammoDataMap[baseAmmo] = ammoDataStruct;
 						}
 					}
 				}
@@ -1079,57 +1073,36 @@ namespace MSF_Data
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 		if (!baseAmmo)
 			return false;
-		for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+		AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+		if (itAmmoData)
 		{
-			if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+			if (num == 0)
 			{
-				if (num == 0)
-				{
-					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
-					{
-						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
-							return false;
-					}
-					MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
-					MSF_MainData::switchData.ModToAttach = nullptr;
-					MSF_MainData::switchData.LooseModToAdd = nullptr;
-					MSF_MainData::switchData.LooseModToRemove = nullptr;
-					return true;
-				}
-				num--;
-				if ((num + 1) > itAmmoData->ammoMods.size())
-					return false;
-				AmmoData::AmmoMod* ammoMod = &itAmmoData->ammoMods[num];
 				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 				{
-					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
+					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
 						return false;
 				}
-				MSF_MainData::switchData.ModToAttach = ammoMod->mod;
-				MSF_MainData::switchData.ModToRemove = nullptr;
+				MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				MSF_MainData::switchData.ModToAttach = nullptr;
 				MSF_MainData::switchData.LooseModToAdd = nullptr;
 				MSF_MainData::switchData.LooseModToRemove = nullptr;
 				return true;
-
-				//UInt32 index = 1;
-				//for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				//{
-				//	if (index == num)
-				//	{
-				//		if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
-				//		{
-				//			if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, itAmmoMod->ammo) == 0)
-				//				return false;
-				//		}
-				//		MSF_MainData::switchData.ModToAttach = itAmmoMod->mod;
-				//		MSF_MainData::switchData.ModToRemove = nullptr;
-				//		MSF_MainData::switchData.LooseModToAdd = nullptr;
-				//		MSF_MainData::switchData.LooseModToRemove = nullptr;
-				//		return true;
-				//	}
-				//	index++;
-				//}
 			}
+			num--;
+			if ((num + 1) > itAmmoData->ammoMods.size())
+				return false;
+			AmmoData::AmmoMod* ammoMod = &itAmmoData->ammoMods[num];
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
+			{
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
+					return false;
+			}
+			MSF_MainData::switchData.ModToAttach = ammoMod->mod;
+			MSF_MainData::switchData.ModToRemove = nullptr;
+			MSF_MainData::switchData.LooseModToAdd = nullptr;
+			MSF_MainData::switchData.LooseModToRemove = nullptr;
+			return true;
 		}
 		return false;
 	}
@@ -1259,36 +1232,34 @@ namespace MSF_Data
 		UInt32 chance = 0;
 		if (baseAmmo)
 		{
-			for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+			if (itAmmoData)
 			{
-				if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+				chance += itAmmoData->baseAmmoData.spawnChance;
+				UInt32 _chance = 0;
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
-					chance += itAmmoData->baseAmmoData.spawnChance;
-					UInt32 _chance = 0;
-					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-					{
-						_chance += itAmmoMod->spawnChance;
-					}
-					if (_chance == 0)
-						break;
-					chance += _chance - 1;
-					UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
-					_chance = itAmmoData->baseAmmoData.spawnChance - 1;
-					if (picked <= _chance)
-						break;
-					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-					{
-						_chance += itAmmoMod->spawnChance;
-						if (picked <= _chance)
-						{
-							mods->Push(itAmmoMod->mod);
-							*ammo = itAmmoMod->ammo;
-							*count = MSF_MainData::rng.RandomInt(6, 48);
-							break;
-						}
-					}
-					break;
+					_chance += itAmmoMod->spawnChance;
 				}
+				if (_chance == 0)
+					return false;
+				chance += _chance - 1;
+				UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
+				_chance = itAmmoData->baseAmmoData.spawnChance - 1;
+				if (picked <= _chance)
+					return false;
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				{
+					_chance += itAmmoMod->spawnChance;
+					if (picked <= _chance)
+					{
+						mods->Push(itAmmoMod->mod);
+						*ammo = itAmmoMod->ammo;
+						*count = MSF_MainData::rng.RandomInt(6, 48);
+						break;
+					}
+				}
+				return true;
 			}
 		}
 		// mod association

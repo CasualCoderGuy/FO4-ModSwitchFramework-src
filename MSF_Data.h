@@ -228,7 +228,6 @@ public:
 	static Utilities::Timer tmr;
 
 	//Data added by plugins
-	static std::vector<AmmoData> ammoData;
 	static std::vector<SingleModPair> singleModPairs;
 	static std::vector<ModPairArray> modPairArrays;
 	static std::vector<MultipleMod> multiModAssocs;
@@ -237,9 +236,7 @@ public:
 	static std::vector<HUDScopeData> scopeDisplayData;
 	static std::vector<HUDMuzzleData> muzzleDisplayData;
 
-	/////
 	static std::unordered_map<TESAmmo*, AmmoData*> ammoDataMap;
-	static std::unordered_map<BGSMod::Attachment::Mod*, TESAmmo*> ammoModMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> reloadAnimDataMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> fireAnimDataMap;
 

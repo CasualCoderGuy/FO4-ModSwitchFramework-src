@@ -337,7 +337,7 @@ namespace MSF_Base
 
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modLoadedAmmoCount, bool updateAnimGraph)
 	{
-		_MESSAGE("attach");
+		_MESSAGE("attach, updAnim: %02X", updateAnimGraph);
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(actor, 41);
 		if (!stack)
 			return false;
@@ -466,19 +466,18 @@ namespace MSF_Base
 						continue;
 					TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 					bool found = false;
-					for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+					if (!baseAmmo)
+						continue;
+					AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+					if (itAmmoData)
 					{
-						if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+						for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 						{
-							for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+							if (itAmmoMod->mod == mod)
 							{
-								if (itAmmoMod->mod == mod)
-								{
-									found = true;
-									break;
-								}
+								found = true;
+								break;
 							}
-							break;
 						}
 					}
 					if (!found)
@@ -540,19 +539,18 @@ namespace MSF_Base
 				return false;
 			TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 			bool found = false;
-			for (std::vector<AmmoData>::iterator itAmmoData = MSF_MainData::ammoData.begin(); itAmmoData != MSF_MainData::ammoData.end(); itAmmoData++)
+			if (!baseAmmo)
+				return false;
+			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+			if (itAmmoData)
 			{
-				if (itAmmoData->baseAmmoData.ammo == baseAmmo)
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
-					for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+					if (itAmmoMod->mod == mod)
 					{
-						if (itAmmoMod->mod == mod)
-						{
-							found = true;
-							break;
-						}
+						found = true;
+						break;
 					}
-					break;
 				}
 			}
 			if (!found)
