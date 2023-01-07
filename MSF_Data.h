@@ -1,6 +1,7 @@
 #pragma once
 #include "MSF_Shared.h"
 
+
 class AmmoData
 {
 public:
@@ -67,19 +68,9 @@ public:
 	std::vector<BGSMod::Attachment::Mod*> functionMods;
 };
 
-class ReloadAnimData //OR make class OR store as formID
+class AnimationData
 {
 public:
-	TESObjectWEAP* uniqueWeap;
-	TESIdleForm* animIdle_1stP;
-	TESIdleForm* animIdle_3rdP;
-	//BGSAction* animAction;
-};
-
-class FireAnimData //OR make class OR store as formID
-{
-public:
-	TESObjectWEAP* uniqueWeap;
 	TESIdleForm* animIdle_1stP;
 	TESIdleForm* animIdle_3rdP;
 	//BGSAction* animAction;
@@ -241,12 +232,16 @@ public:
 	static std::vector<SingleModPair> singleModPairs;
 	static std::vector<ModPairArray> modPairArrays;
 	static std::vector<MultipleMod> multiModAssocs;
-	static std::vector<ReloadAnimData> reloadAnimData;
-	static std::vector<FireAnimData> fireAnimData;
 
 	static std::vector<HUDFiringModeData> fmDisplayData;
 	static std::vector<HUDScopeData> scopeDisplayData;
 	static std::vector<HUDMuzzleData> muzzleDisplayData;
+
+	/////
+	static std::unordered_map<TESAmmo*, AmmoData*> ammoDataMap;
+	static std::unordered_map<BGSMod::Attachment::Mod*, TESAmmo*> ammoModMap;
+	static std::unordered_map<TESObjectWEAP*, AnimationData*> reloadAnimDataMap;
+	static std::unordered_map<TESObjectWEAP*, AnimationData*> fireAnimDataMap;
 
 	//Mandatory Data, filled during mod initialization
 	static BGSKeyword* hasSwitchedAmmoKW;
@@ -285,8 +280,9 @@ public:
 		bShowScopeData = 0x0040
 	};
 	static UInt16 MCMSettingFlags;
-	static std::vector<KeybindData> keybinds;
-	static std::vector<MCMfloatData> MCMfloats;
+	static std::unordered_map<std::string, float> MCMfloatSettingMap;
+	static std::unordered_map<UInt64, KeybindData*> keybindMap;
+	static std::unordered_map<std::string, KeybindData*> keybindIDMap;
 };
 
 namespace MSF_Data

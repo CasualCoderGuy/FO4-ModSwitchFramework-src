@@ -6,12 +6,19 @@
 #include <fstream>
 #include <algorithm>
 
+std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
+std::unordered_map<BGSMod::Attachment::Mod*, TESAmmo*> MSF_MainData::ammoModMap;
+std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
+std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::fireAnimDataMap;
+
+std::unordered_map<UInt64, KeybindData*> MSF_MainData::keybindMap;
+std::unordered_map<std::string, KeybindData*> MSF_MainData::keybindIDMap;
+std::unordered_map<std::string, float> MSF_MainData::MCMfloatSettingMap;
+
 std::vector<AmmoData> MSF_MainData::ammoData;
 std::vector<SingleModPair> MSF_MainData::singleModPairs;
 std::vector<ModPairArray> MSF_MainData::modPairArrays;
 std::vector<MultipleMod> MSF_MainData::multiModAssocs;
-std::vector<ReloadAnimData> MSF_MainData::reloadAnimData;
-std::vector<FireAnimData> MSF_MainData::fireAnimData;
 
 std::vector<HUDFiringModeData> MSF_MainData::fmDisplayData;
 std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
@@ -40,8 +47,6 @@ BGSAction* MSF_MainData::ActionGunDown;
 bool MSF_MainData::IsInitialized = false;
 int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
-std::vector<KeybindData> MSF_MainData::keybinds;
-std::vector<MCMfloatData> MSF_MainData::MCMfloats;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
 int MSF_MainData::numberOfOpenedMenus = 0;
@@ -129,11 +134,7 @@ namespace MSF_Data
 
 	void AddFloatSetting(std::string name, float value)
 	{
-		MCMfloatData data;
-		data.name = name;
-		data.value = value;
-		MSF_MainData::MCMfloats.push_back(data);
-		return;
+		MSF_MainData::MCMfloatSettingMap[name] = value;
 	}
 
 	bool ReadMCMKeybindData()
@@ -162,15 +163,17 @@ namespace MSF_Data
 					std::string id = keybind["id"].asString();
 					if (id == "")
 						continue;
-					std::vector<KeybindData>::iterator itKb = MSF_MainData::keybinds.begin();
-					for (itKb; itKb != MSF_MainData::keybinds.end(); itKb++)
+
+					KeybindData* kb = MSF_MainData::keybindIDMap[id];
+					if (kb)
 					{
-						if (itKb->functionID == id)
-						{
-							itKb->keyCode = keybind["keycode"].asInt();
-							itKb->modifiers = keybind["modifiers"].asInt();
-							break;
-						}
+						UInt64 key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
+						if (key)
+							MSF_MainData::keybindMap.erase(key);
+						kb->keyCode = keybind["keycode"].asInt();
+						kb->modifiers = keybind["modifiers"].asInt();
+						key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
+						MSF_MainData::keybindMap[key] = kb;
 					}
 				}
 
@@ -240,56 +243,45 @@ namespace MSF_Data
 						if (id == "")
 							continue;
 
-						std::vector<KeybindData>::iterator itKb = MSF_MainData::keybinds.begin();
-						for (itKb; itKb != MSF_MainData::keybinds.end(); itKb++)
+						KeybindData* kb = MSF_MainData::keybindIDMap[id];
+						if (kb)
 						{
-							if (itKb->functionID == id)
-							{
-								std::string menuName = keybind["menuName"].asString();
-								std::string swfFilename = keybind["swfFilename"].asString();
-								UInt8 flags = keybind["keyfunction"].asInt();
-								//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
-								//	break;
-								//if (flags & KeybindData::bHUDselection)
-								//{
-								//	if (itKb->selectMenu)
-								//	{
-								//		itKb->selectMenu->scaleformID = menuName;
-								//		itKb->selectMenu->swfFilename = swfFilename;
-								//	}
-								//	else
-								//		itKb->selectMenu = new ModSelectionMenu(menuName, swfFilename);
-								//}
-								//else
-								itKb->selectMenu = nullptr;
-								itKb->type = flags;
-								break;
-							}
-							//BSReadAndWriteLocker locker(&g_customMenuLock);
-							//g_customMenuData[menuName.c_str()].menuPath = menuPath;
-							//g_customMenuData[menuName.c_str()].rootPath = rootPath;
-							//g_customMenuData[menuName.c_str()].menuFlags = menuFlags;
-							//g_customMenuData[menuName.c_str()].movieFlags = movieFlags;
-							//g_customMenuData[menuName.c_str()].extFlags = extFlags;
-							//g_customMenuData[menuName.c_str()].depth = depth;
+							std::string menuName = keybind["menuName"].asString();
+							std::string swfFilename = keybind["swfFilename"].asString();
+							UInt8 flags = keybind["keyfunction"].asInt();
+							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
+							//	break;
+							//if (flags & KeybindData::bHUDselection)
+							//{
+							//	if (itKb->selectMenu)
+							//	{
+							//		itKb->selectMenu->scaleformID = menuName;
+							//		itKb->selectMenu->swfFilename = swfFilename;
+							//	}
+							//	else
+							//		itKb->selectMenu = new ModSelectionMenu(menuName, swfFilename);
+							//}
+							//else
+							kb->selectMenu = nullptr;
+							kb->type = flags;
 						}
-						if (itKb == MSF_MainData::keybinds.end())
+						else
 						{
 							std::string menuName = keybind["menuName"].asString();
 							std::string swfFilename = keybind["swfFilename"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
 							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
 							//	continue;
-							KeybindData kb = {};
-							kb.functionID = id;
-							kb.type = flags;
-							kb.keyCode = 0;
-							kb.modifiers = 0;
+							kb = new KeybindData;
+							kb->functionID = id;
+							kb->type = flags;
+							kb->keyCode = 0;
+							kb->modifiers = 0;
 							//if (flags & KeybindData::bHUDselection)
 							//	kb.selectMenu = new ModSelectionMenu(menuName, swfFilename);
 							//else
-							kb.selectMenu = nullptr;
-							MSF_MainData::keybinds.push_back(kb);
+							kb->selectMenu = nullptr;
+							MSF_MainData::keybindIDMap[id] = kb;
 						}
 					}
 				}
@@ -421,13 +413,11 @@ namespace MSF_Data
 		}
 		else if (section == "Position")
 		{
-			for (std::vector<MCMfloatData>::iterator it = MSF_MainData::MCMfloats.begin(); it != MSF_MainData::MCMfloats.end(); it++)
+			std::unordered_map<std::string, float>::iterator setting = MSF_MainData::MCMfloatSettingMap.find(settingName);
+			if (setting != MSF_MainData::MCMfloatSettingMap.end())
 			{
-				if (it->name == settingName)
-				{
-					it->value = std::stof(settingValue);
-					return true;
-				}
+				setting->second = std::stof(settingValue);
+				return true;
 			}
 		}
 		return false;
@@ -645,39 +635,179 @@ namespace MSF_Data
 						std::string keyID = key["keyID"].asString();
 						if (keyID == "")
 							continue;
-						std::vector<KeybindData>::iterator itKb = MSF_MainData::keybinds.begin();
-						for (itKb; itKb != MSF_MainData::keybinds.end(); itKb++)
+						KeybindData* itKb = MSF_MainData::keybindIDMap[keyID];
+						if (!itKb)
+							continue;
+						if (itKb->type & KeybindData::bIsAmmo)
+							continue;
+						data1 = key["modData"];
+						if (data1.isArray())
 						{
-							if (itKb->functionID == keyID)
+							for (int i = 0; i < data1.size(); i++)
 							{
-								if (itKb->type & KeybindData::bIsAmmo)
-									break;
-								data1 = key["modData"];
-								if (data1.isArray())
+								const Json::Value& modData = data1[i];
+								UInt16 type = modData["type"].asInt();
+								if (type < 1 || type > 3)
+									continue;
+								std::string str = modData["fnKeyword"].asString();
+								BGSKeyword* functionKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+								if (!functionKW)
+									continue;
+								UInt16 flags = modData["flags"].asInt();
+								TESIdleForm* animIdle_1stP = nullptr;
+								TESIdleForm* animIdle_3rdP = nullptr;
+								str = modData["animIdle_1stP"].asString();
+								if (str != "")
+									animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+								str = modData["animIdle_3rdP"].asString();
+								if (str != "")
+									animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+								bool bAdd = false;
+								if (type == 1)
 								{
-									for (int i = 0; i < data1.size(); i++)
+									str = modData["baseMod"].asString();
+									if (str == "")
+										continue;
+									BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+									if (!baseMod)
+										continue;
+									if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+										continue;
+									str = modData["functionMod"].asString();
+									if (str == "")
+										continue;
+									BGSMod::Attachment::Mod* functionMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+									if (!functionMod)
+										continue;
+									if (functionMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+										continue;
+									std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
+									for (itData; itData != itKb->modAssociations.end(); itData++)
 									{
-										const Json::Value& modData = data1[i];
-										UInt16 type = modData["type"].asInt();
-										if (type < 1 || type > 3)
-											continue;
-										std::string str = modData["fnKeyword"].asString();
-										BGSKeyword* functionKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
-										if (!functionKW)
-											continue;
-										UInt16 flags = modData["flags"].asInt();
-										TESIdleForm* animIdle_1stP = nullptr;
-										TESIdleForm* animIdle_3rdP = nullptr;
-										str = modData["animIdle_1stP"].asString();
-										if (str != "")
-											animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
-										str = modData["animIdle_3rdP"].asString();
-										if (str != "")
-											animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
-										bool bAdd = false;
-										if (type == 1)
+										if ((*itData)->funcKeyword == functionKW)
+											break;
+										if ((*itData)->GetType() == 1)
 										{
-											str = modData["baseMod"].asString();
+											SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
+											if (currModPair->modPair.parentMod == baseMod)
+												break;
+										}
+										else if ((*itData)->GetType() == 3)
+										{
+											MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
+											if (currMultipleMod->parentMod == baseMod)
+												break;
+										}
+										else if ((*itData)->GetType() == 2)
+										{
+											ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
+											std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
+											for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
+											{
+												if (itModPair->parentMod == baseMod)
+													break;
+											}
+											if (itModPair != currModPairArray->modPairs.end())
+												break;
+										}
+									}
+									if (itData == itKb->modAssociations.end())
+									{
+										SingleModPair* modPair = new SingleModPair;
+										modPair->modPair.parentMod = baseMod;
+										modPair->modPair.functionMod = functionMod;
+										modPair->funcKeyword = functionKW;
+										modPair->flags = flags;
+										modPair->animIdle_1stP = animIdle_1stP;
+										modPair->animIdle_3rdP = animIdle_3rdP;
+										itKb->modAssociations.push_back(modPair);
+									}
+								}
+								else if (type == 3)
+								{
+									str = modData["baseMod"].asString();
+									if (str == "")
+										continue;
+									BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+									if (!baseMod)
+										continue;
+									if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+										continue;
+									std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
+									for (itData; itData != itKb->modAssociations.end(); itData++)
+									{
+										if ((*itData)->funcKeyword == functionKW)
+											break;
+										if ((*itData)->GetType() == 1)
+										{
+											SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
+											if (currModPair->modPair.parentMod == baseMod)
+												break;
+										}
+										else if ((*itData)->GetType() == 3)
+										{
+											MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
+											if (currMultipleMod->parentMod == baseMod)
+												break;
+										}
+										else if ((*itData)->GetType() == 2)
+										{
+											ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
+											std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
+											for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
+											{
+												if (itModPair->parentMod == baseMod)
+													break;
+											}
+											if (itModPair != currModPairArray->modPairs.end())
+												break;
+										}
+									}
+									if (itData == itKb->modAssociations.end())
+									{
+										MultipleMod* multipleMod = new MultipleMod;
+										multipleMod->parentMod = baseMod;
+										multipleMod->funcKeyword = functionKW;
+										multipleMod->flags = flags;
+										multipleMod->animIdle_1stP = animIdle_1stP;
+										multipleMod->animIdle_3rdP = animIdle_3rdP;
+										data2 = modData["functionMods"];
+										if (data2.isArray())
+										{
+											for (int i2 = 0; i2 < data2.size(); i2++)
+											{
+												str = data2[i2].asString();
+												if (str == "")
+													continue;
+												BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+												if (!mod)
+													continue;
+												if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+													continue;
+												std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(multipleMod->functionMods.begin(), multipleMod->functionMods.end(), mod);
+												if (itMod == multipleMod->functionMods.end())
+													multipleMod->functionMods.push_back(mod);
+											}
+										}
+										if (multipleMod->functionMods.size() > 1)
+											itKb->modAssociations.push_back(multipleMod);
+										else
+											delete multipleMod;
+									}
+								}
+								else if (type == 2)
+								{
+									data2 = modData["modPairs"];
+									if (data2.isArray())
+									{
+										ModPairArray* modPairArray = new ModPairArray;
+										modPairArray->funcKeyword = functionKW;
+										modPairArray->flags = flags;
+										modPairArray->animIdle_1stP = animIdle_1stP;
+										modPairArray->animIdle_3rdP = animIdle_3rdP;
+										for (int i2 = 0; i2 < data2.size(); i2++)
+										{
+											str = data2[i2]["baseMod"].asString();
 											if (str == "")
 												continue;
 											BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
@@ -685,7 +815,7 @@ namespace MSF_Data
 												continue;
 											if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 												continue;
-											str = modData["functionMod"].asString();
+											str = data2[i2]["functionMod"].asString();
 											if (str == "")
 												continue;
 											BGSMod::Attachment::Mod* functionMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
@@ -725,172 +855,27 @@ namespace MSF_Data
 											}
 											if (itData == itKb->modAssociations.end())
 											{
-												SingleModPair* modPair = new SingleModPair;
-												modPair->modPair.parentMod = baseMod;
-												modPair->modPair.functionMod = functionMod;
-												modPair->funcKeyword = functionKW;
-												modPair->flags = flags;
-												modPair->animIdle_1stP = animIdle_1stP;
-												modPair->animIdle_3rdP = animIdle_3rdP;
-												itKb->modAssociations.push_back(modPair);
-											}
-										}
-										else if (type == 3)
-										{
-											str = modData["baseMod"].asString();
-											if (str == "")
-												continue;
-											BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-											if (!baseMod)
-												continue;
-											if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-												continue;
-											std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
-											for (itData; itData != itKb->modAssociations.end(); itData++)
-											{
-												if ((*itData)->funcKeyword == functionKW)
-													break;
-												if ((*itData)->GetType() == 1)
+												std::vector<ModAssociationData::ModPair>::iterator itModPair = modPairArray->modPairs.begin();
+												for (itModPair; itModPair != modPairArray->modPairs.end(); itModPair++)
 												{
-													SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
-													if (currModPair->modPair.parentMod == baseMod)
+													if (itModPair->parentMod == baseMod)
 														break;
 												}
-												else if ((*itData)->GetType() == 3)
+												if (itModPair == modPairArray->modPairs.end())
 												{
-													MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
-													if (currMultipleMod->parentMod == baseMod)
-														break;
+													ModAssociationData::ModPair modPair;
+													modPair.parentMod = baseMod;
+													modPair.functionMod = functionMod;
+													modPairArray->modPairs.push_back(modPair);
 												}
-												else if ((*itData)->GetType() == 2)
-												{
-													ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
-													std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
-													for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
-													{
-														if (itModPair->parentMod == baseMod)
-															break;
-													}
-													if (itModPair != currModPairArray->modPairs.end())
-														break;
-												}
-											}
-											if (itData == itKb->modAssociations.end())
-											{
-												MultipleMod* multipleMod = new MultipleMod;
-												multipleMod->parentMod = baseMod;
-												multipleMod->funcKeyword = functionKW;
-												multipleMod->flags = flags;
-												multipleMod->animIdle_1stP = animIdle_1stP;
-												multipleMod->animIdle_3rdP = animIdle_3rdP;
-												data2 = modData["functionMods"];
-												if (data2.isArray())
-												{
-													for (int i2 = 0; i2 < data2.size(); i2++)
-													{
-														str = data2[i2].asString();
-														if (str == "")
-															continue;
-														BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-														if (!mod)
-															continue;
-														if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-															continue;
-														std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(multipleMod->functionMods.begin(), multipleMod->functionMods.end(), mod);
-														if (itMod == multipleMod->functionMods.end())
-															multipleMod->functionMods.push_back(mod);
-													}
-												}
-												if (multipleMod->functionMods.size() > 1)
-													itKb->modAssociations.push_back(multipleMod);
-												else
-													delete multipleMod;
 											}
 										}
-										else if (type == 2)
-										{
-											data2 = modData["modPairs"];
-											if (data2.isArray())
-											{
-												ModPairArray* modPairArray = new ModPairArray;
-												modPairArray->funcKeyword = functionKW;
-												modPairArray->flags = flags;
-												modPairArray->animIdle_1stP = animIdle_1stP;
-												modPairArray->animIdle_3rdP = animIdle_3rdP;
-												for (int i2 = 0; i2 < data2.size(); i2++)
-												{
-													str = data2[i2]["baseMod"].asString();
-													if (str == "")
-														continue;
-													BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-													if (!baseMod)
-														continue;
-													if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-														continue;
-													str = data2[i2]["functionMod"].asString();
-													if (str == "")
-														continue;
-													BGSMod::Attachment::Mod* functionMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-													if (!functionMod)
-														continue;
-													if (functionMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-														continue;
-													std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
-													for (itData; itData != itKb->modAssociations.end(); itData++)
-													{
-														if ((*itData)->funcKeyword == functionKW)
-															break;
-														if ((*itData)->GetType() == 1)
-														{
-															SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
-															if (currModPair->modPair.parentMod == baseMod)
-																break;
-														}
-														else if ((*itData)->GetType() == 3)
-														{
-															MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
-															if (currMultipleMod->parentMod == baseMod)
-																break;
-														}
-														else if ((*itData)->GetType() == 2)
-														{
-															ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
-															std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
-															for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
-															{
-																if (itModPair->parentMod == baseMod)
-																	break;
-															}
-															if (itModPair != currModPairArray->modPairs.end())
-																break;
-														}
-													}
-													if (itData == itKb->modAssociations.end())
-													{
-														std::vector<ModAssociationData::ModPair>::iterator itModPair = modPairArray->modPairs.begin();
-														for (itModPair; itModPair != modPairArray->modPairs.end(); itModPair++)
-														{
-															if (itModPair->parentMod == baseMod)
-																break;
-														}
-														if (itModPair == modPairArray->modPairs.end())
-														{
-															ModAssociationData::ModPair modPair;
-															modPair.parentMod = baseMod;
-															modPair.functionMod = functionMod;
-															modPairArray->modPairs.push_back(modPair);
-														}
-													}
-												}
-												if (modPairArray->modPairs.size() > 1)
-													itKb->modAssociations.push_back(modPairArray);
-												else
-													delete modPairArray;
-											}
-										}
+										if (modPairArray->modPairs.size() > 1)
+											itKb->modAssociations.push_back(modPairArray);
+										else
+											delete modPairArray;
 									}
 								}
-								break;
 							}
 						}
 					}
@@ -920,23 +905,19 @@ namespace MSF_Data
 							animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 						if (!animIdle_3rdP)
 							continue;
-						std::vector<ReloadAnimData>::iterator itAnim = MSF_MainData::reloadAnimData.begin();
-						for (itAnim; itAnim != MSF_MainData::reloadAnimData.end(); itAnim++)
+
+						AnimationData* animationData = MSF_MainData::reloadAnimDataMap[weapon];
+						if (animationData)
 						{
-							if (itAnim->uniqueWeap == weapon)
-							{
-								itAnim->animIdle_1stP = animIdle_1stP;
-								itAnim->animIdle_3rdP = animIdle_3rdP;
-								break;
-							}
+							animationData->animIdle_1stP = animIdle_1stP;
+							animationData->animIdle_3rdP = animIdle_3rdP;
 						}
-						if (itAnim == MSF_MainData::reloadAnimData.end())
+						else
 						{
-							ReloadAnimData anim;
-							anim.uniqueWeap = weapon;
-							anim.animIdle_1stP = animIdle_1stP;
-							anim.animIdle_3rdP = animIdle_3rdP;
-							MSF_MainData::reloadAnimData.push_back(anim);
+							animationData = new AnimationData;
+							animationData->animIdle_1stP = animIdle_1stP;
+							animationData->animIdle_3rdP = animIdle_3rdP;
+							MSF_MainData::reloadAnimDataMap[weapon] = animationData;
 						}
 					}
 				}
@@ -965,23 +946,19 @@ namespace MSF_Data
 							animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 						if (!animIdle_3rdP)
 							continue;
-						std::vector<FireAnimData>::iterator itAnim = MSF_MainData::fireAnimData.begin();
-						for (itAnim; itAnim != MSF_MainData::fireAnimData.end(); itAnim++)
+
+						AnimationData* animationData = MSF_MainData::fireAnimDataMap[weapon];
+						if (animationData)
 						{
-							if (itAnim->uniqueWeap == weapon)
-							{
-								itAnim->animIdle_1stP = animIdle_1stP;
-								itAnim->animIdle_3rdP = animIdle_3rdP;
-								break;
-							}
+							animationData->animIdle_1stP = animIdle_1stP;
+							animationData->animIdle_3rdP = animIdle_3rdP;
 						}
-						if (itAnim == MSF_MainData::fireAnimData.end())
+						else
 						{
-							FireAnimData anim;
-							anim.uniqueWeap = weapon;
-							anim.animIdle_1stP = animIdle_1stP;
-							anim.animIdle_3rdP = animIdle_3rdP;
-							MSF_MainData::fireAnimData.push_back(anim);
+							animationData = new AnimationData;
+							animationData->animIdle_1stP = animIdle_1stP;
+							animationData->animIdle_3rdP = animIdle_3rdP;
+							MSF_MainData::fireAnimDataMap[weapon] = animationData;
 						}
 					}
 				}
@@ -1708,15 +1685,13 @@ namespace MSF_Data
 	//========================= Animations =======================
 	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
 	{
-		for (std::vector<ReloadAnimData>::iterator it = MSF_MainData::reloadAnimData.begin(); it != MSF_MainData::reloadAnimData.end(); it++)
+		AnimationData* animationData = MSF_MainData::reloadAnimDataMap[equippedWeap];
+		if (animationData)
 		{
-			if (it->uniqueWeap == equippedWeap)
-			{
-				if (get3rdP)
-					return it->animIdle_3rdP;
-				else
-					return it->animIdle_1stP;
-			}
+			if (get3rdP)
+				return animationData->animIdle_3rdP;
+			else
+				return animationData->animIdle_1stP;
 		}
 		if (get3rdP)
 			return MSF_MainData::reloadIdle3rdP;
@@ -1726,15 +1701,13 @@ namespace MSF_Data
 
 	TESIdleForm* GetFireAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
 	{
-		for (std::vector<FireAnimData>::iterator it = MSF_MainData::fireAnimData.begin(); it != MSF_MainData::fireAnimData.end(); it++)
+		AnimationData* animationData = MSF_MainData::fireAnimDataMap[equippedWeap];
+		if (animationData)
 		{
-			if (it->uniqueWeap == equippedWeap)
-			{
-				if (get3rdP)
-					return it->animIdle_3rdP;
-				else
-					return it->animIdle_1stP;
-			}
+			if (get3rdP)
+				return animationData->animIdle_3rdP;
+			else
+				return animationData->animIdle_1stP;
 		}
 		if (get3rdP)
 			return MSF_MainData::fireIdle3rdP;
@@ -1794,22 +1767,8 @@ namespace MSF_Data
 
 	KeybindData* GetKeyFunctionID(UInt16 keyCode, UInt8 modifiers)
 	{
-		std::vector<KeybindData>::iterator it;
-		it = std::find_if(MSF_MainData::keybinds.begin(), MSF_MainData::keybinds.end(), [keyCode, modifiers](KeybindData const& data){
-		return data.keyCode == keyCode && data.modifiers == modifiers;
-		} );
-		if (it != MSF_MainData::keybinds.end())
-			return it._Ptr;
-		return nullptr;
-		/*for (std::vector<KeybindData>::iterator it = MSF_MainData::keybinds.begin(); it != MSF_MainData::keybinds.end(); it++)
-		{
-			if (it->keyCode == keyCode)
-			{
-				if (it->modifiers == modifiers)
-					return it._Ptr;
-			}
-		}
-		return nullptr;*/
+		UInt64 key = ((UInt64)modifiers << 32) + keyCode;
+		return MSF_MainData::keybindMap[key];
 	}
 }
 
