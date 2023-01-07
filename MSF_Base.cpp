@@ -304,17 +304,14 @@ namespace MSF_Base
 
 		UInt16 flags = MSF_MainData::switchData.SwitchFlags;
 		MSF_MainData::switchData.ClearData();
-		MSF_MainData::switchData.SwitchFlags = flags & ~SwitchData::bSwitchingInProgress;
-
-
-		
+		MSF_MainData::switchData.SwitchFlags = flags & (SwitchData::bReloadInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
 
 		if (modToRemove)
 		{
 			//if (!Utilities::HasObjectMod(modData, mod))
 			//	ClearSwitchFlags();
 			bool bUpdateAnimGraph = false;
-			if (!modToAttach && flags & SwitchData::bUpdateAnimGraph)
+			if (!modToAttach && (flags & SwitchData::bUpdateAnimGraph))
 				bUpdateAnimGraph = true;
 			if (!AttachModToEquippedWeapon(playerActor, modToRemove, false, 2, bUpdateAnimGraph))
 				return false;
