@@ -12,6 +12,8 @@ namespace MSF_Base
 	bool SwitchModHotkey(UInt8 key, std::vector<ModAssociationData*>* modAssociations);
 	bool HandlePendingAnimations(bool bDoQueueSwitch = false);
 	bool InitWeapon();
+	void SwitchFlagsAND(UInt16 flag);
+	void SwitchFlagsOR(UInt16 flag);
 	bool SwitchMod();
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modAmmoCount, bool updateAnimGraph);
 	bool ReevalModdedWeapon(TESObjectWEAP* weapon);

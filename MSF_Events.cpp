@@ -150,7 +150,8 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 		_MESSAGE("reloadEnd");
 		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadInProgress)
 		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bReloadNotFinished;
+			UInt16 endFlag = ~SwitchData::bReloadNotFinished;
+			delayTask delayEnd(10, true, &MSF_Base::SwitchFlagsAND, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -197,7 +198,8 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	}
 	else if (!_strcmpi("customAnimEnd", name))
 	{
-		MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bAnimNotFinished;
+		UInt16 endFlag = ~SwitchData::bAnimNotFinished;
+		delayTask delayEnd(10, true, &MSF_Base::SwitchFlagsAND, endFlag);
 	}
 	return tf1_Original(arg1, arg2, arg3);
 }

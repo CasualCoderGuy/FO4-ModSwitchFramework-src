@@ -60,14 +60,17 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			{
 				//MSF_Test::ListModTable(*g_player);
 				//MSF_Test::PrintStoredData();
+				//MSF_Test::DumpAttachParent();
+				MSF_Test::GetWeaponState();
+				//MSF_Test::SetAmmoTest();
 				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
 				//MSF_Scaleform::SetWidgetVisibility(true);
 				//MSFMenu::OpenMenu();
 				//static BSFixedString menuName("MSFMenu");
 				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
-				MSFAmmoMenu::OpenMenu();
-				MSFModMenu::OpenMenu();
+				//MSFAmmoMenu::OpenMenu();
+				//MSFModMenu::OpenMenu();
 				//MSF_Test::ListEquippedItemTypes();
 				//MSF_Test::ArmorAttachTest();
 				//MSF_Test::RemapAnimTest(); //sub_141387BE0
@@ -88,7 +91,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
-				MSF_Test::AttachModInternalTest(true, 2);
+				//MSF_Test::AttachModInternalTest(true, 2);
+				MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
 				//MSF_Test::CallAttachModToInvItem();

@@ -19,6 +19,10 @@ RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
 RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
 RelocPtr  <void*> unk_05AB38D0(0x5AB38D0);
 
+BSExtraData::~BSExtraData() {};
+void BSExtraData::Unk_01() {};
+void BSExtraData::Unk_02() {};
+
 CheckStackIDFunctor::CheckStackIDFunctor(UInt64 ID)
 {
 	vtbl = g_CheckStackIDFunctor;

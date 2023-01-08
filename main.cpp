@@ -68,6 +68,7 @@ public:
 		{
 			MSF_MainData::switchData.ClearData();
 			MSF_MainData::switchData.equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+
 			_MESSAGE("Registering MSF menus.");
 			MSFWidgetMenu::RegisterMenu();
 			MSFAmmoMenu::RegisterMenu();

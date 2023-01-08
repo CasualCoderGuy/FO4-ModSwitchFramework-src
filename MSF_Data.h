@@ -16,6 +16,34 @@ public:
 	std::vector<AmmoMod> ammoMods;
 };
 
+class AnimationData
+{
+public:
+	TESIdleForm* animIdle_1stP;
+	TESIdleForm* animIdle_3rdP;
+	//BGSAction* animAction;
+};
+
+class ModData
+{
+public:
+	struct Mod
+	{
+		BGSMod::Attachment::Mod* mod;
+		UInt16 flags;
+		AnimationData* animData;
+	};
+	struct BaseModEnabledStruct
+	{
+		std::unordered_map<Mod*, std::vector<Mod*>*> enabledModCycleMap; //hash: functonMod, bucket: functionMod cycle the functonMod is in
+		std::unordered_map<Mod*, Mod*> baseModMap; //hash: baseMod, bucket: functionMod
+	};
+	BGSKeyword* functionKeyword;
+	UInt16 flags;
+	BaseModEnabledStruct baseModEnabledData;
+	std::unordered_map<Mod*, std::vector<Mod*>*> modCycleMap; //hash: baseMod, bucket: functionMod cycle
+};
+
 class ModAssociationData
 {
 protected:
@@ -66,14 +94,6 @@ public:
 	MultipleMod() { type = 0x3; }
 	BGSMod::Attachment::Mod* parentMod;
 	std::vector<BGSMod::Attachment::Mod*> functionMods;
-};
-
-class AnimationData
-{
-public:
-	TESIdleForm* animIdle_1stP;
-	TESIdleForm* animIdle_3rdP;
-	//BGSAction* animAction;
 };
 
 class BurstMode
@@ -168,6 +188,7 @@ public:
 		bNeedInit = 0x0001,
 		bSwitchingInProgress = 0x0002,
 		bQueuedSwitch = 0x0004,
+		bSetChamberedAmmo = 0x0008,
 		bDrawNeeded = 0x0080,
 		bDrawInProgress = 0x0800,
 		bReloadNeeded = 0x0010,
@@ -205,8 +226,39 @@ public:
 	}
 };
 
+class ExtraWeaponState : public BSExtraData
+{
+public:
+	virtual ~ExtraWeaponState() override {};
+	virtual void Unk_01() override {};
+	virtual void Unk_02() override {};
+	enum
+	{
+		kType_ExtraWeaponState = 0xF1
+	};
+	ExtraWeaponState()
+	{
+		type = kType_ExtraWeaponState;
+		unk10 = 0;
+		unk13 = 0;
+		unk14 = 0;
+		next = NULL;
+	};
+	struct AmmoState
+	{
+		TESAmmo* ammoType;
+		UInt64 magazineCount;
+	};
+	std::pair<AmmoState, AmmoState> chamberedRoundMP;
+	std::pair<AmmoState, AmmoState> magazineStateMP;
+	bool hasSecondaryAmmo;
+	//BGSMod::Attachment::Mod* baseMod;
+	//BGSMod::Attachment::Mod* functionMod;
+};
+
 class ModSwitchManager
 {
+public:
 	UInt16 SwitchState;
 	SwitchData* threadUnsafeData;
 	std::string openedMenu;
@@ -242,7 +294,7 @@ public:
 
 	//Mandatory Data, filled during mod initialization
 	static BGSKeyword* hasSwitchedAmmoKW;
-	static BGSKeyword* hasSwitchedSecAmmoKW;
+	static BGSKeyword* hasSecondaryAmmoKW;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;

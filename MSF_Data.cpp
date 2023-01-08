@@ -23,7 +23,7 @@ std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
 std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
 
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
-BGSKeyword* MSF_MainData::hasSwitchedSecAmmoKW;
+BGSKeyword* MSF_MainData::hasSecondaryAmmoKW;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;

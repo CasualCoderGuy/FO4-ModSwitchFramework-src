@@ -292,6 +292,16 @@ namespace MSF_Base
 		return true;
 	}
 
+	void SwitchFlagsAND(UInt16 flag)
+	{
+		MSF_MainData::switchData.SwitchFlags &= flag;
+	}
+
+	void SwitchFlagsOR(UInt16 flag)
+	{
+		MSF_MainData::switchData.SwitchFlags |= flag;
+	}
+
 	bool SwitchMod()
 	{
 		_MESSAGE("SwitchMod; flags: %02X ; Attach: %08X ; Remove: %08X", MSF_MainData::switchData.SwitchFlags, MSF_MainData::switchData.ModToAttach, MSF_MainData::switchData.ModToRemove);
@@ -588,6 +598,182 @@ namespace MSF_Base
 				}
 			}
 			//check mod association or inject to TESObjectWEAP at start
+		}
+	}
+
+	void SetCurrentWeaponState(bool hasSecondaryAmmo, bool clearSecondaryAmmo)
+	{
+		ExtraDataList* extraData = nullptr;
+		(*g_player)->GetEquippedExtraData(41, &extraData);
+		if (extraData)
+		{
+			ExtraWeaponState* weaponState = (ExtraWeaponState*)extraData->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+			EquipWeaponData* eqData = (EquipWeaponData*)(*g_player)->middleProcess->unk08->equipData->equippedData;
+			if (eqData && eqData->ammo)
+			{
+				if (!weaponState)
+				{
+					weaponState = new ExtraWeaponState;
+					extraData->Add(ExtraWeaponState::kType_ExtraWeaponState, weaponState);
+				}
+				if (hasSecondaryAmmo)
+				{
+					weaponState->magazineStateMP.second.ammoType = eqData->ammo;
+					weaponState->magazineStateMP.second.magazineCount = eqData->loadedAmmoCount;
+				}
+				else
+				{
+					weaponState->magazineStateMP.first.ammoType = eqData->ammo;
+					weaponState->magazineStateMP.first.magazineCount = eqData->loadedAmmoCount;
+					if (clearSecondaryAmmo)
+					{
+						weaponState->magazineStateMP.second.ammoType = nullptr;
+						weaponState->magazineStateMP.second.magazineCount = 0;
+					}
+				}
+			}
+		}
+	}
+
+	void RecoverWeaponState(bool recoverSecondary)
+	{
+		ExtraDataList* extraData = nullptr;
+		(*g_player)->GetEquippedExtraData(41, &extraData);
+		if (extraData)
+		{
+			ExtraWeaponState* weaponState = (ExtraWeaponState*)extraData->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+			if (weaponState)
+			{
+				EquipWeaponData* eqData = (EquipWeaponData*)(*g_player)->middleProcess->unk08->equipData->equippedData;
+				if (eqData && eqData->ammo)
+				{
+					if (recoverSecondary && weaponState->magazineStateMP.second.ammoType)
+					{
+						if (eqData->ammo == weaponState->magazineStateMP.second.ammoType)
+							eqData->loadedAmmoCount = weaponState->magazineStateMP.second.magazineCount;
+						else
+							eqData->loadedAmmoCount; //change back to switched ammo
+					}
+					else if (weaponState->magazineStateMP.first.ammoType)
+					{
+						if (eqData->ammo == weaponState->magazineStateMP.first.ammoType)
+							eqData->loadedAmmoCount = weaponState->magazineStateMP.first.magazineCount;
+						else
+							eqData->loadedAmmoCount; //change back to switched ammo
+					}
+				}
+			}
+		}
+	}
+
+	void SetChamberedRound(bool hasSecondaryAmmo, bool clearSecondaryAmmo) //only if hasKW chamberedEnable/secChamberedEnable
+	{
+		ExtraDataList* extraData = nullptr;
+		(*g_player)->GetEquippedExtraData(41, &extraData);
+		if (extraData)
+		{
+			ExtraWeaponState* weaponState = (ExtraWeaponState*)extraData->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+			EquipWeaponData* eqData = (EquipWeaponData*)(*g_player)->middleProcess->unk08->equipData->equippedData;
+			if (eqData && eqData->ammo)
+			{
+				if (!weaponState)
+				{
+					weaponState = new ExtraWeaponState;
+					extraData->Add(ExtraWeaponState::kType_ExtraWeaponState, weaponState);
+				}
+				if (hasSecondaryAmmo)
+				{
+					weaponState->chamberedRoundMP.second.ammoType = eqData->ammo;
+					weaponState->chamberedRoundMP.second.magazineCount = eqData->loadedAmmoCount;
+					//+++ BGSImpactDataSet, damageTypes, minRange, maxRange, outOfRangeMultiplier, secondary, critChargeBonus, minPowerShot, critDamageMult, projectileOverride, numProjectiles, stagger, baseDamage
+					//remove chambered ammo
+				}
+				else
+				{
+					weaponState->chamberedRoundMP.first.ammoType = eqData->ammo;
+					weaponState->chamberedRoundMP.first.magazineCount = eqData->loadedAmmoCount;
+					//+++
+					//remove chambered ammo
+					if (clearSecondaryAmmo)
+					{
+						weaponState->chamberedRoundMP.second.ammoType = nullptr;
+						weaponState->chamberedRoundMP.second.magazineCount = 0;
+					}
+				}
+			}
+		}
+	}
+
+	void RecoverChamberedRound(bool recoverSecondary) //only if hasKW chamberedEnable/secChamberedEnable
+	{
+		ExtraDataList* extraData = nullptr;
+		(*g_player)->GetEquippedExtraData(41, &extraData);
+		if (extraData)
+		{
+			ExtraWeaponState* weaponState = (ExtraWeaponState*)extraData->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+			EquipWeaponData* eqData = (EquipWeaponData*)(*g_player)->middleProcess->unk08->equipData->equippedData;
+			TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast((*g_player)->middleProcess->unk08->equipData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			if (eqData && eqData->ammo && instanceData && instanceData->ammo && weaponState)
+			{
+				if (recoverSecondary && weaponState->chamberedRoundMP.second.ammoType && weaponState->chamberedRoundMP.second.magazineCount > 0)
+				{
+					TESAmmo* currentAmmo = instanceData->ammo;
+					instanceData->ammo = weaponState->chamberedRoundMP.second.ammoType;
+					eqData->ammo = instanceData->ammo;
+					weaponState->chamberedRoundMP.second.ammoType = currentAmmo;
+					//+++
+					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, currentAmmo);
+					if (ammoCount < instanceData->ammoCapacity)
+						eqData->loadedAmmoCount = ammoCount + 1;
+					else
+						eqData->loadedAmmoCount = instanceData->ammoCapacity + 1;
+
+				}
+				else if (weaponState->chamberedRoundMP.first.ammoType && weaponState->chamberedRoundMP.first.magazineCount > 0)
+				{
+					TESAmmo* currentAmmo = instanceData->ammo;
+					instanceData->ammo = weaponState->chamberedRoundMP.first.ammoType;
+					eqData->ammo = instanceData->ammo;
+					weaponState->chamberedRoundMP.first.ammoType = currentAmmo;
+					//+++
+					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, currentAmmo);
+					if (ammoCount < instanceData->ammoCapacity)
+						eqData->loadedAmmoCount = ammoCount + 1;
+					else
+						eqData->loadedAmmoCount = instanceData->ammoCapacity + 1;
+				}
+			}
+		}
+	}
+
+	void ClearChamberedRound(bool clearSecondary) //only if hasKW chamberedEnable/secChamberedEnable
+	{
+		ExtraDataList* extraData = nullptr;
+		(*g_player)->GetEquippedExtraData(41, &extraData);
+		if (extraData)
+		{
+			ExtraWeaponState* weaponState = (ExtraWeaponState*)extraData->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+			EquipWeaponData* eqData = (EquipWeaponData*)(*g_player)->middleProcess->unk08->equipData->equippedData;
+			TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast((*g_player)->middleProcess->unk08->equipData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			if (eqData && instanceData && weaponState)
+			{
+				if (clearSecondary)
+				{
+					instanceData->ammo = weaponState->chamberedRoundMP.second.ammoType;
+					eqData->ammo = instanceData->ammo;
+					//+++
+					weaponState->chamberedRoundMP.second.ammoType = nullptr;
+					weaponState->chamberedRoundMP.second.magazineCount = 0;
+				}
+				else
+				{
+					instanceData->ammo = weaponState->chamberedRoundMP.first.ammoType;
+					eqData->ammo = instanceData->ammo;
+					//+++
+					weaponState->chamberedRoundMP.first.ammoType = nullptr;
+					weaponState->chamberedRoundMP.first.magazineCount = 0;
+				}
+			}
 		}
 	}
 
