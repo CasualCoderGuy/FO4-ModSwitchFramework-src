@@ -319,6 +319,14 @@ namespace MSF_Papyrus
 		return false;
 	}
 
+	bool EquippedItemHasKeyword(StaticFunctionTag*, Actor* owner, BGSKeyword* keyword, UInt32 slotIndex)
+	{
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotIndex);
+		if (Utilities::WeaponInstanceHasKeyword(instanceData, keyword))
+			return true;
+		return false;
+	}
+
 	TESAmmo* GetEquippedBaseCaliber(StaticFunctionTag*, Actor * owner, UInt32 slotID = 41)
 	{
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(owner, slotID);
@@ -412,7 +420,9 @@ void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 	vm->RegisterFunction(
 		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSMod::Attachment::Mod*, UInt32>("EquippedItemHasMod", SCRIPTNAME, EquippedItemHasMod, vm));
 	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, TESAmmo*, Actor*, UInt32>("EquippedItemHasMod", SCRIPTNAME, GetEquippedBaseCaliber, vm));
+		new NativeFunction2 <StaticFunctionTag, TESAmmo*, Actor*, UInt32>("GetEquippedBaseCaliber", SCRIPTNAME, GetEquippedBaseCaliber, vm));
+	vm->RegisterFunction(
+		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSKeyword*, UInt32>("EquippedItemHasKeyword", SCRIPTNAME, EquippedItemHasKeyword, vm));
 
 	vm->RegisterFunction(
 		new NativeFunction0 <StaticFunctionTag, UInt32>("GetVersion", SCRIPTNAME, GetVersion, vm));

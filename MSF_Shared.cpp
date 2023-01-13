@@ -12,7 +12,7 @@ RelocAddr <_PlayIdle2> PlayIdleInternal2(0x13864C0);
 RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0 
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
-//RelocAddr <_HUDAmmoCounter__UpdateComponent> HUDAmmoCounter__UpdateComponent(0x000A0E580);
+RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
 
 RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
 RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
@@ -347,6 +347,49 @@ namespace Utilities
 		{
 			if (data->forms[i].formId == mod->formID)
 				return true;
+		}
+		return false;
+	}
+
+	BGSKeyword* GetAttachParent(BGSMod::Attachment::Mod* mod)
+	{
+		if (!mod)
+			return nullptr;
+		return GetKeywordFromValueArray(AttachParentArray::iDataType, mod->unkC0);
+	}
+
+	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
+	{
+		if (!attachPoints || !attachPointKW)
+			return false;
+		for (UInt32 i = 0; i < attachPoints->kewordValueArray.size; i++)
+		{
+			UInt16 value = attachPoints->kewordValueArray[i];
+			BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
+			if (keyword == attachPointKW)
+				return true;
+		}
+		return false;
+	}
+
+	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW)
+	{
+		if (!modData || !attachPointKW)
+			return false;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return false;
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
+			for (UInt32 i = 0; i < attachPoints->kewordValueArray.size; i++)
+			{
+				UInt16 value = attachPoints->kewordValueArray[i];
+				BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
+				if (keyword == attachPointKW)
+					return true;
+			}
 		}
 		return false;
 	}

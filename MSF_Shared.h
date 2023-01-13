@@ -164,6 +164,25 @@ struct unkEquipSlotStruct
 	UInt64 unk18; //=0x10001 or 0x10000
 };
 
+template <typename T> class TypedKeywordValueArray
+{
+public:
+	T* ptr;
+	int size;
+	T& operator[](int idx) { return *(ptr + idx); }
+};
+
+
+class AttachParentArray : public BaseFormComponent
+{
+public:
+	TypedKeywordValueArray<UInt16>	kewordValueArray;
+	enum
+	{
+		iDataType = 2
+	};
+};
+
 namespace Utilities
 {
 	TESForm* GetFormFromIdentifier(const std::string& identifier);
@@ -178,6 +197,9 @@ namespace Utilities
 	std::vector<BGSMod::Attachment::Mod*> FindModsByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
 	BGSMod::Attachment::Mod* GetFirstModWithPriority(BGSObjectInstanceExtra* modData, UInt8 priority);
 	bool HasObjectMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
+	BGSKeyword* GetAttachParent(BGSMod::Attachment::Mod* mod);
+	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
+	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW);
 	bool WeaponInstanceHasKeyword(TESObjectWEAP::InstanceData* instanceData, BGSKeyword* checkKW);
 	bool UpdateAimModel(MSFAimModel* oldModel, MSFAimModel* newModel);
 	bool UpdateZoomData(MSFZoomData* oldData, MSFZoomData* newData);
@@ -273,6 +295,7 @@ typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, InstanceDataStruct 
 typedef void(*_UniversalEquipHandler)(Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UnkSub_EFF9D0)(Actor* actor);
 typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
+typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, UInt32 value);
 
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
 typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent);
