@@ -1,14 +1,5 @@
 #include "MSF_Base.h"
 
-RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
-RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
-RelocAddr <_UpdateEquipData> UpdateEquipData(0x01C0040);
-RelocAddr <_UpdateAnimGraph> UpdateAnimGraph(0x0D7EB20);
-RelocAddr <_EquipHandler> EquipHandler(0x0E1D6D0);
-RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
-RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
-RelocAddr <_UnkSub_DFE930> UnkSub_DFE930(0xDFE930);
-
 namespace MSF_Base
 {
 	//========================== Main Functions ===========================
@@ -564,6 +555,35 @@ namespace MSF_Base
 				AttachModToEquippedWeapon(owner, mod, false, 2, false);
 		}
 		return true;
+	}
+
+	bool ReevalAttachedMods(TESObjectWEAP* baseWeap, BGSObjectInstanceExtra* mods)
+	{
+		if (!baseWeap || !mods)
+			return false;
+		auto data = mods->data;
+		if (!data || !data->forms)
+			return false;
+		std::vector<BGSMod::Attachment::Mod*> objectMods;
+		std::vector<BGSMod::Attachment::Mod*> remaining;
+		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (objectMod)
+			{
+				objectMods.push_back(objectMod);
+				remaining.push_back(objectMod);
+			}
+		}
+		AttachParentArray* baseAP = (AttachParentArray*)&baseWeap->attachParentArray;
+		for (std::vector<BGSMod::Attachment::Mod*>::iterator modIt = objectMods.begin(); modIt != objectMods.end(); modIt++)
+		{
+			if (baseAP->kewordValueArray.GetItemIndex((*modIt)->unkC0) >= 0)
+			{
+				//remaining.erase()
+				//	objectMods.
+			}
+		}
 	}
 
 	void SpawnRandomMods(TESObjectCELL* cell)

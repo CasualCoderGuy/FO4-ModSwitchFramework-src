@@ -22,6 +22,7 @@ std::vector<HUDFiringModeData> MSF_MainData::fmDisplayData;
 std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
 std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
 
+BGSKeyword* MSF_MainData::baseModCompatibilityKW;
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
 BGSKeyword* MSF_MainData::hasSecondaryAmmoKW;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
@@ -79,6 +80,12 @@ namespace MSF_Data
 		}
 		MSF_MainData::hasSwitchedAmmoKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x000002F);
 		MSF_MainData::APbaseMod = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000065);
+		if (MSF_MainData::baseModCompatibilityKW)
+		{
+			UInt16 attachParent = Utilities::GetValueForTypedKeyword(MSF_MainData::baseModCompatibilityKW);
+			if (attachParent >= 0)
+				MSF_MainData::APbaseMod->unkC0 = attachParent;
+		}
 		MSF_MainData::NullMuzzleMod = (BGSMod::Attachment::Mod*)LookupFormByID((UInt32)0x004F21D);
 		MSF_MainData::CanHaveNullMuzzleKW = (BGSKeyword*)LookupFormByID((UInt32)0x01C9E78);
 		MSF_MainData::FiringModeUnderbarrelKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000021);
@@ -469,6 +476,22 @@ namespace MSF_Data
 				{
 					_ERROR("Unsupported data version: %s", fileName.c_str());
 					return true;
+				}
+
+				data1 = json["compatibility"];
+
+				for (int i = 0; i < data1.size(); i++)
+				{
+					std::string apKWstr = data1["baseModAttachPoint"].asString();
+					if (apKWstr == "")
+						continue;
+					BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(apKWstr), TESForm, BGSKeyword);
+					if (!apKW || Utilities::GetValueForTypedKeyword(apKW) < 0)
+						continue;
+					if (MSF_MainData::baseModCompatibilityKW)
+						_WARNING("Conflict: attach point base mod compatibility keyword already loaded with formID: %s. Ignoring new keyword: %s in file %s", Utilities::GetIdentifierFromForm(MSF_MainData::baseModCompatibilityKW), Utilities::GetIdentifierFromForm(apKW), fileName.c_str());
+					else
+						MSF_MainData::baseModCompatibilityKW = apKW;
 				}
 				
 				data1 = json["plugins"];

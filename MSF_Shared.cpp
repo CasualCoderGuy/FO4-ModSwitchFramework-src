@@ -13,11 +13,20 @@ RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
 RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
+RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
+RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
+RelocAddr <_UpdateEquipData> UpdateEquipData(0x01C0040);
+RelocAddr <_UpdateAnimGraph> UpdateAnimGraph(0x0D7EB20);
+RelocAddr <_EquipHandler> EquipHandler(0x0E1D6D0);
+RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
+RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
+RelocAddr <_UnkSub_DFE930> UnkSub_DFE930(0xDFE930);
 
 RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
 RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
 RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
 RelocPtr  <void*> unk_05AB38D0(0x5AB38D0);
+RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
 
 BSExtraData::~BSExtraData() {};
 void BSExtraData::Unk_01() {};
@@ -129,6 +138,32 @@ namespace Utilities
 			return LookupFormByID(formID);
 		}
 		return nullptr;
+	}
+
+	const char* GetIdentifierFromForm(TESForm* form)
+	{
+		if (!form)
+			return "";
+		UInt32 formID = form->formID;
+		if ((formID & 0xFF000000) == 0xFE000000)
+		{
+			std::ostringstream str;
+			UInt8 modIndex = (UInt8)(formID >> 12 & 0xFF);
+			str << (*g_dataHandler)->modList.lightMods[modIndex]->name << '|';
+			formID &= 0xFFFF;
+			str << std::hex << formID;
+			return str.str().c_str();
+		}
+		else if ((formID & 0xFF000000) != 0xFF000000)
+		{
+			std::ostringstream str;
+			UInt8 modIndex = (UInt8)(formID >> 24);
+			str << (*g_dataHandler)->modList.loadedMods[modIndex]->name << '|';
+			formID &= 0xFFFFFF;
+			str << std::hex << formID;
+			return str.str().c_str();
+		}
+		return "";
 	}
 
 	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot)
@@ -358,11 +393,18 @@ namespace Utilities
 		return GetKeywordFromValueArray(AttachParentArray::iDataType, mod->unkC0);
 	}
 
+	SInt16 GetValueForTypedKeyword(BGSKeyword* keyword)
+	{
+		if (!keyword)
+			return -1;
+		return g_AttachPointKeywordArray->GetItemIndex(keyword);
+	}
+
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
 	{
 		if (!attachPoints || !attachPointKW)
 			return false;
-		for (UInt32 i = 0; i < attachPoints->kewordValueArray.size; i++)
+		for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 		{
 			UInt16 value = attachPoints->kewordValueArray[i];
 			BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
@@ -383,13 +425,28 @@ namespace Utilities
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
-			for (UInt32 i = 0; i < attachPoints->kewordValueArray.size; i++)
+			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 			{
 				UInt16 value = attachPoints->kewordValueArray[i];
 				BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
 				if (keyword == attachPointKW)
 					return true;
 			}
+		}
+		return false;
+	}
+
+	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
+	{
+		if (!attachPoints || !attachPointKW)
+			return false;
+		SInt16 idx = g_AttachPointKeywordArray->GetItemIndex(attachPointKW);
+		if (idx >= 0)
+		{
+			UInt16 uidx = (UInt16)idx;
+			if (attachPoints->kewordValueArray.GetItemIndex(uidx) == -1)
+				attachPoints->kewordValueArray.Push(idx);
+			return true;
 		}
 		return false;
 	}

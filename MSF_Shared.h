@@ -16,12 +16,17 @@
 #include "RNG.h"
 #include  <thread>
 #include  <chrono>
+#include  <sstream>
 
 
 UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 
-class TESIdleForm;
+class TESIdleForm : public TESForm
+{
+public:
+	enum { kTypeID = kFormType_IDLE };
+};
 
 class MSFAimModel : public TESForm //https://github.com/isathar/F4SE_AmmoTweaksExtension cast AimModel as MSFAimModel, edit result
 {
@@ -167,9 +172,148 @@ struct unkEquipSlotStruct
 template <typename T> class TypedKeywordValueArray
 {
 public:
-	T* ptr;
-	int size;
-	T& operator[](int idx) { return *(ptr + idx); }
+	T* entries;
+	UInt32 count;
+	//T& operator[](int idx) { return *(ptr + idx); }
+
+	TypedKeywordValueArray() : entries(NULL), count(0) { }
+
+	T& operator[](UInt64 index)
+	{
+		return entries[index];
+	}
+
+	bool GetNthItem(UInt64 index, T& pT) const
+	{
+		if (index < count) {
+			pT = entries[index];
+			return true;
+		}
+		return false;
+	}
+
+	SInt64 GetItemIndex(T & pFind) const
+	{
+		for (UInt64 n = 0; n < count; n++) {
+			T& pT = entries[n];
+			if (pT == pFind)
+				return n;
+		}
+		return -1;
+	}
+
+	void Clear()
+	{
+		Heap_Free(entries);
+		entries = NULL;
+		count = 0;
+	}
+
+	bool Push(const T & entry)
+	{
+		UInt32 idx = count;
+		if (!Grow())
+			return false;
+		entries[idx] = entry;
+		return true;
+	};
+
+	bool Insert(UInt32 index, const T & entry)
+	{
+		if (!entries)
+			return false;
+
+		UInt32 lastSize = count;
+
+		if (!Grow())
+			return false;
+
+		if (index != lastSize)  // Not inserting onto the end, need to move everything down
+		{
+			UInt32 remaining = count - index;
+			memmove_s(&entries[index + 1], sizeof(T) * remaining, &entries[index], sizeof(T) * remaining); // Move the rest up
+		}
+
+		entries[index] = entry;
+		return true;
+	};
+
+	bool Remove(UInt32 index)
+	{
+		if (!entries || index >= count)
+			return false;
+
+		// This might not be right for pointer types...
+		(&entries[index])->~T();
+
+		if (index + 1 < count) {
+			UInt32 remaining = count - index;
+			memmove_s(&entries[index], sizeof(T) * remaining, &entries[index + 1], sizeof(T) * remaining); // Move the rest up
+		}
+		count--;
+		if (count == 0)
+			Clear();
+		else
+			Shrink();
+
+		return true;
+	}
+
+private:
+	bool Shrink()
+	{
+		if (!entries) return false;
+
+		try {
+			UInt32 newSize = count;
+			T * oldArray = entries;
+			T * newArray = (T *)Heap_Allocate(sizeof(T) * newSize); // Allocate new block
+			memmove_s(newArray, sizeof(T) * newSize, entries, sizeof(T) * newSize); // Move the old block
+			entries = newArray;
+			Heap_Free(oldArray); // Free the old block
+			return true;
+		}
+		catch (...) {
+			return false;
+		}
+
+		return false;
+	}
+
+	bool Grow()
+	{
+		if (!entries) {
+			entries = (T *)Heap_Allocate(sizeof(T));
+			count = 1;
+			return true;
+		}
+
+		try {
+			UInt32 oldSize = count;
+			UInt32 newSize = oldSize + 1;
+			T * oldArray = entries;
+			T * newArray = (T *)Heap_Allocate(sizeof(T) * newSize); // Allocate new block
+			if (oldArray)
+				memmove_s(newArray, sizeof(T) * newSize, entries, sizeof(T) * oldSize); // Move the old block
+			entries = newArray;
+			count = newSize;
+
+			if (oldArray)
+				Heap_Free(oldArray); // Free the old block
+
+			for (UInt32 i = oldSize; i < newSize; i++) // Allocate the rest of the free blocks
+				new (&entries[i]) T;
+
+			return true;
+		}
+		catch (...) {
+			return false;
+		}
+
+		return false;
+	}
+
+	DEFINE_STATIC_HEAP(Heap_Allocate, Heap_Free)
 };
 
 
@@ -186,6 +330,7 @@ public:
 namespace Utilities
 {
 	TESForm* GetFormFromIdentifier(const std::string& identifier);
+	const char* GetIdentifierFromForm(TESForm* form);
 	UInt32 GetEquippedItemFormID(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
@@ -198,8 +343,10 @@ namespace Utilities
 	BGSMod::Attachment::Mod* GetFirstModWithPriority(BGSObjectInstanceExtra* modData, UInt8 priority);
 	bool HasObjectMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
 	BGSKeyword* GetAttachParent(BGSMod::Attachment::Mod* mod);
+	SInt16 GetValueForTypedKeyword(BGSKeyword* keyword);
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
 	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW);
+	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
 	bool WeaponInstanceHasKeyword(TESObjectWEAP::InstanceData* instanceData, BGSKeyword* checkKW);
 	bool UpdateAimModel(MSFAimModel* oldModel, MSFAimModel* newModel);
 	bool UpdateZoomData(MSFZoomData* oldData, MSFZoomData* newData);
@@ -313,10 +460,31 @@ typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStr
 //typedef bool(*_UnEquipItem)(void* unkPtr, Actor* target, unkWeapBaseStruct baseWeap, UInt32 unk_r9d, UInt64 unk_rsp20, SInt32 unk_rsp28, UInt8 unk_rsp30, UInt8 unk_rsp38, UInt8 unk_rsp40, UInt8 unk_rsp48, UInt64 unk_rsp50);
 // sub_140E1BEF0(qword_145A10618, v7, &v25, 1, v16, -1, 1, a5, 1, 0, 0i64);
 
+extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
+extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
+extern RelocAddr <_AddItem_Native> AddItemNative;
+extern RelocAddr <_RemoveItem_Native> RemoveItemNative;
+extern RelocAddr <_IsInIronSights> IsInIronSights;
+extern RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal; //0x140EA10
+extern RelocAddr <_PlayIdle> PlayIdleInternal; //0x13863A0
+extern RelocAddr <_PlayIdle2> PlayIdleInternal2;
+extern RelocAddr <_PlayIdleAction> PlayIdleActionInternal; //0x13864A0 
+extern RelocAddr <_ShowNotification> ShowNotification;
+extern RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal; //0x138A130
+extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;
+extern RelocAddr <_AttachModToStack> AttachRemoveModStack;
+extern RelocAddr <_UpdMidProc> UpdateMiddleProcess;
+extern RelocAddr <_UpdateEquipData> UpdateEquipData;
+extern RelocAddr <_UpdateAnimGraph> UpdateAnimGraph;
+extern RelocAddr <_EquipHandler> EquipHandler;
+extern RelocAddr <_UniversalEquipHandler> UniversalEquipHandler;
+extern RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0;
+extern RelocAddr <_UnkSub_DFE930> UnkSub_DFE930;
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;
 extern RelocPtr <void*> unk_05AB38D0; //unkmanager
+extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 
 
 //AddItem?shorter?: 0x143A0C0
@@ -603,11 +771,5 @@ public:
 	//	void	** _vtbl;	// 00
 	UInt32 unk04;		// 04
 	UInt32 unk08;		// 08
-};
-
-class TESIdleForm : public TESForm
-{
-public:
-	enum { kTypeID = kFormType_IDLE };
 };
 	

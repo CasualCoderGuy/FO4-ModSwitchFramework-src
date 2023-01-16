@@ -293,6 +293,7 @@ public:
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> fireAnimDataMap;
 
 	//Mandatory Data, filled during mod initialization
+	static BGSKeyword* baseModCompatibilityKW;
 	static BGSKeyword* hasSwitchedAmmoKW;
 	static BGSKeyword* hasSecondaryAmmoKW;
 	static BGSMod::Attachment::Mod* APbaseMod;

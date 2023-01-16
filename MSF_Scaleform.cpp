@@ -61,7 +61,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::ListModTable(*g_player);
 				//MSF_Test::PrintStoredData();
 				//MSF_Test::DumpAttachParent();
-				MSF_Test::GetWeaponState();
+				//MSF_Test::GetWeaponState();
+				MSF_Test::DumpAttachParent();
 				//MSF_Test::SetAmmoTest();
 				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
@@ -92,7 +93,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
 				//MSF_Test::AttachModInternalTest(true, 2);
-				MSF_Test::CreateWeaponState();
+				//MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
 				//MSF_Test::CallAttachModToInvItem();
