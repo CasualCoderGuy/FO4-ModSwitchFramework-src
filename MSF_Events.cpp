@@ -89,13 +89,13 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 	{
 		if (evn->isOpen)
 		{
-			MSF_MainData::numberOfOpenedMenus++;
+			MSF_MainData::modSwitchManager.IncOpenedMenus();
 		}
-		else if (MSF_MainData::numberOfOpenedMenus > 0)
+		else if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
-			MSF_MainData::numberOfOpenedMenus--;
+			MSF_MainData::modSwitchManager.DecOpenedMenus();
 		}
-		if (MSF_MainData::numberOfOpenedMenus > 0)
+		if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
 			//_MESSAGE("CloseMSFMenu");
 			//MSFMenu::CloseMenu();

@@ -28,7 +28,7 @@ namespace MSF_Scaleform
 	bool UpdateWidgetSettings();
 	UInt32 GetInterfaceVersion();
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
-	bool ToggleModMenu(ModSelectionMenu* selectMenu, std::vector<ModAssociationData*>* modAssociations);
+	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);
 }
 
 class MSFWidgetMenu : public GameMenuBase

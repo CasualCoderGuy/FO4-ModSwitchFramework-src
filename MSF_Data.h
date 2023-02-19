@@ -19,6 +19,7 @@ public:
 class AnimationData
 {
 public:
+	// TESIdleForm* GetAnimation();
 	TESIdleForm* animIdle_1stP;
 	TESIdleForm* animIdle_3rdP;
 	//BGSAction* animAction;
@@ -27,73 +28,66 @@ public:
 class ModData
 {
 public:
-	struct Mod
+	class Mod
 	{
+	public:
+		enum
+		{
+			//bCanToggleSingle = 0x0004,
+			//bCanToggleSingle_SkipFirst = 0x0008,
+			//bThreadSafe = 0x0100,
+			bDrawEnabled = 0x1000,
+			bRequireLooseMod = 0x2000,
+			bUpdateAnimGraph = 0x4000,
+			bIgnoreAnimations = 0x8000,
+			mBitTransferMask = 0xF000
+		};
+		class AttachRequirements
+		{
+		public:
+			bool CheckRequirements(ExtraDataList* extraData);
+			struct Requirements
+			{
+				std::vector<TESObjectWEAP*> weapons;
+				std::vector<BGSMod::Attachment::Mod*> mods;
+				std::vector<BGSKeyword*> keywords;
+			};
+			Requirements requirements;
+			Requirements lackrequirements;
+		};
 		BGSMod::Attachment::Mod* mod;
 		UInt16 flags;
+		AttachRequirements* attachRequirements;
 		AnimationData* animData;
 	};
-	struct BaseModEnabledStruct
+	typedef std::vector<Mod*> ModVector;
+	struct ModCycle
 	{
-		std::unordered_map<Mod*, std::vector<Mod*>*> enabledModCycleMap; //hash: functonMod, bucket: functionMod cycle the functonMod is in
-		std::unordered_map<Mod*, Mod*> baseModMap; //hash: baseMod, bucket: functionMod
-	};
-	BGSKeyword* functionKeyword;
-	UInt16 flags;
-	BaseModEnabledStruct baseModEnabledData;
-	std::unordered_map<Mod*, std::vector<Mod*>*> modCycleMap; //hash: baseMod, bucket: functionMod cycle
-};
-
-class ModAssociationData
-{
-protected:
-	UInt8 type;
-public:
-	UInt8 GetType() { return type; }
-	struct ModPair
-	{
-		BGSMod::Attachment::Mod* parentMod;
-		BGSMod::Attachment::Mod* functionMod;
+		enum
+		{
+			bCannotHaveNullMod = 0x0001
+		};
+		ModVector mods;
+		UInt32 flags;
 	};
 	enum
 	{
-		bRequireAPmod = 0x0001,
-		bCanHaveNullMod = 0x0002,
-		bCanToggleSingle = 0x0004,
-		bCanToggleSingle_SkipFirst = 0x0008,
-		bThreadSafe = 0x0100,
-		bDrawEnabled = 0x1000,
-		bRequireLooseMod = 0x2000,
-		bUpdateAnimGraph = 0x4000,
-		bIgnoreAnimations = 0x8000,
-		mBitTransferMask = 0xF001
+		bRequireAPmod = 0x0001
 	};
+	UInt16 attachParentValue;
 	UInt16 flags;
-	BGSKeyword* funcKeyword; //!!!!
-	TESIdleForm* animIdle_1stP;
-	TESIdleForm* animIdle_3rdP;
+	Mod::AttachRequirements* APattachRequirements;
+	std::unordered_map<KeywordValue, ModCycle*> modCycleMap; //hash: attachparent mod's instantiation keyword value, bucket: modcycle; if multiple cycles are found ambiuguity error is thrown
 };
 
-class SingleModPair : public ModAssociationData
+class ModCompatibilityEdits
 {
 public:
-	SingleModPair() { type = 0x1; }
-	ModPair modPair;
-};
-
-class ModPairArray : public ModAssociationData
-{
-public:
-	ModPairArray() { type = 0x2; }
-	std::vector<ModPair> modPairs;
-};
-
-class MultipleMod : public ModAssociationData
-{
-public:
-	MultipleMod() { type = 0x3; }
-	BGSMod::Attachment::Mod* parentMod;
-	std::vector<BGSMod::Attachment::Mod*> functionMods;
+	KeywordValue attachParent;
+	std::vector<KeywordValue> removedAPslots;
+	std::vector<KeywordValue> addedAPslots;
+	std::vector<KeywordValue> removedFilters;
+	std::vector<KeywordValue> addedFilters;
 };
 
 class BurstMode
@@ -110,26 +104,15 @@ public:
 	bool animReady;
 };
 
-class HUDFiringModeData
+class HUDDisplayData
 {
 public:
-	BGSKeyword* modeKeyword;
+	BGSKeyword* keyword;
 	std::string displayString;
 };
-
-class HUDScopeData
-{
-public:
-	BGSKeyword* scopeKeyword;
-	std::string displayString;
-};
-
-class HUDMuzzleData
-{
-public:
-	BGSKeyword* muzzleKeyword;
-	std::string displayString;
-};
+class HUDFiringModeData : public HUDDisplayData {};
+class HUDScopeData : public HUDDisplayData {};
+class HUDMuzzleData : public HUDDisplayData {};
 
 class ModSelectionMenu
 {
@@ -153,6 +136,7 @@ public:
 class KeybindData
 {
 public:
+
 	enum
 	{
 		//lower 4 bits: Nth
@@ -169,7 +153,8 @@ public:
 	ModSelectionMenu* selectMenu;
 	//std::string swfPath;
 	//std::string menuScriptPath;
-	std::vector<ModAssociationData*> modAssociations;
+	//std::vector<ModAssociationData*> modAssociations;
+	ModData* modData;
 };
 
 class MCMfloatData
@@ -182,7 +167,6 @@ public:
 class SwitchData
 {
 public:
-	//SwitchData() { InitializeCriticalSection(switchCriticalSection); }
 	enum
 	{
 		bNeedInit = 0x0001,
@@ -202,7 +186,6 @@ public:
 		bUpdateAnimGraph = 0x4000,
 		bIgnoreAnimations = 0x8000
 	};
-	LPCRITICAL_SECTION switchCriticalSection;
 	UInt16 SwitchFlags;
 	BGSMod::Attachment::Mod* ModToAttach;
 	BGSMod::Attachment::Mod* ModToRemove;
@@ -211,7 +194,6 @@ public:
 	TESIdleForm* AnimToPlay1stP;
 	TESIdleForm* AnimToPlay3rdP;
 	TESObjectWEAP::InstanceData* equippedInstanceData;
-	ModSelectionMenu* openedMenu;
 	void ClearData()
 	{
 		//EnterCriticalSection(switchCriticalSection);
@@ -258,39 +240,95 @@ public:
 
 class ModSwitchManager
 {
-public:
-	UInt16 SwitchState;
-	SwitchData* threadUnsafeData;
-	std::string openedMenu;
+private:
+	UInt16 switchState;
+	BSReadWriteLock queueLock;
+	std::vector<SwitchData*> switchDataQueue;
+
+	BSReadWriteLock menuLock;
+	ModSelectionMenu* openedMenu;
+	int numberOfOpenedMenus;
+
 	TESObjectWEAP::InstanceData* equippedInstanceData;
+public:
+	ModSwitchManager()
+	{
+		switchState = 0;
+		openedMenu = nullptr;
+		numberOfOpenedMenus = 0;
+		equippedInstanceData = nullptr;
+	};
+
+	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
+	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { equippedInstanceData = weaponInstance; };
+	void IncOpenedMenus() { numberOfOpenedMenus++; };
+	void DecOpenedMenus() { numberOfOpenedMenus--; };
+	int GetOpenedMenus() { return numberOfOpenedMenus; };
+	ModSelectionMenu* GetOpenedMenu() { return openedMenu; };
+	void SetOpenedMenu(ModSelectionMenu* menu) { openedMenu = menu; };
+	bool QueueSwitch(SwitchData* data)
+	{
+		if (!data)
+			return false;
+		queueLock.LockForWrite();
+		//find?
+		switchDataQueue.push_back(data);
+		queueLock.Unlock();
+		return true;
+	};
+	bool FinishSwitch(SwitchData* data)
+	{
+		if (!data)
+			return false;
+		queueLock.LockForReadAndWrite();
+		//find?
+		auto it = std::find(switchDataQueue.begin(), switchDataQueue.end(), data);
+		if (it != switchDataQueue.end())
+			switchDataQueue.erase(it);
+		queueLock.Unlock();
+		return true;
+	};
+	SwitchData* GetNextSwitch()
+	{
+		SwitchData* result = nullptr;
+		queueLock.LockForReadAndWrite();
+		for (auto it = switchDataQueue.begin(); it != switchDataQueue.end(); it++)
+		{
+
+		}
+		queueLock.Unlock();
+		return result;
+	};
 };
 
 class MSF_MainData
 {
 public:
 	static bool IsInitialized;
+
 	static RandomNumber rng;
 	static int iCheckDelayMS;
+
 	static GFxMovieRoot* MSFMenuRoot;
 	static ModSelectionMenu* widgetMenu;
-	static int numberOfOpenedMenus;
+
+	static ModSwitchManager modSwitchManager;
 
 	static SwitchData switchData;
 	static std::vector<BurstMode> burstMode;
 	static Utilities::Timer tmr;
 
 	//Data added by plugins
-	static std::vector<SingleModPair> singleModPairs;
-	static std::vector<ModPairArray> modPairArrays;
-	static std::vector<MultipleMod> multiModAssocs;
-
-	static std::vector<HUDFiringModeData> fmDisplayData;
-	static std::vector<HUDScopeData> scopeDisplayData;
-	static std::vector<HUDMuzzleData> muzzleDisplayData;
-
+	static std::unordered_map<UInt64, KeybindData*> keybindMap;
+	static std::unordered_map<std::string, KeybindData*> keybindIDMap;
 	static std::unordered_map<TESAmmo*, AmmoData*> ammoDataMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> reloadAnimDataMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> fireAnimDataMap;
+	static std::vector<HUDFiringModeData> fmDisplayData;
+	static std::vector<HUDScopeData> scopeDisplayData;
+	static std::vector<HUDMuzzleData> muzzleDisplayData;
+	static std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> compatibilityEdits;
+	static std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> instantiationRequirements;
 
 	//Mandatory Data, filled during mod initialization
 	static BGSKeyword* baseModCompatibilityKW;
@@ -327,17 +365,17 @@ public:
 		bShowAmmoName = 0x0008,
 		bShowMuzzleName = 0x0010,
 		bShowFiringMode = 0x0020,
-		bShowScopeData = 0x0040
+		bShowScopeData = 0x0040,
+		bShowUnavailableMods = 0x0080
 	};
 	static UInt16 MCMSettingFlags;
 	static std::unordered_map<std::string, float> MCMfloatSettingMap;
-	static std::unordered_map<UInt64, KeybindData*> keybindMap;
-	static std::unordered_map<std::string, KeybindData*> keybindIDMap;
 };
 
 namespace MSF_Data
 {
 	bool InitData();
+	bool InitCompatibility();
 	bool InitMCMSettings();
 	bool ReadMCMKeybindData();
 	bool ReadKeybindData();
@@ -347,8 +385,8 @@ namespace MSF_Data
 	bool LoadPluginData();
 	bool ReadDataFromJSON(std::string fileName, std::string location);
 	bool GetNthAmmoMod(UInt32 num);
-	bool GetNthMod(UInt32 num, std::vector<ModAssociationData*>* modAssociations);
-	bool GetNextMod(BGSInventoryItem::Stack* eqStack, std::vector<ModAssociationData*>* modAssociations);
+	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
+	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
 	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack);
 	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP);

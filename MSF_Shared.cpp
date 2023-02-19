@@ -27,6 +27,9 @@ RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
 RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
 RelocPtr  <void*> unk_05AB38D0(0x5AB38D0);
 RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
+RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420);
+RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438);
+RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498);
 
 BSExtraData::~BSExtraData() {};
 void BSExtraData::Unk_01() {};
@@ -164,6 +167,17 @@ namespace Utilities
 			return str.str().c_str();
 		}
 		return "";
+	}
+
+	bool AddToFormList(BGSListForm* flst, TESForm* form, SInt64 idx)
+	{
+		if (!flst || !form)
+			return false;
+		if (idx >= 0 && idx <= flst->forms.count)
+			flst->forms.Insert(idx & 0xFFFFFFFF, form);
+		else
+			flst->forms.Push(form);
+		return true;
 	}
 
 	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot)
@@ -393,11 +407,38 @@ namespace Utilities
 		return GetKeywordFromValueArray(AttachParentArray::iDataType, mod->unkC0);
 	}
 
-	SInt16 GetValueForTypedKeyword(BGSKeyword* keyword)
+	bool GetParentMods(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod, std::vector<BGSMod::Attachment::Mod*>* parents)
+	{
+		if (!modData || !mod || !parents)
+			return false;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return false;
+		parents->clear();
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod || objectMod == mod)
+				continue;
+			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
+			if (attachPoints->kewordValueArray.GetItemIndex(mod->unkC0) >= 0)
+				parents->push_back(objectMod);
+		}
+		return true;
+	}
+
+	KeywordValue GetAttachValueForTypedKeyword(BGSKeyword* keyword)
 	{
 		if (!keyword)
 			return -1;
 		return g_AttachPointKeywordArray->GetItemIndex(keyword);
+	}
+
+	KeywordValue GetInstantiationValueForTypedKeyword(BGSKeyword* keyword)
+	{
+		if (!keyword)
+			return -1;
+		return g_InstantiationKeywordArray->GetItemIndex(keyword);
 	}
 
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
@@ -406,7 +447,7 @@ namespace Utilities
 			return false;
 		for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 		{
-			UInt16 value = attachPoints->kewordValueArray[i];
+			KeywordValue value = attachPoints->kewordValueArray[i];
 			BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
 			if (keyword == attachPointKW)
 				return true;
@@ -424,16 +465,68 @@ namespace Utilities
 		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
 			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 			{
-				UInt16 value = attachPoints->kewordValueArray[i];
+				KeywordValue value = attachPoints->kewordValueArray[i];
 				BGSKeyword* keyword = GetKeywordFromValueArray(AttachParentArray::iDataType, value);
 				if (keyword == attachPointKW)
 					return true;
 			}
 		}
 		return false;
+	}
+
+	BGSMod::Attachment::Mod* GetModAtAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue value)
+	{
+		if (!modData)
+			return nullptr;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return nullptr;
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
+			if (objectMod->unkC0 == value)
+				return objectMod;
+		}
+		return nullptr;
+	}
+
+	bool GetParentInstantiationValues(BGSObjectInstanceExtra* modData, KeywordValue parentValue, std::vector<KeywordValue>* instantiationValues)
+	{
+		if (!modData)
+			return false;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return false;
+		instantiationValues->clear();
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
+			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
+			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
+			{
+				_MESSAGE("api: %i", i);
+				KeywordValue value = attachPoints->kewordValueArray[i];
+				if (value == parentValue)
+				{
+					KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&objectMod->unkB0);
+					_MESSAGE("if count: %i", instantiationData->count);
+					for (UInt32 i = 0; i < instantiationData->count; i++)
+						instantiationValues->push_back((*instantiationData)[i]);
+					break;
+				}
+			}
+		}
+		_MESSAGE("if counts: %i", instantiationValues->size());
+		return true;
 	}
 
 	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
@@ -446,6 +539,18 @@ namespace Utilities
 			UInt16 uidx = (UInt16)idx;
 			if (attachPoints->kewordValueArray.GetItemIndex(uidx) == -1)
 				attachPoints->kewordValueArray.Push(idx);
+			return true;
+		}
+		return false;
+	}
+
+	bool AddAttachValue(AttachParentArray* attachPoints, KeywordValue attachValue)
+	{
+		if (!attachPoints || attachValue < 0)
+			return false;
+		if (attachPoints->kewordValueArray.GetItemIndex(attachValue) == -1)
+		{
+			attachPoints->kewordValueArray.Push(attachValue);
 			return true;
 		}
 		return false;

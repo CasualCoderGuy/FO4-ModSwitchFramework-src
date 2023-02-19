@@ -126,6 +126,8 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				_MESSAGE("Plugin Data Loading Time: %llu ms.", tmr.stop());
 
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
+
+				MSF_Data::InitCompatibility();
 			}
 		}
 	}

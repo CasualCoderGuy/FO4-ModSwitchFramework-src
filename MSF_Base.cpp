@@ -93,12 +93,44 @@ namespace MSF_Base
 	}
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove)
+	bool SwitchToSelectedMod(void* modDataToAttach, void* modDataToRemove)
 	{
-		if (!modToAttach && !modToRemove)
+		if (!modDataToAttach && !modDataToRemove)
 			return false;
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
+
+		ModData::Mod* modToAttach = reinterpret_cast<ModData::Mod*>(modDataToAttach);
+		ModData::Mod* modToRemove = reinterpret_cast<ModData::Mod*>(modDataToRemove);
+		if (modToAttach)
+		{
+			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+					return false; //missing loosemod
+				MSF_MainData::switchData.LooseModToRemove = looseMod;
+			}
+			MSF_MainData::switchData.ModToAttach = modToAttach->mod;
+			MSF_MainData::switchData.SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
+			MSF_MainData::switchData.AnimToPlay1stP = nullptr;
+			MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
+			if (modToAttach->animData)
+			{
+				MSF_MainData::switchData.AnimToPlay1stP = modToAttach->animData->animIdle_1stP;
+				MSF_MainData::switchData.AnimToPlay3rdP = modToAttach->animData->animIdle_3rdP;
+			}
+		}
+		if (modToRemove)
+		{
+			MSF_MainData::switchData.ModToRemove = modToRemove->mod;
+			MSF_MainData::switchData.LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
+			//remove anim?
+		}
+		
+		MSF_MainData::switchData.ModToRemove = modToRemove->mod;
+
+
 		if (!(MSF_MainData::switchData.SwitchFlags & SwitchData::bIgnoreAnimations))
 		{
 			if (!MSF_Base::HandlePendingAnimations())
@@ -112,8 +144,8 @@ namespace MSF_Base
 				return false;
 			}
 		}
-		MSF_MainData::switchData.ModToAttach = reinterpret_cast<BGSMod::Attachment::Mod*>(modToAttach);
-		MSF_MainData::switchData.ModToRemove = reinterpret_cast<BGSMod::Attachment::Mod*>(modToRemove);
+
+
 		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bSetLooseMods)
 		{
 			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bSetLooseMods;
@@ -156,14 +188,14 @@ namespace MSF_Base
 
 
 	//FROM HOTKEY:
-	bool ToggleModHotkey(std::vector<ModAssociationData*>* modAssociations)
+	bool ToggleModHotkey(ModData* modData)
 	{
 		_MESSAGE("swflags: %04X", MSF_MainData::switchData.SwitchFlags);
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
 		Actor* playerActor = *g_player;
 		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(playerActor, 41);
-		if (MSF_Data::GetNextMod(eqStack, modAssociations))
+		if (MSF_Data::GetNextMod(eqStack, modData))
 		{
 			if (SwitchData::bNeedInit)
 			{
@@ -208,11 +240,13 @@ namespace MSF_Base
 		return false;
 	}
 
-	bool SwitchModHotkey(UInt8 key, std::vector<ModAssociationData*>* modAssociations)
+	bool SwitchModHotkey(UInt8 key, ModData* modData)
 	{
 		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
 			return false;
-		if (MSF_Data::GetNthMod(key, modAssociations))
+		Actor* playerActor = *g_player;
+		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(playerActor, 41);
+		if (MSF_Data::GetNthMod(key, eqStack, modData))
 		{
 			if (SwitchData::bNeedInit)
 			{
@@ -227,7 +261,7 @@ namespace MSF_Base
 				if (!MSF_Base::HandlePendingAnimations())
 					return false;
 			}
-			if (MSF_MainData::switchData.SwitchFlags & SwitchData::bDrawEnabled || (*g_player)->actorState.IsWeaponDrawn())
+			if (MSF_MainData::switchData.SwitchFlags & SwitchData::bDrawEnabled || playerActor->actorState.IsWeaponDrawn())
 			{
 				MSF_MainData::switchData.SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
 				if (!MSF_Base::DrawWeapon())
@@ -565,23 +599,66 @@ namespace MSF_Base
 		if (!data || !data->forms)
 			return false;
 		std::vector<BGSMod::Attachment::Mod*> objectMods;
-		std::vector<BGSMod::Attachment::Mod*> remaining;
+		std::vector<BGSMod::Attachment::Mod*> qualified;
 		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-			if (objectMod)
+			objectMods.push_back(objectMod);
+			if (objectMod && MSF_MainData::instantiationRequirements.count(objectMod) > 0)
 			{
-				objectMods.push_back(objectMod);
-				remaining.push_back(objectMod);
+				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
+				bool bRemove = true;
+				std::vector<BGSMod::Attachment::Mod*> parentMods;
+				Utilities::GetParentMods(mods, objectMod, &parentMods);
+				for (auto it = range.first; it != range.second; ++it)
+				{
+					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
+					{
+						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
+						if (instantiationData->GetItemIndex(it->second) >= 0)
+						{
+							bRemove = false;
+							break;
+						}
+					}
+					if (bRemove == false)
+						break;
+				}
+				//remove
 			}
 		}
 		AttachParentArray* baseAP = (AttachParentArray*)&baseWeap->attachParentArray;
-		for (std::vector<BGSMod::Attachment::Mod*>::iterator modIt = objectMods.begin(); modIt != objectMods.end(); modIt++)
+		if (baseAP->kewordValueArray.count > 0)
 		{
-			if (baseAP->kewordValueArray.GetItemIndex((*modIt)->unkC0) >= 0)
+			std::vector<KeywordValue> attachPoints;
+			for (UInt32 i = 0; i < baseAP->kewordValueArray.count; i++)
+				attachPoints.push_back(baseAP->kewordValueArray[i]);
+			//for (std::vector<KeywordValue>::iterator itValue = attachPoints.begin(); itValue != attachPoints.end(); itValue++)
+			for (UInt32 i = 0; i < attachPoints.size(); i++)
 			{
-				//remaining.erase()
-				//	objectMods.
+				for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = objectMods.begin(); itMod != objectMods.end(); itMod++)
+				{
+					if (*itMod)
+					{
+						if ((*itMod)->unkC0 == attachPoints[i])
+						{
+							qualified.push_back(*itMod);
+							AttachParentArray* apArray = (AttachParentArray*)&baseWeap->attachParentArray;
+							for (UInt32 i2 = 0; i2 < apArray->kewordValueArray.count; i2++)
+								attachPoints.push_back(baseAP->kewordValueArray[i2]);
+							*itMod = nullptr;
+						}
+					}
+				}
+				if (qualified.size() == objectMods.size())
+					break;
+			}
+			for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = objectMods.begin(); itMod != objectMods.end(); itMod++)
+			{
+				if (*itMod)
+				{
+					break; //remove
+				}
 			}
 		}
 	}
@@ -633,7 +710,7 @@ namespace MSF_Base
 			{
 				if (!weaponState)
 				{
-					weaponState = new ExtraWeaponState;
+					weaponState = new ExtraWeaponState();
 					extraData->Add(ExtraWeaponState::kType_ExtraWeaponState, weaponState);
 				}
 				if (hasSecondaryAmmo)
@@ -698,7 +775,7 @@ namespace MSF_Base
 			{
 				if (!weaponState)
 				{
-					weaponState = new ExtraWeaponState;
+					weaponState = new ExtraWeaponState();
 					extraData->Add(ExtraWeaponState::kType_ExtraWeaponState, weaponState);
 				}
 				if (hasSecondaryAmmo)
@@ -871,7 +948,7 @@ namespace MSF_Base
 	{
 		if (!data)
 		{
-			data = new BurstMode;
+			data = new BurstMode();
 			data->actor = *g_player;
 			data->fireSingleAction = MSF_MainData::ActionFireSingle;
 			data->fireIdle = MSF_MainData::fireIdle1stP;

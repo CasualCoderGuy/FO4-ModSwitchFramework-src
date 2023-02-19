@@ -8,8 +8,8 @@ namespace MSF_Base
 	bool SwitchToSelectedAmmo(void* obj, bool bAttach);
 	bool SwitchAmmoHotkey(UInt8 key);
 	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove);
-	bool ToggleModHotkey(std::vector<ModAssociationData*>* modAssociations);
-	bool SwitchModHotkey(UInt8 key, std::vector<ModAssociationData*>* modAssociations);
+	bool ToggleModHotkey(ModData* modData);
+	bool SwitchModHotkey(UInt8 key, ModData* modData);
 	bool HandlePendingAnimations(bool bDoQueueSwitch = false);
 	bool InitWeapon();
 	void SwitchFlagsAND(UInt16 flag);

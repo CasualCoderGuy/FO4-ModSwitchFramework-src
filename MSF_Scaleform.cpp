@@ -59,10 +59,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//MSF_Test::ListModTable(*g_player);
-				//MSF_Test::PrintStoredData();
+				MSF_Test::PrintStoredData();
 				//MSF_Test::DumpAttachParent();
 				//MSF_Test::GetWeaponState();
-				MSF_Test::DumpAttachParent();
+				//MSF_Test::DumpAttachParent();
+				//MSF_Test::DumpForms();
 				//MSF_Test::SetAmmoTest();
 				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
@@ -136,11 +137,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
 				}
 				else if (keyFn->type & KeybindData::bHUDselection)
-					MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, &keyFn->modAssociations);
+					MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, keyFn->modData);
 				else if (keyFn->type & KeybindData::bToggle)
-					MSF_Base::ToggleModHotkey(&keyFn->modAssociations);
+					MSF_Base::ToggleModHotkey(keyFn->modData);
 				else
-					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mNumMask, &keyFn->modAssociations);
+					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mNumMask, keyFn->modData);
 			}
 		}
 			break;
@@ -233,7 +234,7 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetBool(1);
 			//std::string menu = args->args[0].data.string;
-			MSF_MainData::switchData.openedMenu = nullptr;
+			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		}
 	};
 
@@ -254,7 +255,7 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 1) return;
-			MSF_MainData::switchData.openedMenu = nullptr;
+			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 			if (args->args[0].data.obj)
 				MSF_Base::SwitchToSelectedAmmo(args->args[0].data.obj, args->args[1].data.boolean);
 
@@ -268,7 +269,7 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 2) return;
-			MSF_MainData::switchData.openedMenu = nullptr;
+			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 			MSF_Base::SwitchToSelectedMod(args->args[0].data.obj, args->args[1].data.obj);
 
 			args->result->SetBool(true);
@@ -540,15 +541,15 @@ namespace MSF_Scaleform
 		std::string openPath = "root.ReceiveAmmoData";
 		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 1))
 			return true;
-		MSF_MainData::switchData.openedMenu = nullptr;
+		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		return false;
 	}
 
-	bool ToggleModMenu(ModSelectionMenu* selectMenu, std::vector<ModAssociationData*>* modAssociations)
+	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods)
 	{
 		//if (!MSF_MainData::MSFMenuRoot || !selectMenu)
 		//	return false;
-		if (!modAssociations)
+		if (!mods)
 			return false;
 		//check conditions
 		//GFxMovieRoot* menuRoot = MSF_MainData::MSFMenuRoot
@@ -583,7 +584,7 @@ namespace MSF_Scaleform
 		//else if (MSF_MainData::switchData.openedMenu != nullptr)
 		//	return false;
 
-		if (!(*g_ui)->IsMenuOpen(menuName))
+		if ((*g_ui)->IsMenuOpen(menuName))
 		{
 			MSFModMenu::CloseMenu();
 			return true;
@@ -600,119 +601,82 @@ namespace MSF_Scaleform
 		GFxValue args[2];
 		GFxValue modPtrs;
 		menuRoot->CreateArray(&modPtrs);
-		GFxValue bNull;
-		menuRoot->CreateObject(&bNull);
-		MSF_MainData::switchData.SwitchFlags &= ~(ModAssociationData::mBitTransferMask);
+		GFxValue bNoNull;
+		menuRoot->CreateObject(&bNoNull);
+		MSF_MainData::switchData.SwitchFlags &= ~(ModData::Mod::mBitTransferMask);
 		MSF_MainData::switchData.AnimToPlay1stP = nullptr;
 		MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
 
-		for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++)
+		std::vector<KeywordValue> instantiationValues;
+		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
+			return false;
+
+		ModData::ModCycle* modCycle = nullptr;
+		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
-			UInt8 type = (*itData)->GetType();
-			if (type == 0x1)
+			KeywordValue value = *itData;
+			ModData::ModCycle* currCycle = mods->modCycleMap[value];
+			if (currCycle && modCycle)
 			{
-				SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
-				if (Utilities::HasObjectMod(modData, modPair->modPair.parentMod))
-				{
-					if (modPair->flags & ModAssociationData::bRequireLooseMod)
-					{
-						TESObjectMISC* looseMod = Utilities::GetLooseMod(modPair->modPair.functionMod);
-						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-							break;
-					}
-					GFxValue modArg;
-					menuRoot->CreateObject(&modArg);
-					RegisterString(&modArg, menuRoot, "modName", modPair->modPair.functionMod->fullName.name.c_str());
-					RegisterObject(&modArg, menuRoot, "modObj", modPair->modPair.functionMod);
-					RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, modPair->modPair.functionMod));
-					modPtrs.PushBack(&modArg);
-					RegisterBool(&bNull, menuRoot, "bNullMod", true);
-					MSF_MainData::switchData.SwitchFlags |= (modPair->flags & ModAssociationData::mBitTransferMask);
-					MSF_MainData::switchData.AnimToPlay1stP = modPair->animIdle_1stP;
-					MSF_MainData::switchData.AnimToPlay3rdP = modPair->animIdle_3rdP;
-					break;
-				}
+				_MESSAGE("Ambiguity error"); //or combine
+				return false;
 			}
-			else if (type == 0x3)
-			{
-				MultipleMod* mods = static_cast<MultipleMod*>(*itData);
-				if (Utilities::HasObjectMod(modData, mods->parentMod))
-				{
-					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = mods->functionMods.begin(); itMod != mods->functionMods.end(); itMod++)
-					{
-						if (mods->flags & ModAssociationData::bRequireLooseMod)
-						{
-							TESObjectMISC* looseMod = Utilities::GetLooseMod(*itMod);
-							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-								continue;
-						}
-						GFxValue modArg;
-						menuRoot->CreateObject(&modArg);
-						RegisterString(&modArg, menuRoot, "modName", (*itMod)->fullName.name.c_str());
-						RegisterObject(&modArg, menuRoot, "modObj", *itMod);
-						RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, (*itMod)));
-						modPtrs.PushBack(&modArg);
-					}
-					RegisterBool(&bNull, menuRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
-					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-					break;
-				}
-			}
-			else if (type == 0x2)
-			{
-				ModPairArray* mods = static_cast<ModPairArray*>(*itData);
-				bool found = false;
-				for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
-				{
-					if (Utilities::HasObjectMod(modData, itMod->parentMod))
-					{
-						if (mods->flags & ModAssociationData::bRequireLooseMod)
-						{
-							TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-								continue;
-						}
-						found = true;
-						GFxValue modArg;
-						menuRoot->CreateObject(&modArg);
-						RegisterString(&modArg, menuRoot, "modName", itMod->functionMod->fullName.name.c_str());
-						RegisterObject(&modArg, menuRoot, "modObj", itMod->functionMod);
-						RegisterBool(&modArg, menuRoot, "isEquipped", Utilities::HasObjectMod(modData, itMod->functionMod));
-						modPtrs.PushBack(&modArg);
-					}
-				}
-				if (found)
-				{
-					RegisterBool(&bNull, menuRoot, "bNullMod", mods->flags & ModAssociationData::bCanHaveNullMod);
-					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-					break;
-				}
-			}
+			modCycle = currCycle;
 		}
-		if (bNull.type != GFxValue::kType_Bool)
+		if (!modCycle)
+			return false;
+
+		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, mods->attachParentValue);
+		for (ModData::ModVector::iterator itMod = modCycle->mods.begin(); itMod != modCycle->mods.end(); itMod++)
+		{
+			ModData::Mod* currMod = *itMod;
+			if (currMod->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(currMod->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+					break;
+			}
+			GFxValue modArg;
+			menuRoot->CreateObject(&modArg);
+			RegisterString(&modArg, menuRoot, "modName", currMod->mod->fullName.name.c_str());
+			RegisterObject(&modArg, menuRoot, "modObj", currMod);
+			RegisterBool(&modArg, menuRoot, "isEquipped", currMod->mod == attachedMod);
+			bool reqsOK = true;
+			if (currMod->mod->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(currMod->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+					reqsOK = false;
+			}
+			//check requirements
+			RegisterBool(&modArg, menuRoot, "reqsOK", reqsOK);
+			modPtrs.PushBack(&modArg);
+		}
+
+		MSF_MainData::switchData.SwitchFlags |= mods->flags & ModData::bRequireAPmod;
+		RegisterBool(&bNoNull, menuRoot, "bNoNullMod", modCycle->flags & ModData::ModCycle::bCannotHaveNullMod);
+
+		if (bNoNull.type != GFxValue::kType_Bool)
 		{
 			MSF_MainData::switchData.ClearData();
 			return false;
 		}
-		if (modPtrs.GetArraySize() == 0 || (!bNull.data.boolean && modPtrs.GetArraySize() < 2))
+		if (modPtrs.GetArraySize() == 0 || (bNoNull.data.boolean && modPtrs.GetArraySize() < 2))
 		{
 			MSF_MainData::switchData.ClearData();
 			return false;
 		}
 		
 		args[0].SetMember("modPtrs", &modPtrs);
-		args[1].SetMember("canHaveNullMod", &modPtrs);
+		args[1].SetMember("cantHaveNullMod", &bNoNull);
 		//std::string openPath = "root." + selectMenu->scaleformID + "_loader.content.open";
 		//MSF_MainData::switchData.openedMenu = selectMenu;
 		MSFModMenu::OpenMenu();
 		std::string openPath = "root.ReceiveModData";
 		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 2))
 			return true;
-		MSF_MainData::switchData.openedMenu = nullptr;
+		MSFModMenu::CloseMenu();
+		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::switchData.ClearData();
 		return false;
 	}

@@ -22,6 +22,8 @@
 UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 
+typedef unsigned short KeywordValue;
+
 class TESIdleForm : public TESForm
 {
 public:
@@ -316,11 +318,12 @@ private:
 	DEFINE_STATIC_HEAP(Heap_Allocate, Heap_Free)
 };
 
+typedef TypedKeywordValueArray<KeywordValue> KeywordValueArray;
 
 class AttachParentArray : public BaseFormComponent
 {
 public:
-	TypedKeywordValueArray<UInt16>	kewordValueArray;
+	KeywordValueArray	kewordValueArray;
 	enum
 	{
 		iDataType = 2
@@ -331,6 +334,7 @@ namespace Utilities
 {
 	TESForm* GetFormFromIdentifier(const std::string& identifier);
 	const char* GetIdentifierFromForm(TESForm* form);
+	bool AddToFormList(BGSListForm* flst, TESForm* form, SInt64 idx);
 	UInt32 GetEquippedItemFormID(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
@@ -343,10 +347,15 @@ namespace Utilities
 	BGSMod::Attachment::Mod* GetFirstModWithPriority(BGSObjectInstanceExtra* modData, UInt8 priority);
 	bool HasObjectMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
 	BGSKeyword* GetAttachParent(BGSMod::Attachment::Mod* mod);
-	SInt16 GetValueForTypedKeyword(BGSKeyword* keyword);
+	bool GetParentMods(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod, std::vector<BGSMod::Attachment::Mod*>* parents);
+	KeywordValue GetAttachValueForTypedKeyword(BGSKeyword* keyword);
+	KeywordValue GetInstantiationValueForTypedKeyword(BGSKeyword* keyword);
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
 	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW);
+	BGSMod::Attachment::Mod* GetModAtAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue keywordValue);
+	bool GetParentInstantiationValues(BGSObjectInstanceExtra* modData, KeywordValue parentValue, std::vector<KeywordValue>* instantiationValues);
 	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
+	bool AddAttachValue(AttachParentArray* attachPoints, KeywordValue attachValue);
 	bool WeaponInstanceHasKeyword(TESObjectWEAP::InstanceData* instanceData, BGSKeyword* checkKW);
 	bool UpdateAimModel(MSFAimModel* oldModel, MSFAimModel* newModel);
 	bool UpdateZoomData(MSFZoomData* oldData, MSFZoomData* newData);
@@ -442,7 +451,7 @@ typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, InstanceDataStruct 
 typedef void(*_UniversalEquipHandler)(Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UnkSub_EFF9D0)(Actor* actor);
 typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
-typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, UInt32 value);
+typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordValue value);
 
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
 typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent);
@@ -485,6 +494,9 @@ extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;
 extern RelocPtr <void*> unk_05AB38D0; //unkmanager
 extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
+extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;
+extern RelocPtr <tArray<BGSKeyword*>> g_ModAssociationKeywordArray;
+extern RelocPtr <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray;
 
 
 //AddItem?shorter?: 0x143A0C0
@@ -526,6 +538,26 @@ UInt38 unkB60; float? when holding object, constant
 UInt64 v. UInt8 unkCE8; 1 when holding object
 
 */
+
+class ModColData
+{
+public:
+	enum
+	{
+		kFlag_Optional = 1,
+		kFlag_Unk = 2
+	};
+	BGSMod::Attachment::Mod* mod;
+	UInt8 minlvl;
+	UInt8 flags;
+	//UInt16 padA;
+	//UInt32 padC;
+};
+
+enum FormFlags
+{
+	kType_ModCol = 0x80
+};
 
 enum ActorStateFlags08
 {

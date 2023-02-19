@@ -14,9 +14,9 @@ std::unordered_map<UInt64, KeybindData*> MSF_MainData::keybindMap;
 std::unordered_map<std::string, KeybindData*> MSF_MainData::keybindIDMap;
 std::unordered_map<std::string, float> MSF_MainData::MCMfloatSettingMap;
 
-std::vector<SingleModPair> MSF_MainData::singleModPairs;
-std::vector<ModPairArray> MSF_MainData::modPairArrays;
-std::vector<MultipleMod> MSF_MainData::multiModAssocs;
+//std::vector<SingleModPair> MSF_MainData::singleModPairs;
+//std::vector<ModPairArray> MSF_MainData::modPairArrays;
+//std::vector<MultipleMod> MSF_MainData::multiModAssocs;
 
 std::vector<HUDFiringModeData> MSF_MainData::fmDisplayData;
 std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
@@ -48,8 +48,10 @@ int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
-int MSF_MainData::numberOfOpenedMenus = 0;
 
+std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
+std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
+ModSwitchManager MSF_MainData::modSwitchManager;
 SwitchData MSF_MainData::switchData;
 std::vector<BurstMode> MSF_MainData::burstMode;
 Utilities::Timer MSF_MainData::tmr;
@@ -82,7 +84,7 @@ namespace MSF_Data
 		MSF_MainData::APbaseMod = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000065);
 		if (MSF_MainData::baseModCompatibilityKW)
 		{
-			UInt16 attachParent = Utilities::GetValueForTypedKeyword(MSF_MainData::baseModCompatibilityKW);
+			UInt16 attachParent = Utilities::GetAttachValueForTypedKeyword(MSF_MainData::baseModCompatibilityKW);
 			if (attachParent >= 0)
 				MSF_MainData::APbaseMod->unkC0 = attachParent;
 		}
@@ -106,6 +108,35 @@ namespace MSF_Data
 		//MSF_MainData::PlaceholderModUB = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000061);
 		//MSF_MainData::PlaceholderModZD = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000062);
 		
+		return true;
+	}
+
+	bool InitCompatibility()
+	{
+		for (std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator itComp = MSF_MainData::compatibilityEdits.begin(); itComp != MSF_MainData::compatibilityEdits.end(); itComp++)
+		{
+			BGSMod::Attachment::Mod* mod = itComp->first;
+			if (itComp->second->attachParent > 0)
+				mod->unkC0 = itComp->second->attachParent;
+			KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&mod->unkB0);
+			for (std::vector<KeywordValue>::iterator itValue = itComp->second->removedFilters.begin(); itValue != itComp->second->removedFilters.end(); itValue++)
+			{
+				SInt64 idx = instantiationData->GetItemIndex(*itValue);
+				if (idx >= 0)
+					instantiationData->Remove(idx);
+			}
+			for (std::vector<KeywordValue>::iterator itValue = itComp->second->addedFilters.begin(); itValue != itComp->second->addedFilters.end(); itValue++)
+				instantiationData->Push(*itValue);
+			AttachParentArray* attachParentArray = reinterpret_cast<AttachParentArray*>(&mod->unk98);
+			for (std::vector<KeywordValue>::iterator itValue = itComp->second->removedAPslots.begin(); itValue != itComp->second->removedAPslots.end(); itValue++)
+			{
+				SInt64 idx = attachParentArray->kewordValueArray.GetItemIndex(*itValue);
+				if (idx >= 0)
+					attachParentArray->kewordValueArray.Remove(idx);
+			}
+			for (std::vector<KeywordValue>::iterator itValue = itComp->second->addedAPslots.begin(); itValue != itComp->second->addedAPslots.end(); itValue++)
+				attachParentArray->kewordValueArray.Push(*itValue);
+		}
 		return true;
 	}
 
@@ -277,7 +308,7 @@ namespace MSF_Data
 							UInt8 flags = keybind["keyfunction"].asInt();
 							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
 							//	continue;
-							kb = new KeybindData;
+							kb = new KeybindData();
 							kb->functionID = id;
 							kb->type = flags;
 							kb->keyCode = 0;
@@ -286,6 +317,7 @@ namespace MSF_Data
 							//	kb.selectMenu = new ModSelectionMenu(menuName, swfFilename);
 							//else
 							kb->selectMenu = nullptr;
+							kb->modData = nullptr;
 							MSF_MainData::keybindIDMap[id] = kb;
 						}
 					}
@@ -479,36 +511,186 @@ namespace MSF_Data
 				}
 
 				data1 = json["compatibility"];
-
-				for (int i = 0; i < data1.size(); i++)
+				if (data1.isObject())
 				{
 					std::string apKWstr = data1["baseModAttachPoint"].asString();
-					if (apKWstr == "")
-						continue;
-					BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(apKWstr), TESForm, BGSKeyword);
-					if (!apKW || Utilities::GetValueForTypedKeyword(apKW) < 0)
-						continue;
-					if (MSF_MainData::baseModCompatibilityKW)
-						_WARNING("Conflict: attach point base mod compatibility keyword already loaded with formID: %s. Ignoring new keyword: %s in file %s", Utilities::GetIdentifierFromForm(MSF_MainData::baseModCompatibilityKW), Utilities::GetIdentifierFromForm(apKW), fileName.c_str());
-					else
-						MSF_MainData::baseModCompatibilityKW = apKW;
+					if (apKWstr != "")
+					{
+						BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(apKWstr), TESForm, BGSKeyword);
+						if (!apKW || Utilities::GetAttachValueForTypedKeyword(apKW) < 0)
+						{
+							if (MSF_MainData::baseModCompatibilityKW)
+								_WARNING("Conflict: attach point base mod compatibility keyword already loaded with formID: %s. Ignoring new keyword: %s in file %s", Utilities::GetIdentifierFromForm(MSF_MainData::baseModCompatibilityKW), Utilities::GetIdentifierFromForm(apKW), fileName.c_str());
+							else
+								MSF_MainData::baseModCompatibilityKW = apKW;
+						}
+					}
+					data2 = data1["attachParent"];
+					if (data2.isArray())
+					{
+						for (int i = 0; i < data2.size(); i++)
+						{
+							const Json::Value& apData = data2[i];
+							std::string str = apData["mod"].asString();
+							if (str == "")
+								continue;
+							BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+							if (!mod)
+								continue;
+							str = apData["apKeyword"].asString();
+							if (str == "")
+								continue;
+							BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+							KeywordValue value = Utilities::GetAttachValueForTypedKeyword(apKW);
+							if (!apKW || value < 0)
+								continue;
+							std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
+							if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+							{
+								if (compIt->second->attachParent != 0)
+								{
+									BGSKeyword* kw = nullptr;
+									g_AttachPointKeywordArray.GetPtr()->GetNthItem(compIt->second->attachParent, kw);
+									_WARNING("Conflict: attach parent already changed for mod with formID: %s to keyword: %s. Ignoring new keyword: %s in file %s",
+										Utilities::GetIdentifierFromForm(compIt->first), Utilities::GetIdentifierFromForm(kw), str.c_str(), fileName.c_str());
+								}
+								else
+									compIt->second->attachParent = value;
+							}
+							else
+							{
+								ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
+								compatibility->attachParent = value;
+								MSF_MainData::compatibilityEdits[mod] = compatibility;
+							}
+						}
+					}
 				}
+
+				data2 = data1["attachChildren"];
+				if (data2.isArray())
+				{
+					for (int i = 0; i < data2.size(); i++)
+					{
+						const Json::Value& apData = data2[i];
+						std::string str = apData["mod"].asString();
+						if (str == "")
+							continue;
+						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+						if (!mod)
+							continue;
+						str = apData["apKeyword"].asString();
+						if (str == "")
+							continue;
+						bool bRemove = apData["bRemove"].asBool();
+						BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+						KeywordValue value = Utilities::GetAttachValueForTypedKeyword(apKW);
+						if (!apKW || value < 0)
+							continue;
+						std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
+						if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+						{
+							std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedAPslots.begin(), compIt->second->addedAPslots.end(), value);
+							const char* removedstr = "added";
+							if (foundEntry == compIt->second->addedAPslots.end())
+							{
+								foundEntry = std::find(compIt->second->removedAPslots.begin(), compIt->second->removedAPslots.end(), value);
+								removedstr = "removed";
+							}
+							if (foundEntry != compIt->second->addedAPslots.end())
+							{
+								_WARNING("Conflict: attach children for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
+									Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+							}
+							else if (bRemove)
+								compIt->second->removedAPslots.push_back(value);
+							else
+								compIt->second->addedAPslots.push_back(value);
+						}
+						else
+						{
+							ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
+							compatibility->attachParent = 0;
+							if (bRemove)
+								compatibility->removedAPslots.push_back(value);
+							else
+								compatibility->addedAPslots.push_back(value);
+							MSF_MainData::compatibilityEdits[mod] = compatibility;
+						}
+					}
+				}
+
+				data2 = data1["instantiationKWs"];
+				if (data2.isArray())
+				{
+					for (int i = 0; i < data2.size(); i++)
+					{
+						const Json::Value& ifData = data2[i];
+						std::string str = ifData["mod"].asString();
+						if (str == "")
+							continue;
+						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+						if (!mod)
+							continue;
+						str = ifData["ifKeyword"].asString();
+						if (str == "")
+							continue;
+						bool bRemove = ifData["bRemove"].asBool();
+						BGSKeyword* ifKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+						KeywordValue value = Utilities::GetInstantiationValueForTypedKeyword(ifKW);
+						if (!ifKW || value < 0)
+							continue;
+						std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
+						if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+						{
+							std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedFilters.begin(), compIt->second->addedFilters.end(), value);
+							const char* removedstr = "added";
+							if (foundEntry == compIt->second->addedFilters.end())
+							{
+								foundEntry = std::find(compIt->second->removedFilters.begin(), compIt->second->removedFilters.end(), value);
+								removedstr = "removed";
+							}
+							if (foundEntry != compIt->second->addedFilters.end())
+							{
+								_WARNING("Conflict: instantiation filter for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
+									Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+							}
+							else if (bRemove)
+								compIt->second->removedFilters.push_back(value);
+							else
+								compIt->second->addedFilters.push_back(value);
+						}
+						else
+						{
+							ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
+							compatibility->attachParent = 0;
+							if (bRemove)
+								compatibility->removedFilters.push_back(value);
+							else
+								compatibility->addedFilters.push_back(value);
+							MSF_MainData::compatibilityEdits[mod] = compatibility;
+						}
+					}
+				}
+
 				
 				data1 = json["plugins"];
-
-				for (int i = 0; i < data1.size(); i++)
+				if (data1.isArray())
 				{
-					//const Json::Value& dataN = data1[i];
-					//std::string pluginName = dataN["pluginName"].asString();
-					std::string pluginName = data1[i].asString();
-					if (pluginName == "")
-						continue;
-					UInt8 espModIndex = (*g_dataHandler)->GetLoadedModIndex(pluginName.c_str());
-					if (espModIndex == 0xFF)
+					for (int i = 0; i < data1.size(); i++)
 					{
-						UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(pluginName.c_str());
-						if (eslModIndex == 0xFFFF)
-							return false;
+						//const Json::Value& dataN = data1[i];
+						//std::string pluginName = dataN["pluginName"].asString();
+						std::string pluginName = data1[i].asString();
+						if (pluginName == "")
+							continue;
+						UInt8 espModIndex = (*g_dataHandler)->GetLoadedModIndex(pluginName.c_str());
+						if (espModIndex == 0xFF)
+						{
+							UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(pluginName.c_str());
+							if (eslModIndex == 0xFFFF)
+								return false;
+						}
 					}
 				}
 
@@ -588,7 +770,7 @@ namespace MSF_Data
 						}
 						else
 						{
-							AmmoData* ammoDataStruct = new AmmoData;
+							AmmoData* ammoDataStruct = new AmmoData();
 							ammoDataStruct->baseAmmoData.ammo = baseAmmo;
 							ammoDataStruct->baseAmmoData.mod = baseMod;
 							ammoDataStruct->baseAmmoData.ammoID = ammoIDbase;
@@ -646,8 +828,10 @@ namespace MSF_Data
 				keydata = json["hotkeys"];
 				if (keydata.isArray())
 				{
+					_MESSAGE("hotkeys");
 					for (int i = 0; i < keydata.size(); i++)
 					{
+						_MESSAGE("i: %i", i);
 						const Json::Value& key = keydata[i];
 						std::string keyID = key["keyID"].asString();
 						if (keyID == "")
@@ -657,243 +841,113 @@ namespace MSF_Data
 							continue;
 						if (itKb->type & KeybindData::bIsAmmo)
 							continue;
-						data1 = key["modData"];
-						if (data1.isArray())
+						const Json::Value& modStruct = key["modData"];
+						_MESSAGE("beforeModStruct");
+						if (!modStruct.isArray()) /////!!!!!!
 						{
-							for (int i = 0; i < data1.size(); i++)
+							_MESSAGE("modStruct");
+							std::string str = modStruct["apKeyword"].asString();
+							BGSKeyword* apKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+							if (!apKeyword)
+								continue;
+							KeywordValue apValue = Utilities::GetAttachValueForTypedKeyword(apKeyword);
+							if (apValue < 0)
+								continue;
+							_MESSAGE("kw ok, modData: %p", itKb->modData);
+							UInt16 apflags = modStruct["apFlags"].asInt();
+							ModData* modData = itKb->modData;
+							//APattachReqs
+							if (!modData)
 							{
-								const Json::Value& modData = data1[i];
-								UInt16 type = modData["type"].asInt();
-								if (type < 1 || type > 3)
-									continue;
-								std::string str = modData["fnKeyword"].asString();
-								BGSKeyword* functionKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
-								if (!functionKW)
-									continue;
-								UInt16 flags = modData["flags"].asInt();
-								TESIdleForm* animIdle_1stP = nullptr;
-								TESIdleForm* animIdle_3rdP = nullptr;
-								str = modData["animIdle_1stP"].asString();
-								if (str != "")
-									animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
-								str = modData["animIdle_3rdP"].asString();
-								if (str != "")
-									animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
-								bool bAdd = false;
-								if (type == 1)
+								_MESSAGE("new ModData");
+								modData = new ModData();
+								modData->attachParentValue = apValue;
+								modData->flags = apflags;
+							}
+							const Json::Value& modCycles = modStruct["modArrays"];
+							if (modCycles.isArray())
+							{
+								for (int i = 0; i < modCycles.size(); i++)
 								{
-									str = modData["baseMod"].asString();
-									if (str == "")
+									const Json::Value& modCycle = modCycles[i];
+									str = modCycle["ifKeyword"].asString();
+									BGSKeyword* ifKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+									if (!ifKeyword)
 										continue;
-									BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-									if (!baseMod)
+									KeywordValue ifValue = Utilities::GetInstantiationValueForTypedKeyword(ifKeyword);
+									if (ifValue < 0)
 										continue;
-									if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-										continue;
-									str = modData["functionMod"].asString();
-									if (str == "")
-										continue;
-									BGSMod::Attachment::Mod* functionMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-									if (!functionMod)
-										continue;
-									if (functionMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-										continue;
-									std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
-									for (itData; itData != itKb->modAssociations.end(); itData++)
+									UInt16 ifflags = modCycle["ifFlags"].asInt();
+									ModData::ModCycle* cycle = modData->modCycleMap[ifValue];
+									if (!cycle)
 									{
-										if ((*itData)->funcKeyword == functionKW)
-											break;
-										if ((*itData)->GetType() == 1)
-										{
-											SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
-											if (currModPair->modPair.parentMod == baseMod)
-												break;
-										}
-										else if ((*itData)->GetType() == 3)
-										{
-											MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
-											if (currMultipleMod->parentMod == baseMod)
-												break;
-										}
-										else if ((*itData)->GetType() == 2)
-										{
-											ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
-											std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
-											for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
-											{
-												if (itModPair->parentMod == baseMod)
-													break;
-											}
-											if (itModPair != currModPairArray->modPairs.end())
-												break;
-										}
+										cycle = new ModData::ModCycle();
+										cycle->flags = ifflags;
 									}
-									if (itData == itKb->modAssociations.end())
+									const Json::Value& mods = modCycle["mods"];
+									if (mods.isArray())
 									{
-										SingleModPair* modPair = new SingleModPair;
-										modPair->modPair.parentMod = baseMod;
-										modPair->modPair.functionMod = functionMod;
-										modPair->funcKeyword = functionKW;
-										modPair->flags = flags;
-										modPair->animIdle_1stP = animIdle_1stP;
-										modPair->animIdle_3rdP = animIdle_3rdP;
-										itKb->modAssociations.push_back(modPair);
-									}
-								}
-								else if (type == 3)
-								{
-									str = modData["baseMod"].asString();
-									if (str == "")
-										continue;
-									BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-									if (!baseMod)
-										continue;
-									if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-										continue;
-									std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
-									for (itData; itData != itKb->modAssociations.end(); itData++)
-									{
-										if ((*itData)->funcKeyword == functionKW)
-											break;
-										if ((*itData)->GetType() == 1)
+										for (int i = 0; i < mods.size(); i++)
 										{
-											SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
-											if (currModPair->modPair.parentMod == baseMod)
-												break;
-										}
-										else if ((*itData)->GetType() == 3)
-										{
-											MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
-											if (currMultipleMod->parentMod == baseMod)
-												break;
-										}
-										else if ((*itData)->GetType() == 2)
-										{
-											ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
-											std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
-											for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
-											{
-												if (itModPair->parentMod == baseMod)
-													break;
-											}
-											if (itModPair != currModPairArray->modPairs.end())
-												break;
-										}
-									}
-									if (itData == itKb->modAssociations.end())
-									{
-										MultipleMod* multipleMod = new MultipleMod;
-										multipleMod->parentMod = baseMod;
-										multipleMod->funcKeyword = functionKW;
-										multipleMod->flags = flags;
-										multipleMod->animIdle_1stP = animIdle_1stP;
-										multipleMod->animIdle_3rdP = animIdle_3rdP;
-										data2 = modData["functionMods"];
-										if (data2.isArray())
-										{
-											for (int i2 = 0; i2 < data2.size(); i2++)
-											{
-												str = data2[i2].asString();
-												if (str == "")
-													continue;
-												BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-												if (!mod)
-													continue;
-												if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-													continue;
-												std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(multipleMod->functionMods.begin(), multipleMod->functionMods.end(), mod);
-												if (itMod == multipleMod->functionMods.end())
-													multipleMod->functionMods.push_back(mod);
-											}
-										}
-										if (multipleMod->functionMods.size() > 1)
-											itKb->modAssociations.push_back(multipleMod);
-										else
-											delete multipleMod;
-									}
-								}
-								else if (type == 2)
-								{
-									data2 = modData["modPairs"];
-									if (data2.isArray())
-									{
-										ModPairArray* modPairArray = new ModPairArray;
-										modPairArray->funcKeyword = functionKW;
-										modPairArray->flags = flags;
-										modPairArray->animIdle_1stP = animIdle_1stP;
-										modPairArray->animIdle_3rdP = animIdle_3rdP;
-										for (int i2 = 0; i2 < data2.size(); i2++)
-										{
-											str = data2[i2]["baseMod"].asString();
+											const Json::Value& switchmod = mods[i];
+											str = switchmod["mod"].asString();
 											if (str == "")
 												continue;
-											BGSMod::Attachment::Mod* baseMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-											if (!baseMod)
+											BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+											if (!mod || mod->unkC0 != apValue)
 												continue;
-											if (baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+											ModData::ModVector::iterator itMod = std::find_if(cycle->mods.begin(), cycle->mods.end(), [mod](ModData::Mod* data){
+												return data->mod == mod;
+											});
+											if (itMod != cycle->mods.end()) //overwrite?
 												continue;
-											str = data2[i2]["functionMod"].asString();
-											if (str == "")
-												continue;
-											BGSMod::Attachment::Mod* functionMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-											if (!functionMod)
-												continue;
-											if (functionMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-												continue;
-											std::vector<ModAssociationData*>::iterator itData = itKb->modAssociations.begin();
-											for (itData; itData != itKb->modAssociations.end(); itData++)
+											UInt16 modflags = switchmod["modFlags"].asInt();
+											//requirements
+											TESIdleForm* animIdle_1stP = nullptr;
+											TESIdleForm* animIdle_3rdP = nullptr;
+											str = switchmod["animIdle_1stP"].asString();
+											if (str != "")
+												animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+											str = switchmod["animIdle_3rdP"].asString();
+											if (str != "")
+												animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+
+											ModData::Mod* modDataMod = new ModData::Mod();
+											modDataMod->mod = mod;
+											modDataMod->flags = modflags;
+											if (animIdle_1stP || animIdle_3rdP)
 											{
-												if ((*itData)->funcKeyword == functionKW)
-													break;
-												if ((*itData)->GetType() == 1)
-												{
-													SingleModPair* currModPair = static_cast<SingleModPair*>(*itData);
-													if (currModPair->modPair.parentMod == baseMod)
-														break;
-												}
-												else if ((*itData)->GetType() == 3)
-												{
-													MultipleMod* currMultipleMod = static_cast<MultipleMod*>(*itData);
-													if (currMultipleMod->parentMod == baseMod)
-														break;
-												}
-												else if ((*itData)->GetType() == 2)
-												{
-													ModPairArray* currModPairArray = static_cast<ModPairArray*>(*itData);
-													std::vector<ModAssociationData::ModPair>::iterator itModPair = currModPairArray->modPairs.begin();
-													for (itModPair; itModPair != currModPairArray->modPairs.end(); itModPair++)
-													{
-														if (itModPair->parentMod == baseMod)
-															break;
-													}
-													if (itModPair != currModPairArray->modPairs.end())
-														break;
-												}
+												AnimationData* animData = new AnimationData();
+												animData->animIdle_1stP = animIdle_1stP;
+												animData->animIdle_3rdP = animIdle_3rdP;
+												modDataMod->animData = animData;
 											}
-											if (itData == itKb->modAssociations.end())
-											{
-												std::vector<ModAssociationData::ModPair>::iterator itModPair = modPairArray->modPairs.begin();
-												for (itModPair; itModPair != modPairArray->modPairs.end(); itModPair++)
-												{
-													if (itModPair->parentMod == baseMod)
-														break;
-												}
-												if (itModPair == modPairArray->modPairs.end())
-												{
-													ModAssociationData::ModPair modPair;
-													modPair.parentMod = baseMod;
-													modPair.functionMod = functionMod;
-													modPairArray->modPairs.push_back(modPair);
-												}
-											}
+											cycle->mods.push_back(modDataMod);
 										}
-										if (modPairArray->modPairs.size() > 1)
-											itKb->modAssociations.push_back(modPairArray);
-										else
-											delete modPairArray;
 									}
+									if (cycle->mods.size() < 1 || ((cycle->flags & ModData::ModCycle::bCannotHaveNullMod) && cycle->mods.size() < 2))
+									{
+										for (ModData::ModVector::iterator itMod = cycle->mods.begin(); itMod != cycle->mods.end(); itMod++)
+										{
+											ModData::Mod* modDataMod = *itMod;
+											delete modDataMod;
+										}
+										delete cycle;
+										continue;
+									}
+									modData->modCycleMap[ifValue] = cycle;
 								}
 							}
+							if (modData->modCycleMap.size() < 1)
+							{
+								//deletereqs
+								delete modData;
+								continue;
+							}
+							itKb->modData = modData;
+							if (modData->flags & ModData::bRequireAPmod)
+								Utilities::AddAttachValue((AttachParentArray*)&MSF_MainData::APbaseMod->unk98, apValue);
+
 						}
 					}
 				}
@@ -931,7 +985,7 @@ namespace MSF_Data
 						}
 						else
 						{
-							animationData = new AnimationData;
+							animationData = new AnimationData();
 							animationData->animIdle_1stP = animIdle_1stP;
 							animationData->animIdle_3rdP = animIdle_3rdP;
 							MSF_MainData::reloadAnimDataMap[weapon] = animationData;
@@ -972,7 +1026,7 @@ namespace MSF_Data
 						}
 						else
 						{
-							animationData = new AnimationData;
+							animationData = new AnimationData();
 							animationData->animIdle_1stP = animIdle_1stP;
 							animationData->animIdle_3rdP = animIdle_3rdP;
 							MSF_MainData::fireAnimDataMap[weapon] = animationData;
@@ -996,7 +1050,7 @@ namespace MSF_Data
 						std::vector<HUDFiringModeData>::iterator itData = MSF_MainData::fmDisplayData.begin();
 						for (itData; itData != MSF_MainData::fmDisplayData.end(); itData++)
 						{
-							if (itData->modeKeyword == keyword)
+							if (itData->keyword == keyword)
 							{
 								itData->displayString = str;
 								break;
@@ -1005,7 +1059,7 @@ namespace MSF_Data
 						if (itData == MSF_MainData::fmDisplayData.end())
 						{
 							HUDFiringModeData displayData;
-							displayData.modeKeyword = keyword;
+							displayData.keyword = keyword;
 							displayData.displayString = str;
 							MSF_MainData::fmDisplayData.push_back(displayData);
 						}
@@ -1028,7 +1082,7 @@ namespace MSF_Data
 						std::vector<HUDScopeData>::iterator itData = MSF_MainData::scopeDisplayData.begin();
 						for (itData; itData != MSF_MainData::scopeDisplayData.end(); itData++)
 						{
-							if (itData->scopeKeyword == keyword)
+							if (itData->keyword == keyword)
 							{
 								itData->displayString = str;
 								break;
@@ -1037,7 +1091,7 @@ namespace MSF_Data
 						if (itData == MSF_MainData::scopeDisplayData.end())
 						{
 							HUDScopeData displayData;
-							displayData.scopeKeyword = keyword;
+							displayData.keyword = keyword;
 							displayData.displayString = str;
 							MSF_MainData::scopeDisplayData.push_back(displayData);
 						}
@@ -1060,7 +1114,7 @@ namespace MSF_Data
 						std::vector<HUDMuzzleData>::iterator itData = MSF_MainData::muzzleDisplayData.begin();
 						for (itData; itData != MSF_MainData::muzzleDisplayData.end(); itData++)
 						{
-							if (itData->muzzleKeyword == keyword)
+							if (itData->keyword == keyword)
 							{
 								itData->displayString = str;
 								break;
@@ -1069,13 +1123,13 @@ namespace MSF_Data
 						if (itData == MSF_MainData::muzzleDisplayData.end())
 						{
 							HUDMuzzleData displayData;
-							displayData.muzzleKeyword = keyword;
+							displayData.keyword = keyword;
 							displayData.displayString = str;
 							MSF_MainData::muzzleDisplayData.push_back(displayData);
 						}
 					}
 				}
-
+				_MESSAGE("end True");
 				return true;
 			}
 		}
@@ -1084,6 +1138,7 @@ namespace MSF_Data
 			_WARNING("Warning - Failed to load Gameplay Data from %s.json", fileName.c_str());
 			return false;
 		}
+		_MESSAGE("end False");
 		return false;
 	}
 
@@ -1130,122 +1185,502 @@ namespace MSF_Data
 		return false;
 	}
 
-	bool GetNthMod(UInt32 num, std::vector<ModAssociationData*>* modAssociations)
+	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData)
 	{
 		if (num < 0)
 			return false;
-		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
-		if (!stack || !modAssociations)
+		if (!eqStack || !modData)
 			return false;
-		ExtraDataList* dataList = stack->extraData;
+		ExtraDataList* dataList = eqStack->extraData;
 		if (!dataList)
 			return false;
 		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
-		BGSObjectInstanceExtra* modData = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
+		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
 		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!modData || !instanceData)
+		if (!attachedMods || !instanceData)
 			return false;
-		auto data = modData->data;
-		if (!data || !data->forms)
+
+		std::vector<KeywordValue> instantiationValues;
+		if (!Utilities::GetParentInstantiationValues(attachedMods, modData->attachParentValue, &instantiationValues))
 			return false;
-		for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++)
+
+		ModData::ModCycle* modCycle = nullptr;
+		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
-			UInt8 type = (*itData)->GetType();
-			if (type == 0x1)
+			KeywordValue value = *itData;
+			ModData::ModCycle* currCycle = modData->modCycleMap[value];
+			if (currCycle && modCycle)
 			{
-				SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
-				if (Utilities::HasObjectMod(modData, modPair->modPair.parentMod))
-				{
-					if (num == 1)
-					{
-						MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
-						MSF_MainData::switchData.ModToRemove = nullptr;
-						MSF_MainData::switchData.LooseModToAdd = nullptr;
-						if (modPair->flags & ModAssociationData::bRequireLooseMod)
-						{
-							TESObjectMISC* looseMod = Utilities::GetLooseMod(modPair->modPair.functionMod);
-							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
-								return false;
-							MSF_MainData::switchData.LooseModToRemove = looseMod;
-						}
-						else
-							MSF_MainData::switchData.LooseModToRemove = nullptr;
-						return true;
-					}
-					else if (num == 0)
-					{
-						MSF_MainData::switchData.ModToRemove = modPair->modPair.functionMod;
-						MSF_MainData::switchData.ModToAttach = nullptr;
-						MSF_MainData::switchData.LooseModToRemove = nullptr;
-						MSF_MainData::switchData.LooseModToAdd = (modPair->flags & ModAssociationData::bRequireLooseMod) ? Utilities::GetLooseMod(modPair->modPair.functionMod) : nullptr;
-						return true;
-					}
-					return false;
-				}
+				_MESSAGE("Ambiguity error");
+				return false;
 			}
-			//else if (type == 0x3)
-			//{
-			//	MultipleMod* mods = static_cast<MultipleMod*>(*itData);
-			//	if (Utilities::HasObjectMod(modData, mods->parentMod))
-			//	{
-			//		if (num == 0 && (mods->flags & ModAssociationData::bCanHaveNullMod))
-			//		{
-			//			MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), mods->funcKeyword);
-			//			if (!MSF_MainData::switchData.ModToRemove)
-			//				return false;
-			//			MSF_MainData::switchData.ModToAttach = nullptr;
-			//			MSF_MainData::switchData.LooseModToRemove = nullptr;
-			//			MSF_MainData::switchData.LooseModToAdd = (mods->flags & ModAssociationData::bRequireLooseMod) ? Utilities::GetLooseMod(MSF_MainData::switchData.ModToRemove) : nullptr;
-			//			return true;
-			//		}
-			//		if (mods->flags & ModAssociationData::bCanHaveNullMod)
-			//			num--;
-			//		if ((num + 1) > mods->functionMods.size())
-			//			return false;
-			//		MSF_MainData::switchData.ModToAttach = mods->functionMods[num];
-			//		MSF_MainData::switchData.ModToRemove = nullptr;
-			//		MSF_MainData::switchData.LooseModToAdd = nullptr;
-			//		MSF_MainData::switchData.LooseModToRemove = (mods->flags & ModAssociationData::bRequireLooseMod) ? Utilities::GetLooseMod(MSF_MainData::switchData.ModToAttach) : nullptr;
-			//		return true;
-			//	}
-			//}
-			//else if (type == 0x2)
-			//{
-			//	ModPairArray* mods = static_cast<ModPairArray*>(*itData);
-			//	if (num == 0 && (mods->flags & ModAssociationData::bCanHaveNullMod))
-			//	{
-			//		MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), mods->funcKeyword);
-			//		if (!MSF_MainData::switchData.ModToRemove)
-			//			return false;
-			//		MSF_MainData::switchData.ModToAttach = nullptr;
-			//		MSF_MainData::switchData.LooseModToRemove = nullptr;
-			//		MSF_MainData::switchData.LooseModToAdd = (mods->flags & ModAssociationData::bRequireLooseMod) ? Utilities::GetLooseMod(MSF_MainData::switchData.ModToRemove) : nullptr;
-			//		return true;
-			//	}
-			//	if (mods->flags & ModAssociationData::bCanHaveNullMod)
-			//		num--;
-			//	if ((num + 1) > mods->modPairs.size())
-			//		return false;
-			//	ModAssociationData::ModPair* modPair = &mods->modPairs[num];
-			//	if (!Utilities::HasObjectMod(modData, modPair->parentMod))
-			//		return false;
-			//	MSF_MainData::switchData.ModToAttach = modPair->functionMod;
-			//	MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), mods->funcKeyword);
-			//	if (mods->flags & ModAssociationData::bRequireLooseMod)
-			//	{
-			//		MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(MSF_MainData::switchData.ModToRemove);
-			//		MSF_MainData::switchData.LooseModToRemove = Utilities::GetLooseMod(MSF_MainData::switchData.ModToAttach);
-			//	}
-			//	else
-			//	{
-			//		MSF_MainData::switchData.LooseModToAdd = nullptr;
-			//		MSF_MainData::switchData.LooseModToRemove = nullptr;
-			//	}
-			//	return true;
-			//}
+			modCycle = currCycle;
 		}
-		return false;
+		if (!modCycle)
+			return false;
+
+		if (num > modCycle->mods.size() || (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod && num >= modCycle->mods.size()))
+			return false; //out of range
+		ModData::Mod* modToAttach = nullptr;
+		ModData::Mod* modToRemove = nullptr;
+		if (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod)
+			modToAttach = modCycle->mods[num];
+		else if (num != 0)
+			modToAttach = modCycle->mods[num-1];
+
+		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(attachedMods, modData->attachParentValue);
+		ModData::ModVector::iterator itMod = std::find_if(modCycle->mods.begin(), modCycle->mods.end(), [attachedMod](ModData::Mod* data){
+			return data->mod == attachedMod;
+		});
+		if (itMod != modCycle->mods.end())
+			modToRemove = *itMod;
+
+		if (modToAttach == modToRemove)
+			return false; //no change
+
+		//checkAttachRequrements
+		if (modToAttach)
+		{
+			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+					return false; //missing loosemod
+				MSF_MainData::switchData.LooseModToRemove = looseMod;
+			}
+			MSF_MainData::switchData.ModToAttach = modToAttach->mod;
+			MSF_MainData::switchData.SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
+			MSF_MainData::switchData.AnimToPlay1stP = nullptr;
+			MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
+			if (modToAttach->animData)
+			{
+				MSF_MainData::switchData.AnimToPlay1stP = modToAttach->animData->animIdle_1stP;
+				MSF_MainData::switchData.AnimToPlay3rdP = modToAttach->animData->animIdle_3rdP;
+			}
+		}
+		if (modToRemove)
+		{
+			MSF_MainData::switchData.ModToRemove = modToRemove->mod;
+			MSF_MainData::switchData.LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
+			//remove anim?
+		}
+		return true;
+	}
+
+	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData)
+	{
+		if (!eqStack || !modData)
+			return false;
+		ExtraDataList* dataList = eqStack->extraData;
+		if (!dataList)
+			return false;
+		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
+		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
+		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		if (!attachedMods || !instanceData)
+			return false;
+
+		_MESSAGE("check OK");
+		std::vector<KeywordValue> instantiationValues;
+		if (!Utilities::GetParentInstantiationValues(attachedMods, modData->attachParentValue, &instantiationValues))
+			return false;
+		_MESSAGE("if counts: %i", instantiationValues.size());
+
+		ModData::ModCycle* modCycle = nullptr;
+		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
+		{
+			KeywordValue value = *itData;
+			_MESSAGE("it: %i", value);
+			ModData::ModCycle* currCycle = modData->modCycleMap[value];
+			if (currCycle && modCycle)
+			{
+				_MESSAGE("Ambiguity error");
+				return false;
+			}
+			modCycle = currCycle;
+		}
+		if (!modCycle)
+			return false;
+
+		ModData::Mod* modToAttach = nullptr;
+		ModData::Mod* modToRemove = nullptr;
+		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(attachedMods, modData->attachParentValue);
+		ModData::ModVector::iterator itMod = std::find_if(modCycle->mods.begin(), modCycle->mods.end(), [attachedMod](ModData::Mod* data){
+			return data->mod == attachedMod;
+		});
+		if (itMod == modCycle->mods.end())
+			modToAttach = modCycle->mods[0];
+		else
+		{
+			modToRemove = *itMod;
+			itMod++;
+			if (itMod != modCycle->mods.end())
+				modToAttach = *itMod;
+			else if (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod)
+				modToAttach = modCycle->mods[0];
+		}
+		//checkAttachRequrements
+		_MESSAGE("final");
+		if (modToAttach)
+		{
+			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+					return false; //missing loosemod
+				MSF_MainData::switchData.LooseModToRemove = looseMod;
+			}
+			MSF_MainData::switchData.ModToAttach = modToAttach->mod;
+			MSF_MainData::switchData.SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
+			MSF_MainData::switchData.SwitchFlags |= modData->flags & ModData::bRequireAPmod;
+			MSF_MainData::switchData.AnimToPlay1stP = nullptr;
+			MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
+			if (modToAttach->animData)
+			{
+				MSF_MainData::switchData.AnimToPlay1stP = modToAttach->animData->animIdle_1stP;
+				MSF_MainData::switchData.AnimToPlay3rdP = modToAttach->animData->animIdle_3rdP;
+			}
+			_MESSAGE("attach");
+		}
+		if (modToRemove)
+		{
+			MSF_MainData::switchData.ModToRemove = modToRemove->mod;
+			MSF_MainData::switchData.LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
+			//remove anim?
+		}
+		return true;
+
+		//if (!eqStack || !modAssociations)
+		//	return false;
+		//ExtraDataList* dataList = eqStack->extraData;
+		//if (!dataList)
+		//	return false;
+		//BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
+		//BGSObjectInstanceExtra* modData = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
+		//ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		//TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		//if (!modData || !instanceData)
+		//	return false;
+		//auto data = modData->data;
+		//if (!data || !data->forms)
+		//	return false;
+		//_MESSAGE("checkOK");
+		//for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++) //HasMod->next
+		//{
+		//	UInt8 type = (*itData)->GetType();
+		//	_MESSAGE("type: %i", type);
+		//	if (type == 0x1)
+		//	{
+		//		SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
+		//		if (Utilities::HasObjectMod(modData, modPair->modPair.parentMod))
+		//		{
+		//			if (Utilities::HasObjectMod(modData, modPair->modPair.functionMod))
+		//			{
+		//				MSF_MainData::switchData.ModToRemove = modPair->modPair.functionMod;
+		//				MSF_MainData::switchData.ModToAttach = nullptr;
+		//				MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//				if (modPair->flags & ModAssociationData::bRequireLooseMod)
+		//					MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(modPair->modPair.functionMod);
+		//				else
+		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//			}
+		//			else
+		//			{
+		//				if (modPair->flags & ModAssociationData::bRequireLooseMod)
+		//				{
+		//					TESObjectMISC* looseMod = Utilities::GetLooseMod(modPair->modPair.functionMod);
+		//					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//					{
+		//						MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
+		//						MSF_MainData::switchData.ModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//					else
+		//						return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
+		//				}
+		//				else
+		//				{
+		//					MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
+		//					MSF_MainData::switchData.ModToRemove = nullptr;
+		//					MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//				}
+		//			}
+		//			MSF_MainData::switchData.SwitchFlags |= (modPair->flags & ModAssociationData::mBitTransferMask);
+		//			MSF_MainData::switchData.AnimToPlay1stP = modPair->animIdle_1stP;
+		//			MSF_MainData::switchData.AnimToPlay3rdP = modPair->animIdle_3rdP;
+		//			return true;
+		//		}
+		//	}
+		//	else if (type == 0x3)
+		//	{
+		//		MultipleMod* mods = static_cast<MultipleMod*>(*itData);
+		//		if (Utilities::HasObjectMod(modData, mods->parentMod))
+		//		{
+		//			_MESSAGE("parentOK");
+		//			if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
+		//			{
+		//				_MESSAGE("hasKW");
+		//				BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
+		//				std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(mods->functionMods.begin(), mods->functionMods.end(), oldMod);
+		//				BGSMod::Attachment::Mod* currMod = *itMod;
+		//				itMod++;
+		//				if (itMod != mods->functionMods.end())
+		//				{
+		//					_MESSAGE("hasOldModNotEnd");
+		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//					{
+		//						TESObjectMISC* looseMod;
+		//						std::vector<BGSMod::Attachment::Mod*>::iterator itHelper = itMod;
+		//						for (itMod; itMod != mods->functionMods.end(); itMod++)
+		//						{
+		//							looseMod = Utilities::GetLooseMod(*itMod);
+		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//								break;
+		//						}
+		//						if (itMod != mods->functionMods.end())
+		//						{
+		//							MSF_MainData::switchData.ModToAttach = *itMod;
+		//							MSF_MainData::switchData.ModToRemove = nullptr;
+		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
+		//						}
+		//						else if (mods->flags & ModAssociationData::bCanHaveNullMod)
+		//						{
+		//							MSF_MainData::switchData.ModToRemove = currMod;
+		//							MSF_MainData::switchData.ModToAttach = nullptr;
+		//							MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
+		//						}
+		//						else
+		//						{
+		//							for (itMod = mods->functionMods.begin(); itMod != itHelper; itMod++)
+		//							{
+		//								looseMod = Utilities::GetLooseMod(*itMod);
+		//								if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//									break;
+		//							}
+		//							if (itMod != itHelper)
+		//							{
+		//								MSF_MainData::switchData.ModToAttach = *itMod;
+		//								MSF_MainData::switchData.ModToRemove = nullptr;
+		//								MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//								MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
+		//							}
+		//							else
+		//								return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
+		//						}
+		//					}
+		//					else
+		//					{
+		//						MSF_MainData::switchData.ModToAttach = *itMod;
+		//						MSF_MainData::switchData.ModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//				}
+		//				else
+		//				{
+		//					if (mods->flags & ModAssociationData::bCanHaveNullMod)
+		//					{
+		//						MSF_MainData::switchData.ModToRemove = currMod;
+		//						MSF_MainData::switchData.ModToAttach = nullptr;
+		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//						if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
+		//						else
+		//							MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//					else if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//					{
+		//						itMod--;
+		//						TESObjectMISC* looseMod;
+		//						std::vector<BGSMod::Attachment::Mod*>::iterator itMod2 = mods->functionMods.begin();
+		//						for (itMod2; itMod2 != itMod; itMod2++)
+		//						{
+		//							looseMod = Utilities::GetLooseMod(*itMod2);
+		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//								break;
+		//						}
+		//						if (itMod2 != itMod)
+		//						{
+		//							MSF_MainData::switchData.ModToAttach = *itMod2;
+		//							MSF_MainData::switchData.ModToRemove = nullptr;
+		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
+		//						}
+		//						else
+		//							return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
+		//					}
+		//					else
+		//					{
+		//						MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
+		//						MSF_MainData::switchData.ModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//				}
+		//			}
+		//			else
+		//			{
+		//				if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//				{
+		//					TESObjectMISC* looseMod;
+		//					std::vector<BGSMod::Attachment::Mod*>::iterator itMod = mods->functionMods.begin();
+		//					for (itMod; itMod != mods->functionMods.end(); itMod++)
+		//					{
+		//						looseMod = Utilities::GetLooseMod(*itMod);
+		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//							break;
+		//					}
+		//					if (itMod != mods->functionMods.end())
+		//					{
+		//						MSF_MainData::switchData.ModToAttach = *itMod;
+		//						MSF_MainData::switchData.ModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//					else
+		//						return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
+		//				}
+		//				else
+		//				{
+		//					MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
+		//					MSF_MainData::switchData.ModToRemove = nullptr;
+		//					MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//				}
+		//			}
+		//			MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
+		//			MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
+		//			MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
+		//			return true;
+		//		}
+		//	}
+		//	else if (type == 0x2)
+		//	{
+		//		ModPairArray* mods = static_cast<ModPairArray*>(*itData);
+		//		if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
+		//		{
+		//			_MESSAGE("hasOldMod");
+		//			BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
+		//			std::vector<ModAssociationData::ModPair>::iterator itHelper = mods->modPairs.begin();
+		//			bool selectNext = false;
+		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
+		//			{
+		//				if (selectNext)
+		//				{
+		//					if (Utilities::HasObjectMod(modData, itMod->parentMod))
+		//					{
+		//						_MESSAGE("hasParent: %08X", itMod->parentMod->formID);
+		//						if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//						{
+		//							TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
+		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//							{
+		//								MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//								MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
+		//							}
+		//							else
+		//								continue;
+		//						}
+		//						else
+		//						{
+		//							MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//							MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//						}
+		//						MSF_MainData::switchData.ModToAttach = itMod->functionMod;
+		//						MSF_MainData::switchData.ModToRemove = oldMod;
+		//						MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
+		//						MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
+		//						MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
+		//						return true;
+		//					}
+		//				}
+		//				else if (itMod->functionMod == oldMod)
+		//				{
+		//					selectNext = true;
+		//					itHelper = itMod;
+		//				}
+		//			}
+		//			if (mods->flags & ModAssociationData::bCanHaveNullMod)
+		//			{
+		//				_MESSAGE("NullMod");
+		//				MSF_MainData::switchData.ModToAttach = nullptr;
+		//				MSF_MainData::switchData.ModToRemove = oldMod;
+		//				MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//				MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
+		//				MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
+		//				MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
+		//				if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//					MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
+		//				else
+		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//				return true;
+		//			}
+		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != itHelper; itMod++)
+		//			{
+		//				if (Utilities::HasObjectMod(modData, itMod->parentMod))
+		//				{
+		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//					{
+		//						TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
+		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//						{
+		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
+		//						}
+		//						else
+		//							continue;
+		//					}
+		//					else
+		//					{
+		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					}
+		//					MSF_MainData::switchData.ModToAttach = itMod->functionMod;
+		//					MSF_MainData::switchData.ModToRemove = oldMod;
+		//					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
+		//					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
+		//					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
+		//					return true;
+		//				}
+		//			}
+		//		}
+		//		else
+		//		{
+		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
+		//			{
+		//				_MESSAGE("itP");
+		//				if (Utilities::HasObjectMod(modData, itMod->parentMod))
+		//				{
+		//					_MESSAGE("parentOK");
+		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
+		//					{
+		//						TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
+		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
+		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
+		//						else
+		//							continue;
+		//					}
+		//					else
+		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
+		//					MSF_MainData::switchData.ModToAttach = itMod->functionMod;
+		//					MSF_MainData::switchData.ModToRemove = nullptr;
+		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
+		//					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
+		//					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
+		//					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
+		//					return true;
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
+		//return false;
 	}
 
 	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
@@ -1289,339 +1724,6 @@ namespace MSF_Data
 
 
 
-		return false;
-	}
-
-	bool GetNextMod(BGSInventoryItem::Stack* eqStack, std::vector<ModAssociationData*>* modAssociations)
-	{
-		if (!eqStack || !modAssociations)
-			return false;
-		ExtraDataList* dataList = eqStack->extraData;
-		if (!dataList)
-			return false;
-		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
-		BGSObjectInstanceExtra* modData = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!modData || !instanceData)
-			return false;
-		auto data = modData->data;
-		if (!data || !data->forms)
-			return false;
-		_MESSAGE("checkOK");
-		for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++) //HasMod->next
-		{
-			UInt8 type = (*itData)->GetType();
-			_MESSAGE("type: %i", type);
-			if (type == 0x1)
-			{
-				SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
-				if (Utilities::HasObjectMod(modData, modPair->modPair.parentMod))
-				{
-					if (Utilities::HasObjectMod(modData, modPair->modPair.functionMod))
-					{
-						MSF_MainData::switchData.ModToRemove = modPair->modPair.functionMod;
-						MSF_MainData::switchData.ModToAttach = nullptr;
-						MSF_MainData::switchData.LooseModToRemove = nullptr;
-						if (modPair->flags & ModAssociationData::bRequireLooseMod)
-							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(modPair->modPair.functionMod);
-						else
-							MSF_MainData::switchData.LooseModToAdd = nullptr;
-					}
-					else
-					{
-						if (modPair->flags & ModAssociationData::bRequireLooseMod)
-						{
-							TESObjectMISC* looseMod = Utilities::GetLooseMod(modPair->modPair.functionMod);
-							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-							{
-								MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
-								MSF_MainData::switchData.ModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToRemove = looseMod;
-								MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-							else
-								return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-						}
-						else
-						{
-							MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
-							MSF_MainData::switchData.ModToRemove = nullptr;
-							MSF_MainData::switchData.LooseModToRemove = nullptr;
-							MSF_MainData::switchData.LooseModToAdd = nullptr;
-						}
-					}
-					MSF_MainData::switchData.SwitchFlags |= (modPair->flags & ModAssociationData::mBitTransferMask);
-					MSF_MainData::switchData.AnimToPlay1stP = modPair->animIdle_1stP;
-					MSF_MainData::switchData.AnimToPlay3rdP = modPair->animIdle_3rdP;
-					return true;
-				}
-			}
-			else if (type == 0x3)
-			{
-				MultipleMod* mods = static_cast<MultipleMod*>(*itData);
-				if (Utilities::HasObjectMod(modData, mods->parentMod))
-				{
-					_MESSAGE("parentOK");
-					if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
-					{
-						_MESSAGE("hasKW");
-						BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
-						std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(mods->functionMods.begin(), mods->functionMods.end(), oldMod);
-						BGSMod::Attachment::Mod* currMod = *itMod;
-						itMod++;
-						if (itMod != mods->functionMods.end())
-						{
-							_MESSAGE("hasOldModNotEnd");
-							if (mods->flags & ModAssociationData::bRequireLooseMod)
-							{
-								TESObjectMISC* looseMod;
-								std::vector<BGSMod::Attachment::Mod*>::iterator itHelper = itMod;
-								for (itMod; itMod != mods->functionMods.end(); itMod++)
-								{
-									looseMod = Utilities::GetLooseMod(*itMod);
-									if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-										break;
-								}
-								if (itMod != mods->functionMods.end())
-								{
-									MSF_MainData::switchData.ModToAttach = *itMod;
-									MSF_MainData::switchData.ModToRemove = nullptr;
-									MSF_MainData::switchData.LooseModToRemove = looseMod;
-									MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-								}
-								else if (mods->flags & ModAssociationData::bCanHaveNullMod)
-								{
-									MSF_MainData::switchData.ModToRemove = currMod;
-									MSF_MainData::switchData.ModToAttach = nullptr;
-									MSF_MainData::switchData.LooseModToRemove = nullptr;
-									MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-								}
-								else
-								{
-									for (itMod = mods->functionMods.begin(); itMod != itHelper; itMod++)
-									{
-										looseMod = Utilities::GetLooseMod(*itMod);
-										if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-											break;
-									}
-									if (itMod != itHelper)
-									{
-										MSF_MainData::switchData.ModToAttach = *itMod;
-										MSF_MainData::switchData.ModToRemove = nullptr;
-										MSF_MainData::switchData.LooseModToRemove = looseMod;
-										MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-									}
-									else
-										return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-								}
-							}
-							else
-							{
-								MSF_MainData::switchData.ModToAttach = *itMod;
-								MSF_MainData::switchData.ModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-						}
-						else
-						{
-							if (mods->flags & ModAssociationData::bCanHaveNullMod)
-							{
-								MSF_MainData::switchData.ModToRemove = currMod;
-								MSF_MainData::switchData.ModToAttach = nullptr;
-								MSF_MainData::switchData.LooseModToRemove = nullptr;
-								if (mods->flags & ModAssociationData::bRequireLooseMod)
-									MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-								else
-									MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-							else if (mods->flags & ModAssociationData::bRequireLooseMod)
-							{
-								itMod--;
-								TESObjectMISC* looseMod;
-								std::vector<BGSMod::Attachment::Mod*>::iterator itMod2 = mods->functionMods.begin();
-								for (itMod2; itMod2 != itMod; itMod2++)
-								{
-									looseMod = Utilities::GetLooseMod(*itMod2);
-									if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-										break;
-								}
-								if (itMod2 != itMod)
-								{
-									MSF_MainData::switchData.ModToAttach = *itMod2;
-									MSF_MainData::switchData.ModToRemove = nullptr;
-									MSF_MainData::switchData.LooseModToRemove = looseMod;
-									MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-								}
-								else
-									return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-							}
-							else
-							{
-								MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
-								MSF_MainData::switchData.ModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-						}
-					}
-					else
-					{
-						if (mods->flags & ModAssociationData::bRequireLooseMod)
-						{
-							TESObjectMISC* looseMod;
-							std::vector<BGSMod::Attachment::Mod*>::iterator itMod = mods->functionMods.begin();
-							for (itMod; itMod != mods->functionMods.end(); itMod++)
-							{
-								looseMod = Utilities::GetLooseMod(*itMod);
-								if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-									break;
-							}
-							if (itMod != mods->functionMods.end())
-							{
-								MSF_MainData::switchData.ModToAttach = *itMod;
-								MSF_MainData::switchData.ModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToRemove = looseMod;
-								MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-							else
-								return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-						}
-						else
-						{
-							MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
-							MSF_MainData::switchData.ModToRemove = nullptr;
-							MSF_MainData::switchData.LooseModToRemove = nullptr;
-							MSF_MainData::switchData.LooseModToAdd = nullptr;
-						}
-					}
-					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-					return true;
-				}
-			}
-			else if (type == 0x2)
-			{
-				ModPairArray* mods = static_cast<ModPairArray*>(*itData);
-				if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
-				{
-					_MESSAGE("hasOldMod");
-					BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
-					std::vector<ModAssociationData::ModPair>::iterator itHelper = mods->modPairs.begin();
-					bool selectNext = false;
-					for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
-					{
-						if (selectNext)
-						{
-							if (Utilities::HasObjectMod(modData, itMod->parentMod))
-							{
-								_MESSAGE("hasParent: %08X", itMod->parentMod->formID);
-								if (mods->flags & ModAssociationData::bRequireLooseMod)
-								{
-									TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-									if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-									{
-										MSF_MainData::switchData.LooseModToRemove = looseMod;
-										MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-									}
-									else
-										continue;
-								}
-								else
-								{
-									MSF_MainData::switchData.LooseModToRemove = nullptr;
-									MSF_MainData::switchData.LooseModToAdd = nullptr;
-								}
-								MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-								MSF_MainData::switchData.ModToRemove = oldMod;
-								MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-								MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-								MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-								return true;
-							}
-						}
-						else if (itMod->functionMod == oldMod)
-						{
-							selectNext = true;
-							itHelper = itMod;
-						}
-					}
-					if (mods->flags & ModAssociationData::bCanHaveNullMod)
-					{
-						_MESSAGE("NullMod");
-						MSF_MainData::switchData.ModToAttach = nullptr;
-						MSF_MainData::switchData.ModToRemove = oldMod;
-						MSF_MainData::switchData.LooseModToRemove = nullptr;
-						MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-						MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-						MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-						if (mods->flags & ModAssociationData::bRequireLooseMod)
-							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-						else
-							MSF_MainData::switchData.LooseModToAdd = nullptr;
-						return true;
-					}
-					for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != itHelper; itMod++)
-					{
-						if (Utilities::HasObjectMod(modData, itMod->parentMod))
-						{
-							if (mods->flags & ModAssociationData::bRequireLooseMod)
-							{
-								TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-								if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-								{
-									MSF_MainData::switchData.LooseModToRemove = looseMod;
-									MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-								}
-								else
-									continue;
-							}
-							else
-							{
-								MSF_MainData::switchData.LooseModToRemove = nullptr;
-								MSF_MainData::switchData.LooseModToAdd = nullptr;
-							}
-							MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-							MSF_MainData::switchData.ModToRemove = oldMod;
-							MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-							MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-							MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-							return true;
-						}
-					}
-				}
-				else
-				{
-					for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
-					{
-						_MESSAGE("itP");
-						if (Utilities::HasObjectMod(modData, itMod->parentMod))
-						{
-							_MESSAGE("parentOK");
-							if (mods->flags & ModAssociationData::bRequireLooseMod)
-							{
-								TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-								if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-									MSF_MainData::switchData.LooseModToRemove = looseMod;
-								else
-									continue;
-							}
-							else
-								MSF_MainData::switchData.LooseModToRemove = nullptr;
-							MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-							MSF_MainData::switchData.ModToRemove = nullptr;
-							MSF_MainData::switchData.LooseModToAdd = nullptr;
-							MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-							MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-							MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-							return true;
-						}
-					}
-				}
-			}
-		}
 		return false;
 	}
 
@@ -1717,9 +1819,9 @@ namespace MSF_Data
 			return "";
 		for (std::vector<HUDFiringModeData>::iterator it = MSF_MainData::fmDisplayData.begin(); it != MSF_MainData::fmDisplayData.end(); it++)
 		{
-			if (!it->modeKeyword)
+			if (!it->keyword)
 				continue;
-			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->modeKeyword))
+			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->keyword))
 			{
 				return it->displayString;
 			}
@@ -1733,9 +1835,9 @@ namespace MSF_Data
 			return "";
 		for (std::vector<HUDScopeData>::iterator it = MSF_MainData::scopeDisplayData.begin(); it != MSF_MainData::scopeDisplayData.end(); it++)
 		{
-			if (!it->scopeKeyword)
+			if (!it->keyword)
 				continue;
-			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->scopeKeyword))
+			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->keyword))
 			{
 				return it->displayString;
 			}
@@ -1749,9 +1851,9 @@ namespace MSF_Data
 			return "";
 		for (std::vector<HUDMuzzleData>::iterator it = MSF_MainData::muzzleDisplayData.begin(); it != MSF_MainData::muzzleDisplayData.end(); it++)
 		{
-			if (!it->muzzleKeyword)
+			if (!it->keyword)
 				continue;
-			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->muzzleKeyword))
+			if (Utilities::WeaponInstanceHasKeyword(instanceData, it->keyword))
 			{
 				return it->displayString;
 			}
