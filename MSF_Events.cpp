@@ -1,5 +1,9 @@
 #include "MSF_Events.h"
 
+//RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F4B24C);
+//RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F48D00);
+RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F494DA);
+RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F4B080);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget(0x0A0E9D2);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original(0x0A22D00);
 RelocPtr <UInt32> uAmmoCounterFadeTimeMS(0x375CF30); //A0E9C9
@@ -41,28 +45,12 @@ EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatch
 
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
-	if ((*g_player)->equipData->slots[41].instanceData)
+	if (evn->weaponInstance != MSF_MainData::modSwitchManager.GetCurrentWeapon())
 	{
-		if (evn->weaponInstance && evn->weaponInstance != MSF_MainData::switchData.equippedInstanceData)
-		{
-			MSF_MainData::switchData.equippedInstanceData = evn->weaponInstance;
-			//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::APbaseMod))
-			//{
-			//	MSF_MainData::switchData.ClearData();
-			//	MSF_MainData::switchData.SwitchFlags = SwitchData::bNeedInit;
-			//	if (!(*g_ui)->IsMenuOpen(BSFixedString("pipboyMenu"))) //(!(*g_ui)->IsMenuOpen(BSFixedString("CursorMenu"))
-			//		MSF_Base::InitWeapon();
-			//}
-			MSF_Scaleform::UpdateWidgetData();
-			//MSFWidgetMenu::OpenMenu();
-		}
-	}
-	else
-	{
-		MSF_MainData::switchData.equippedInstanceData = nullptr;
-		MSF_MainData::switchData.ClearData();
+		MSF_MainData::modSwitchManager.SetCurrentWeapon(evn->weaponInstance);
+		MSF_MainData::modSwitchManager.ClearQueue();
+		//close menu
 		MSF_Scaleform::UpdateWidgetData();
-		//MSFWidgetMenu::OpenMenu();
 	}
 
 	return kEvent_Continue;
@@ -126,80 +114,112 @@ BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents
 	return nullptr;
 }
 
+void* AttackBlockHandler_Hook(void* handler)
+{
+	_MESSAGE("Attack");
+	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
+		return nullptr;
+	return AttackBlockHandler_Original(handler);
+}
+
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime)
 {
 	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
 		MSF_Scaleform::StartWidgetHideCountdown(visibleTime);
-	return HUDShowAmmoCounter_Original(ammoCounter, visibleTime);;
+	return HUDShowAmmoCounter_Original(ammoCounter, visibleTime);
 }
+
+volatile short count = 3;
 
 UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 {
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
 	{
-		_MESSAGE("reloadCOMP %02X", MSF_MainData::switchData.SwitchFlags);
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadInProgress)
+		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
+		if (switchData)
 		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bReloadInProgress;
-			MSF_Base::SwitchMod();
+			_MESSAGE("reloadCOMP %02X", switchData->SwitchFlags);
+			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
+			{
+				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
+				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
+				MSF_Base::SwitchMod(switchData, true);
+				_MESSAGE("switchOK");
+			}
 		}
 	}
 	if (!_strcmpi("reloadEnd", name))
 	{
 		_MESSAGE("reloadEnd");
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadInProgress)
+		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
-			UInt16 endFlag = ~SwitchData::bReloadNotFinished;
-			delayTask delayEnd(10, true, &MSF_Base::SwitchFlagsAND, endFlag);
+			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
+			delayTask delayEnd(10, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
 	{
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bDrawInProgress)
+		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
+		if (switchData)
 		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bDrawInProgress;
-			if ((MSF_MainData::switchData.SwitchFlags & SwitchData::bReloadNeeded))
+			_MESSAGE("drawFlags: %08X", switchData->SwitchFlags);
+			if (switchData->SwitchFlags & SwitchData::bDrawInProgress)
 			{
-				MSF_MainData::switchData.SwitchFlags = (MSF_MainData::switchData.SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-				if (!MSF_Base::ReloadWeapon())
-					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bReloadInProgress | SwitchData::bReloadNotFinished);
-			}
-			else if (SwitchData::bAnimNeeded)
-			{
-				MSF_MainData::switchData.SwitchFlags = (MSF_MainData::switchData.SwitchFlags & ~SwitchData::bAnimNeeded) | SwitchData::bAnimInProgress; //| SwitchData::bAnimNotFinished
-				if (!MSF_Base::PlayAnim())
-					MSF_MainData::switchData.SwitchFlags &= ~(SwitchData::bAnimInProgress | SwitchData::bAnimNotFinished);
+				switchData->SwitchFlags &= ~SwitchData::bDrawInProgress;
+				if ((switchData->SwitchFlags & SwitchData::bReloadNeeded))
+				{
+					_MESSAGE("reloading");
+					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
+					delayTask delayReload(400, true, &MSF_Base::ReloadWeapon);
+					//if (!MSF_Base::ReloadWeapon())
+					//	MSF_MainData::modSwitchManager.ClearQueue();
+				}
+				else if (SwitchData::bAnimNeeded)
+				{
+					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bAnimNeeded) | SwitchData::bAnimInProgress; //| SwitchData::bAnimNotFinished
+					if (!MSF_Base::PlayAnim(switchData->animData))
+						MSF_MainData::modSwitchManager.ClearQueue();
+				}
 			}
 		}
 	}
 	else if (!_strcmpi("weaponFire", name))
 	{
-		if (MSF_MainData::tmr.IsRunning())
-		{
-			if (MSF_MainData::tmr.stop() < 1000)
-				MSF_Base::FireBurst(*g_player);
-		}
+		//if (MSF_MainData::tmr.IsRunning())
+		//{
+		//	if (MSF_MainData::tmr.stop() < 1000)
+		//		MSF_Base::FireBurst(*g_player);
+		//}
 		//InterlockedDecrement16(&count);
 		//if (count)
-		//	Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
+		//	delayTask delayReload(80, true, &Utilities::PlayIdle, *g_player, MSF_MainData::fireIdle1stP);
+		//	//Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
 		//else
 		//	InterlockedExchange16(&count, 3);
 		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
 	}
 	else if (!_strcmpi("switchMod", name))
 	{
-		if (MSF_MainData::switchData.SwitchFlags & SwitchData::bAnimInProgress)
+		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
+		if (switchData)
 		{
-			MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bAnimInProgress;
-			MSF_Base::SwitchMod();
+			if (switchData->SwitchFlags & SwitchData::bAnimInProgress)
+			{
+				switchData->SwitchFlags &= ~SwitchData::bAnimInProgress;
+				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
+				MSF_Base::SwitchMod(switchData, true);
+			}
 		}
 		//_MESSAGE("Anim: switch");
 	}
 	else if (!_strcmpi("customAnimEnd", name))
 	{
-		UInt16 endFlag = ~SwitchData::bAnimNotFinished;
-		delayTask delayEnd(10, true, &MSF_Base::SwitchFlagsAND, endFlag);
+		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_AnimNotFinished)
+		{
+			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
+			delayTask delayEnd(10, true, &MSF_Base::EndSwitch, endFlag);
+		}
 	}
 	return tf1_Original(arg1, arg2, arg3);
 }

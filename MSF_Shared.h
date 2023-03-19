@@ -418,6 +418,16 @@ namespace Utilities
 		bool _IsRunning;
 	};
 }
+
+class TlsShare
+{
+private:
+	std::vector<std::pair<DWORD, void*>> TlsValues;
+public:
+	TlsShare();
+	void CopyTls();
+};
+
 class delayTask
 {
 public:
@@ -428,9 +438,12 @@ public:
 
 		if (async)
 		{
-			std::thread([delay, task]() {
+			TlsShare* tlsShare = new TlsShare;
+			std::thread([delay, task, tlsShare]() {
+				tlsShare->CopyTls();
 				std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 				task();
+				delete tlsShare;
 			}).detach();
 		}
 		else
@@ -456,13 +469,14 @@ typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordVa
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
 typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent);
 typedef void(*_RemoveItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent, TESObjectREFR* toContainer);
-typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef void(*_SetAnimationVariableBool)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
 typedef bool(*_PlayIdle)(VirtualMachine* vm, UInt32 stackId, Actor* actor, TESIdleForm* idle);
 typedef bool(*_PlayIdle2)(Actor* actor, TESIdleForm* idle, UInt64 unk, VirtualMachine* vm, UInt32 stackId);
 typedef bool(*_PlayIdleAction)(Actor* actor, BGSAction* action, TESObjectREFR* target, VirtualMachine* vm, UInt32 stackId);
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
+typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
+typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ShowNotification)(std::string text, UInt32 edx, UInt32 r8d);
 typedef UInt32(*_EquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStruct, SInt32 unk_r9d, SInt8 unk_rsp20, void* unk_rsp28, SInt8 unk_rsp30, bool forceequip, SInt8 unk_rsp40, SInt8 unk_rsp48, bool preventunequip);
 typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStruct, SInt32 unk_r9d, void* equipslot, SInt8 unk_rsp28, SInt8 unk_rsp30, bool abPreventEquip, SInt8 unk_rsp40, SInt8 unk_rsp48, void* unk_rsp50);
@@ -470,16 +484,18 @@ typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStr
 // sub_140E1BEF0(qword_145A10618, v7, &v25, 1, v16, -1, 1, a5, 1, 0, 0i64);
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
-extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
+
 extern RelocAddr <_AddItem_Native> AddItemNative;
 extern RelocAddr <_RemoveItem_Native> RemoveItemNative;
-extern RelocAddr <_IsInIronSights> IsInIronSights;
 extern RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal; //0x140EA10
 extern RelocAddr <_PlayIdle> PlayIdleInternal; //0x13863A0
 extern RelocAddr <_PlayIdle2> PlayIdleInternal2;
 extern RelocAddr <_PlayIdleAction> PlayIdleActionInternal; //0x13864A0 
-extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal; //0x138A130
+extern RelocAddr <_IsInIronSights> IsInIronSights;
+extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
+extern RelocAddr <_FireWeaponInternal> FireWeaponInternal;
+extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;
 extern RelocAddr <_AttachModToStack> AttachRemoveModStack;
 extern RelocAddr <_UpdMidProc> UpdateMiddleProcess;
@@ -489,6 +505,7 @@ extern RelocAddr <_EquipHandler> EquipHandler;
 extern RelocAddr <_UniversalEquipHandler> UniversalEquipHandler;
 extern RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0;
 extern RelocAddr <_UnkSub_DFE930> UnkSub_DFE930;
+
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;

@@ -52,7 +52,6 @@ ModSelectionMenu* MSF_MainData::widgetMenu;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
-SwitchData MSF_MainData::switchData;
 std::vector<BurstMode> MSF_MainData::burstMode;
 Utilities::Timer MSF_MainData::tmr;
 
@@ -145,7 +144,7 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = 0x77F;
+		MSF_MainData::MCMSettingFlags = 0xDFF;
 		AddFloatSetting("fSliderMainX", 950.0);
 		AddFloatSetting("fSliderMainY", 565.0);
 		AddFloatSetting("fPowerArmorOffsetX", 0.0);
@@ -1143,14 +1142,14 @@ namespace MSF_Data
 	}
 
 	//========================= Select Object Mod =======================
-	bool GetNthAmmoMod(UInt32 num)
+	SwitchData* GetNthAmmoMod(UInt32 num)
 	{
 		if (num < 0)
-			return false;
+			return nullptr;
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 		if (!baseAmmo)
-			return false;
+			return nullptr;
 		AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
 		if (itAmmoData)
 		{
@@ -1159,30 +1158,26 @@ namespace MSF_Data
 				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 				{
 					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
-						return false;
+						return nullptr;
 				}
-				MSF_MainData::switchData.ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
-				MSF_MainData::switchData.ModToAttach = nullptr;
-				MSF_MainData::switchData.LooseModToAdd = nullptr;
-				MSF_MainData::switchData.LooseModToRemove = nullptr;
-				return true;
+				SwitchData* switchData = new SwitchData();
+				switchData->ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				return switchData;
 			}
 			num--;
 			if ((num + 1) > itAmmoData->ammoMods.size())
-				return false;
+				return nullptr;
 			AmmoData::AmmoMod* ammoMod = &itAmmoData->ammoMods[num];
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 			{
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
-					return false;
+					return nullptr;
 			}
-			MSF_MainData::switchData.ModToAttach = ammoMod->mod;
-			MSF_MainData::switchData.ModToRemove = nullptr;
-			MSF_MainData::switchData.LooseModToAdd = nullptr;
-			MSF_MainData::switchData.LooseModToRemove = nullptr;
-			return true;
+			SwitchData* switchData = new SwitchData();
+			switchData->ModToAttach = ammoMod->mod;
+			return switchData;
 		}
-		return false;
+		return nullptr;
 	}
 
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData)
@@ -1236,36 +1231,10 @@ namespace MSF_Data
 		if (itMod != modCycle->mods.end())
 			modToRemove = *itMod;
 
-		if (modToAttach == modToRemove)
-			return false; //no change
+		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
+			return false;
 
-		//checkAttachRequrements
-		if (modToAttach)
-		{
-			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
-			{
-				TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
-				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
-					return false; //missing loosemod
-				MSF_MainData::switchData.LooseModToRemove = looseMod;
-			}
-			MSF_MainData::switchData.ModToAttach = modToAttach->mod;
-			MSF_MainData::switchData.SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
-			MSF_MainData::switchData.AnimToPlay1stP = nullptr;
-			MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
-			if (modToAttach->animData)
-			{
-				MSF_MainData::switchData.AnimToPlay1stP = modToAttach->animData->animIdle_1stP;
-				MSF_MainData::switchData.AnimToPlay3rdP = modToAttach->animData->animIdle_3rdP;
-			}
-		}
-		if (modToRemove)
-		{
-			MSF_MainData::switchData.ModToRemove = modToRemove->mod;
-			MSF_MainData::switchData.LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
-			//remove anim?
-		}
-		return true;
+		return QueueModsToSwitch(modToAttach, modToRemove, modData->flags & ModData::bRequireAPmod);
 	}
 
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData)
@@ -1321,409 +1290,140 @@ namespace MSF_Data
 			else if (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod)
 				modToAttach = modCycle->mods[0];
 		}
-		//checkAttachRequrements
-		_MESSAGE("final");
-		if (modToAttach)
-		{
-			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
-			{
-				TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
-				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
-					return false; //missing loosemod
-				MSF_MainData::switchData.LooseModToRemove = looseMod;
-			}
-			MSF_MainData::switchData.ModToAttach = modToAttach->mod;
-			MSF_MainData::switchData.SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
-			MSF_MainData::switchData.SwitchFlags |= modData->flags & ModData::bRequireAPmod;
-			MSF_MainData::switchData.AnimToPlay1stP = nullptr;
-			MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
-			if (modToAttach->animData)
-			{
-				MSF_MainData::switchData.AnimToPlay1stP = modToAttach->animData->animIdle_1stP;
-				MSF_MainData::switchData.AnimToPlay3rdP = modToAttach->animData->animIdle_3rdP;
-			}
-			_MESSAGE("attach");
-		}
-		if (modToRemove)
-		{
-			MSF_MainData::switchData.ModToRemove = modToRemove->mod;
-			MSF_MainData::switchData.LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
-			//remove anim?
-		}
-		return true;
 
-		//if (!eqStack || !modAssociations)
-		//	return false;
-		//ExtraDataList* dataList = eqStack->extraData;
-		//if (!dataList)
-		//	return false;
-		//BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
-		//BGSObjectInstanceExtra* modData = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
-		//ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		//TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		//if (!modData || !instanceData)
-		//	return false;
-		//auto data = modData->data;
-		//if (!data || !data->forms)
-		//	return false;
-		//_MESSAGE("checkOK");
-		//for (std::vector<ModAssociationData*>::iterator itData = modAssociations->begin(); itData != modAssociations->end(); itData++) //HasMod->next
-		//{
-		//	UInt8 type = (*itData)->GetType();
-		//	_MESSAGE("type: %i", type);
-		//	if (type == 0x1)
-		//	{
-		//		SingleModPair* modPair = static_cast<SingleModPair*>(*itData);
-		//		if (Utilities::HasObjectMod(modData, modPair->modPair.parentMod))
-		//		{
-		//			if (Utilities::HasObjectMod(modData, modPair->modPair.functionMod))
-		//			{
-		//				MSF_MainData::switchData.ModToRemove = modPair->modPair.functionMod;
-		//				MSF_MainData::switchData.ModToAttach = nullptr;
-		//				MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//				if (modPair->flags & ModAssociationData::bRequireLooseMod)
-		//					MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(modPair->modPair.functionMod);
-		//				else
-		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//			}
-		//			else
-		//			{
-		//				if (modPair->flags & ModAssociationData::bRequireLooseMod)
-		//				{
-		//					TESObjectMISC* looseMod = Utilities::GetLooseMod(modPair->modPair.functionMod);
-		//					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//					{
-		//						MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
-		//						MSF_MainData::switchData.ModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//					else
-		//						return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-		//				}
-		//				else
-		//				{
-		//					MSF_MainData::switchData.ModToAttach = modPair->modPair.functionMod;
-		//					MSF_MainData::switchData.ModToRemove = nullptr;
-		//					MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//				}
-		//			}
-		//			MSF_MainData::switchData.SwitchFlags |= (modPair->flags & ModAssociationData::mBitTransferMask);
-		//			MSF_MainData::switchData.AnimToPlay1stP = modPair->animIdle_1stP;
-		//			MSF_MainData::switchData.AnimToPlay3rdP = modPair->animIdle_3rdP;
-		//			return true;
-		//		}
-		//	}
-		//	else if (type == 0x3)
-		//	{
-		//		MultipleMod* mods = static_cast<MultipleMod*>(*itData);
-		//		if (Utilities::HasObjectMod(modData, mods->parentMod))
-		//		{
-		//			_MESSAGE("parentOK");
-		//			if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
-		//			{
-		//				_MESSAGE("hasKW");
-		//				BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
-		//				std::vector<BGSMod::Attachment::Mod*>::iterator itMod = find(mods->functionMods.begin(), mods->functionMods.end(), oldMod);
-		//				BGSMod::Attachment::Mod* currMod = *itMod;
-		//				itMod++;
-		//				if (itMod != mods->functionMods.end())
-		//				{
-		//					_MESSAGE("hasOldModNotEnd");
-		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//					{
-		//						TESObjectMISC* looseMod;
-		//						std::vector<BGSMod::Attachment::Mod*>::iterator itHelper = itMod;
-		//						for (itMod; itMod != mods->functionMods.end(); itMod++)
-		//						{
-		//							looseMod = Utilities::GetLooseMod(*itMod);
-		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//								break;
-		//						}
-		//						if (itMod != mods->functionMods.end())
-		//						{
-		//							MSF_MainData::switchData.ModToAttach = *itMod;
-		//							MSF_MainData::switchData.ModToRemove = nullptr;
-		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-		//						}
-		//						else if (mods->flags & ModAssociationData::bCanHaveNullMod)
-		//						{
-		//							MSF_MainData::switchData.ModToRemove = currMod;
-		//							MSF_MainData::switchData.ModToAttach = nullptr;
-		//							MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-		//						}
-		//						else
-		//						{
-		//							for (itMod = mods->functionMods.begin(); itMod != itHelper; itMod++)
-		//							{
-		//								looseMod = Utilities::GetLooseMod(*itMod);
-		//								if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//									break;
-		//							}
-		//							if (itMod != itHelper)
-		//							{
-		//								MSF_MainData::switchData.ModToAttach = *itMod;
-		//								MSF_MainData::switchData.ModToRemove = nullptr;
-		//								MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//								MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-		//							}
-		//							else
-		//								return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-		//						}
-		//					}
-		//					else
-		//					{
-		//						MSF_MainData::switchData.ModToAttach = *itMod;
-		//						MSF_MainData::switchData.ModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//				}
-		//				else
-		//				{
-		//					if (mods->flags & ModAssociationData::bCanHaveNullMod)
-		//					{
-		//						MSF_MainData::switchData.ModToRemove = currMod;
-		//						MSF_MainData::switchData.ModToAttach = nullptr;
-		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//						if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-		//						else
-		//							MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//					else if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//					{
-		//						itMod--;
-		//						TESObjectMISC* looseMod;
-		//						std::vector<BGSMod::Attachment::Mod*>::iterator itMod2 = mods->functionMods.begin();
-		//						for (itMod2; itMod2 != itMod; itMod2++)
-		//						{
-		//							looseMod = Utilities::GetLooseMod(*itMod2);
-		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//								break;
-		//						}
-		//						if (itMod2 != itMod)
-		//						{
-		//							MSF_MainData::switchData.ModToAttach = *itMod2;
-		//							MSF_MainData::switchData.ModToRemove = nullptr;
-		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(currMod);
-		//						}
-		//						else
-		//							return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-		//					}
-		//					else
-		//					{
-		//						MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
-		//						MSF_MainData::switchData.ModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//				}
-		//			}
-		//			else
-		//			{
-		//				if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//				{
-		//					TESObjectMISC* looseMod;
-		//					std::vector<BGSMod::Attachment::Mod*>::iterator itMod = mods->functionMods.begin();
-		//					for (itMod; itMod != mods->functionMods.end(); itMod++)
-		//					{
-		//						looseMod = Utilities::GetLooseMod(*itMod);
-		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//							break;
-		//					}
-		//					if (itMod != mods->functionMods.end())
-		//					{
-		//						MSF_MainData::switchData.ModToAttach = *itMod;
-		//						MSF_MainData::switchData.ModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//					else
-		//						return false; //Utilities::SendNotification("You lack the corresponding loose mod to apply this modification.");
-		//				}
-		//				else
-		//				{
-		//					MSF_MainData::switchData.ModToAttach = mods->functionMods[0];
-		//					MSF_MainData::switchData.ModToRemove = nullptr;
-		//					MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//				}
-		//			}
-		//			MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-		//			MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-		//			MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-		//			return true;
-		//		}
-		//	}
-		//	else if (type == 0x2)
-		//	{
-		//		ModPairArray* mods = static_cast<ModPairArray*>(*itData);
-		//		if (Utilities::WeaponInstanceHasKeyword(instanceData, mods->funcKeyword))
-		//		{
-		//			_MESSAGE("hasOldMod");
-		//			BGSMod::Attachment::Mod* oldMod = Utilities::FindModByUniqueKeyword(modData, mods->funcKeyword);
-		//			std::vector<ModAssociationData::ModPair>::iterator itHelper = mods->modPairs.begin();
-		//			bool selectNext = false;
-		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
-		//			{
-		//				if (selectNext)
-		//				{
-		//					if (Utilities::HasObjectMod(modData, itMod->parentMod))
-		//					{
-		//						_MESSAGE("hasParent: %08X", itMod->parentMod->formID);
-		//						if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//						{
-		//							TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-		//							if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//							{
-		//								MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//								MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-		//							}
-		//							else
-		//								continue;
-		//						}
-		//						else
-		//						{
-		//							MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//							MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//						}
-		//						MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-		//						MSF_MainData::switchData.ModToRemove = oldMod;
-		//						MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-		//						MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-		//						MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-		//						return true;
-		//					}
-		//				}
-		//				else if (itMod->functionMod == oldMod)
-		//				{
-		//					selectNext = true;
-		//					itHelper = itMod;
-		//				}
-		//			}
-		//			if (mods->flags & ModAssociationData::bCanHaveNullMod)
-		//			{
-		//				_MESSAGE("NullMod");
-		//				MSF_MainData::switchData.ModToAttach = nullptr;
-		//				MSF_MainData::switchData.ModToRemove = oldMod;
-		//				MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//				MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-		//				MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-		//				MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-		//				if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//					MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-		//				else
-		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//				return true;
-		//			}
-		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != itHelper; itMod++)
-		//			{
-		//				if (Utilities::HasObjectMod(modData, itMod->parentMod))
-		//				{
-		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//					{
-		//						TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//						{
-		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//							MSF_MainData::switchData.LooseModToAdd = Utilities::GetLooseMod(oldMod);
-		//						}
-		//						else
-		//							continue;
-		//					}
-		//					else
-		//					{
-		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//						MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					}
-		//					MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-		//					MSF_MainData::switchData.ModToRemove = oldMod;
-		//					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-		//					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-		//					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-		//					return true;
-		//				}
-		//			}
-		//		}
-		//		else
-		//		{
-		//			for (std::vector<ModAssociationData::ModPair>::iterator itMod = mods->modPairs.begin(); itMod != mods->modPairs.end(); itMod++)
-		//			{
-		//				_MESSAGE("itP");
-		//				if (Utilities::HasObjectMod(modData, itMod->parentMod))
-		//				{
-		//					_MESSAGE("parentOK");
-		//					if (mods->flags & ModAssociationData::bRequireLooseMod)
-		//					{
-		//						TESObjectMISC* looseMod = Utilities::GetLooseMod(itMod->functionMod);
-		//						if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-		//							MSF_MainData::switchData.LooseModToRemove = looseMod;
-		//						else
-		//							continue;
-		//					}
-		//					else
-		//						MSF_MainData::switchData.LooseModToRemove = nullptr;
-		//					MSF_MainData::switchData.ModToAttach = itMod->functionMod;
-		//					MSF_MainData::switchData.ModToRemove = nullptr;
-		//					MSF_MainData::switchData.LooseModToAdd = nullptr;
-		//					MSF_MainData::switchData.SwitchFlags |= (mods->flags & ModAssociationData::mBitTransferMask);
-		//					MSF_MainData::switchData.AnimToPlay1stP = mods->animIdle_1stP;
-		//					MSF_MainData::switchData.AnimToPlay3rdP = mods->animIdle_3rdP;
-		//					return true;
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
-		//return false;
+		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
+			return false;
+
+		return QueueModsToSwitch(modToAttach, modToRemove, modData->flags & ModData::bRequireAPmod);
 	}
 
-	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
+	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove)
 	{
-		TESAmmo* baseAmmo = *ammo;
-		*ammo = nullptr;
-		UInt32 chance = 0;
-		if (baseAmmo)
+		return true;
+	}
+
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit)
+	{
+		if (modToAttach == modToRemove)
+			return false; //no change
+		SwitchData* switchRemove = nullptr;
+		SwitchData* switchAttach = nullptr;
+		if (modToRemove && (!modToAttach || (modToRemove->flags & ModData::Mod::bStandaloneRemove) || (modToAttach && (modToRemove->flags & ModData::Mod::bStandaloneAttach))))
 		{
-			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-			if (itAmmoData)
+			if (!(modToRemove->flags & SwitchData::bIgnoreAnimations))
 			{
-				chance += itAmmoData->baseAmmoData.spawnChance;
-				UInt32 _chance = 0;
-				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				{
-					_chance += itAmmoMod->spawnChance;
-				}
-				if (_chance == 0)
+				if (!MSF_Base::HandlePendingAnimations())
 					return false;
-				chance += _chance - 1;
-				UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
-				_chance = itAmmoData->baseAmmoData.spawnChance - 1;
-				if (picked <= _chance)
-					return false;
-				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				{
-					_chance += itAmmoMod->spawnChance;
-					if (picked <= _chance)
-					{
-						mods->Push(itAmmoMod->mod);
-						*ammo = itAmmoMod->ammo;
-						*count = MSF_MainData::rng.RandomInt(6, 48);
-						break;
-					}
-				}
-				return true;
 			}
+			switchRemove = new SwitchData();
+			switchRemove->ModToRemove = modToRemove->mod;
+			switchRemove->LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
+			switchRemove->SwitchFlags = modToRemove->flags & ModData::Mod::mBitTransferMask;
+			if (modToRemove->animData)
+				switchRemove->animData = modToRemove->animData;
 		}
-		// mod association
+		if (modToAttach)
+		{
+			TESObjectMISC* looseMod = nullptr;
+			if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
+			{
+				looseMod = Utilities::GetLooseMod(modToAttach->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+				{
+					delete switchRemove;
+					return false; //missing loosemod
+				}
+			}
+			if (!(modToAttach->flags & SwitchData::bIgnoreAnimations) || ((!switchRemove && modToRemove) && !(modToRemove->flags & SwitchData::bIgnoreAnimations)))
+			{
+				if (!MSF_Base::HandlePendingAnimations())
+				{
+					delete switchRemove;
+					return false;
+				}
+			}
+			switchAttach = new SwitchData();
+			switchAttach->LooseModToRemove = looseMod;
+			switchAttach->ModToAttach = modToAttach->mod;
+			switchAttach->SwitchFlags = modToAttach->flags & ModData::Mod::mBitTransferMask;
+			if (!switchRemove && modToRemove)
+			{
+				switchAttach->ModToRemove = modToRemove->mod;
+				switchAttach->LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
+				switchAttach->SwitchFlags &= (modToRemove->flags & ModData::Mod::bDrawEnabled) | ModData::Mod::bRequireLooseMod | ModData::Mod::bUpdateAnimGraph | ModData::Mod::bIgnoreAnimations;
+				switchAttach->SwitchFlags |= modToRemove->flags & ModData::Mod::bUpdateAnimGraph;
+			}
+			if (modToAttach->animData)
+				switchAttach->animData = modToAttach->animData;
+		}
 
+		if (switchRemove && (!switchRemove->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
+		{
+			if ((MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0) && switchAttach && switchAttach->animData && (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
+			{
+				delete switchRemove;
+				delete switchAttach;
+				return false;
+			}
+			if (!MSF_Base::SwitchMod(switchRemove, true))
+			{
+				delete switchAttach;
+				return false;
+			}
+			if (!switchAttach)
+				return true;
+			if (!switchAttach->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
+				return MSF_Base::SwitchMod(switchAttach, true);
+		}
+		else if (switchAttach && ((!switchRemove && !switchAttach->animData) || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
+			return MSF_Base::SwitchMod(switchAttach, true);
 
+		if (MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0)
+		{
+			delete switchRemove;
+			delete switchAttach;
+			return false;
+		}
 
+		SwitchData* switchData = nullptr;
+		if (switchRemove)
+			switchData = switchRemove;
+		else
+			switchData = switchAttach;
+		bool QueueAttach = false;
+		if (switchRemove && switchAttach)
+		{
+			QueueAttach = true;
+			switchAttach->SwitchFlags |= SwitchData::bAnimNeeded;
+		}
+
+		if ((*g_player)->actorState.IsWeaponDrawn())
+		{
+			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress); // | SwitchData::bReloadNotFinished
+			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
+			if (QueueAttach)
+				MSF_MainData::modSwitchManager.QueueSwitch(switchAttach);
+			if (!MSF_Base::PlayAnim(switchData->animData))
+			{
+				MSF_Base::SwitchMod(switchData, true);
+				switchAttach->SwitchFlags &= ~SwitchData::bAnimNeeded;
+				if (QueueAttach && !MSF_Base::PlayAnim(switchAttach->animData))
+					MSF_Base::SwitchMod(switchAttach, true);
+			}
+			return true;
+		}
+		else if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled)
+		{
+			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bAnimNeeded);
+			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
+			if (QueueAttach)
+				MSF_MainData::modSwitchManager.QueueSwitch(switchAttach);
+			Utilities::DrawWeapon(*g_player);
+			//delay check draw state
+			return true;
+		}
+		delete switchRemove;
+		delete switchAttach;
 		return false;
 	}
 
@@ -1776,6 +1476,50 @@ namespace MSF_Data
 		if (!ammoConverted)
 			return weapBase->weapData.ammo;
 		return ammoConverted;
+	}
+
+	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
+	{
+		TESAmmo* baseAmmo = *ammo;
+		*ammo = nullptr;
+		UInt32 chance = 0;
+		if (baseAmmo)
+		{
+			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
+			if (itAmmoData)
+			{
+				chance += itAmmoData->baseAmmoData.spawnChance;
+				UInt32 _chance = 0;
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				{
+					_chance += itAmmoMod->spawnChance;
+				}
+				if (_chance == 0)
+					return false;
+				chance += _chance - 1;
+				UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
+				_chance = itAmmoData->baseAmmoData.spawnChance - 1;
+				if (picked <= _chance)
+					return false;
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				{
+					_chance += itAmmoMod->spawnChance;
+					if (picked <= _chance)
+					{
+						mods->Push(itAmmoMod->mod);
+						*ammo = itAmmoMod->ammo;
+						*count = MSF_MainData::rng.RandomInt(6, 48);
+						break;
+					}
+				}
+				return true;
+			}
+		}
+		// mod association
+
+
+
+		return false;
 	}
 
 	//========================= Animations =======================

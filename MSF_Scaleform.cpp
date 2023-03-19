@@ -128,7 +128,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 					break;
 				_MESSAGE("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
 				if (keyFn->type & KeybindData::bCancel)
-					MSF_MainData::switchData.ClearData();
+					MSF_MainData::modSwitchManager.ClearQueue();
 				else if(keyFn->type & KeybindData::bIsAmmo)
 				{
 					if (keyFn->type & KeybindData::bHUDselection)
@@ -268,9 +268,9 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetBool(false);
 
-			if (args->numArgs != 2) return;
+			if (args->numArgs != 3) return;
 			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-			MSF_Base::SwitchToSelectedMod(args->args[0].data.obj, args->args[1].data.obj);
+			MSF_Base::SwitchToSelectedMod(args->args[0].data.obj, args->args[1].data.obj, args->args[2].data.boolean);
 
 			args->result->SetBool(true);
 		}
@@ -488,8 +488,8 @@ namespace MSF_Scaleform
 			MSFModMenu::CloseMenu();
 		}
 
-		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
-			return false;
+		//if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
+		//	return false;
 		if (!MSF_Base::InitWeapon())
 			return false;
 
@@ -594,18 +594,16 @@ namespace MSF_Scaleform
 			MSFAmmoMenu::CloseMenu();
 		}
 
-		if (MSF_MainData::switchData.SwitchFlags & (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNotFinished | SwitchData::bAnimNotFinished))
-			return false;
-		MSF_MainData::switchData.SwitchFlags &= ~SwitchData::bSetLooseMods;
+		//if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
+		//	return false;
 
 		GFxValue args[2];
 		GFxValue modPtrs;
 		menuRoot->CreateArray(&modPtrs);
 		GFxValue bNoNull;
 		menuRoot->CreateObject(&bNoNull);
-		MSF_MainData::switchData.SwitchFlags &= ~(ModData::Mod::mBitTransferMask);
-		MSF_MainData::switchData.AnimToPlay1stP = nullptr;
-		MSF_MainData::switchData.AnimToPlay3rdP = nullptr;
+		GFxValue bNeedInit;
+		menuRoot->CreateObject(&bNeedInit);
 
 		std::vector<KeywordValue> instantiationValues;
 		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
@@ -653,31 +651,25 @@ namespace MSF_Scaleform
 			modPtrs.PushBack(&modArg);
 		}
 
-		MSF_MainData::switchData.SwitchFlags |= mods->flags & ModData::bRequireAPmod;
 		RegisterBool(&bNoNull, menuRoot, "bNoNullMod", modCycle->flags & ModData::ModCycle::bCannotHaveNullMod);
+		RegisterBool(&bNeedInit, menuRoot, "bNeedInit", mods->flags & ModData::bRequireAPmod);
 
 		if (bNoNull.type != GFxValue::kType_Bool)
-		{
-			MSF_MainData::switchData.ClearData();
 			return false;
-		}
 		if (modPtrs.GetArraySize() == 0 || (bNoNull.data.boolean && modPtrs.GetArraySize() < 2))
-		{
-			MSF_MainData::switchData.ClearData();
 			return false;
-		}
-		
+
 		args[0].SetMember("modPtrs", &modPtrs);
 		args[1].SetMember("cantHaveNullMod", &bNoNull);
+		args[2].SetMember("needInit", &bNeedInit);
 		//std::string openPath = "root." + selectMenu->scaleformID + "_loader.content.open";
 		//MSF_MainData::switchData.openedMenu = selectMenu;
 		MSFModMenu::OpenMenu();
 		std::string openPath = "root.ReceiveModData";
-		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 2))
+		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 3))
 			return true;
 		MSFModMenu::CloseMenu();
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-		MSF_MainData::switchData.ClearData();
 		return false;
 	}
 

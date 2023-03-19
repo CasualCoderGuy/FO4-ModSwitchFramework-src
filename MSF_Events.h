@@ -135,11 +135,20 @@ public:
 };
 STATIC_ASSERT(sizeof(HUDAmmoCounter) == 0x230);
 
+typedef void*(*AttackBlockHandler)(void* handler);
+extern RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget;
+extern RelocAddr <AttackBlockHandler> AttackBlockHandler_Original;
 typedef UInt64(*HUDShowAmmoCounter)(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget;
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original;
 extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 
+UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
+UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
+void* AttackBlockHandler_Hook(void* handler);
+
+BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);
+#define GET_EVENT_DISPATCHER(EventName) (BSTEventDispatcher<EventName>*) GetGlobalEventDispatcher(*g_globalEvents, #EventName);
 
 #define DECLARE_EVENT_DISPATCHER_EX(Event, address) \
 template<> inline BSTEventDispatcher<Event> * GetEventDispatcher() \
@@ -155,8 +164,3 @@ template<> inline BSTEventDispatcher<Event> * GetEventDispatcher() \
 #define BASIC_EVENT_HANDLER_INDIRECTIONS1(_offset) { {0,1,5},{0x14,1,5},{ _offset,1,5 },{ 0x35,1,5 } }
 #define FRAGMENT_EVENT_HANDLER_INDIRECTIONS(_offset) { {0,1,5},{0x2C,1,5},{ _offset,1,5 },{ 0x9,1,5 } }
 #define REGISTER_EVENT(_event, _sink) GetEventDispatcher<_event>()->AddEventSink(&_sink);
-
-BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);
-#define GET_EVENT_DISPATCHER(EventName) (BSTEventDispatcher<EventName>*) GetGlobalEventDispatcher(*g_globalEvents, #EventName);
-UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
-UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);

@@ -66,8 +66,8 @@ public:
 		}
 		if (MSF_MainData::IsInitialized)
 		{
-			MSF_MainData::switchData.ClearData();
-			MSF_MainData::switchData.equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+			MSF_MainData::modSwitchManager.Reset();
+			MSF_MainData::modSwitchManager.SetCurrentWeapon(Utilities::GetEquippedInstanceData(*g_player, 41));
 
 			_MESSAGE("Registering MSF menus.");
 			MSFWidgetMenu::RegisterMenu();
@@ -167,6 +167,7 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 	_MESSAGE("Base address: %p", reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
 	tf1_Original = HookUtil::SafeWrite64(tf1_HookTarget.GetUIntPtr(), &tf1_Hook);
+	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 
 	if (!MSF_Data::ReadKeybindData())

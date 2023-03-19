@@ -7,22 +7,24 @@ namespace MSF_Base
 {
 	bool SwitchToSelectedAmmo(void* obj, bool bAttach);
 	bool SwitchAmmoHotkey(UInt8 key);
-	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove);
+	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove, bool bNeedInit);
 	bool ToggleModHotkey(ModData* modData);
 	bool SwitchModHotkey(UInt8 key, ModData* modData);
-	bool HandlePendingAnimations(bool bDoQueueSwitch = false);
+	bool HandlePendingAnimations();
 	bool InitWeapon();
+	void EndSwitch(UInt16 flag);
 	void SwitchFlagsAND(UInt16 flag);
 	void SwitchFlagsOR(UInt16 flag);
-	bool SwitchMod();
+	bool SwitchMod(SwitchData* switchData, bool updateWidget);
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modAmmoCount, bool updateAnimGraph);
 	bool ReevalModdedWeapon(TESObjectWEAP* weapon);
 	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod);
+	bool ReevalAttachedMods(Actor* owner, BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	void SpawnRandomMods(TESObjectCELL* cell);
 
 	bool ReloadWeapon();
 	bool DrawWeapon();
-	bool PlayAnim();
+	bool PlayAnim(AnimationData* animData);
 	bool FireBurst(Actor* actor);
 	void BurstTest(BurstMode* data);
 }

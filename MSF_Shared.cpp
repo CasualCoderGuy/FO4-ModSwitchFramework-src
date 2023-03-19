@@ -2,16 +2,16 @@
 
 
 RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl(0x2C4BE10); // ??_7BGSObjectInstanceExtra@@6B@
-RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
 RelocAddr <_AddItem_Native> AddItemNative(0x1402B40); 
 RelocAddr <_RemoveItem_Native> RemoveItemNative(0x140D1F0);
-RelocAddr <_IsInIronSights> IsInIronSights(0x13911D0);
 RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal(0x140EB30); //0x140EA10
 RelocAddr <_PlayIdle> PlayIdleInternal(0x13864C0); //0x13863A0
 RelocAddr <_PlayIdle2> PlayIdleInternal2(0x13864C0);
 RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0 
-RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
+RelocAddr <_IsInIronSights> IsInIronSights(0x13911D0);
+RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
+RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
 RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
 RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
@@ -30,6 +30,10 @@ RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
 RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420);
 RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438);
 RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498);
+
+RelocPtr  <DWORD> hkLifoAllocator_TLS(0x5B02960);
+RelocPtr  <DWORD> unk1_TLS(0x5B02F18);
+RelocPtr  <void*> hkLifoAllocator_vtbl(0x2DBD288);
 
 BSExtraData::~BSExtraData() {};
 void BSExtraData::Unk_01() {};
@@ -748,4 +752,27 @@ namespace Utilities
 		return stack;
 	}
 
+
 }
+
+TlsShare::TlsShare()
+{
+	DWORD tlsidx = *(hkLifoAllocator_TLS.GetPtr());
+	void* hkLifoAllocator = TlsGetValue(tlsidx);
+	std::pair<DWORD, void*> TlsPair;
+	TlsPair.first = tlsidx;
+	TlsPair.second = hkLifoAllocator;
+	TlsValues.push_back(TlsPair);
+
+	tlsidx = *(unk1_TLS.GetPtr());
+	void* unkptr = TlsGetValue(tlsidx);
+	TlsPair.first = tlsidx;
+	TlsPair.second = unkptr;
+	TlsValues.push_back(TlsPair);
+};
+
+void TlsShare::CopyTls()
+{
+	for (auto it = TlsValues.begin(); it != TlsValues.end(); it++)
+		TlsSetValue(it->first, it->second);
+};

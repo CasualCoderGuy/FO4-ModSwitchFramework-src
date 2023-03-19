@@ -33,9 +33,8 @@ public:
 	public:
 		enum
 		{
-			//bCanToggleSingle = 0x0004,
-			//bCanToggleSingle_SkipFirst = 0x0008,
-			//bThreadSafe = 0x0100,
+			bStandaloneAttach = 0x0001,
+			bStandaloneRemove = 0x0002,
 			bDrawEnabled = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
@@ -167,11 +166,20 @@ public:
 class SwitchData
 {
 public:
+	SwitchData()
+	{
+		SwitchFlags = 0;
+		ModToAttach = nullptr;
+		ModToRemove = nullptr;
+		LooseModToRemove = nullptr;
+		LooseModToAdd = nullptr;
+		animData = nullptr;
+	};
 	enum
 	{
 		bNeedInit = 0x0001,
 		bSwitchingInProgress = 0x0002,
-		bQueuedSwitch = 0x0004,
+		bQueuedHUDSelection = 0x0004,
 		bSetChamberedAmmo = 0x0008,
 		bDrawNeeded = 0x0080,
 		bDrawInProgress = 0x0800,
@@ -191,21 +199,7 @@ public:
 	BGSMod::Attachment::Mod* ModToRemove;
 	TESObjectMISC* LooseModToRemove;
 	TESObjectMISC* LooseModToAdd;
-	TESIdleForm* AnimToPlay1stP;
-	TESIdleForm* AnimToPlay3rdP;
-	TESObjectWEAP::InstanceData* equippedInstanceData;
-	void ClearData()
-	{
-		//EnterCriticalSection(switchCriticalSection);
-		SwitchFlags = 0;
-		ModToAttach = nullptr;
-		ModToRemove = nullptr;
-		LooseModToRemove = nullptr;
-		LooseModToAdd = nullptr;
-		AnimToPlay1stP = nullptr;
-		AnimToPlay3rdP = nullptr;
-		//LeaveCriticalSection(switchCriticalSection);
-	}
+	AnimationData* animData;
 };
 
 class ExtraWeaponState : public BSExtraData
@@ -242,10 +236,10 @@ class ModSwitchManager
 {
 private:
 	UInt16 switchState;
-	BSReadWriteLock queueLock;
+	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
 
-	BSReadWriteLock menuLock;
+	SimpleLock menuLock;
 	ModSelectionMenu* openedMenu;
 	int numberOfOpenedMenus;
 
@@ -258,7 +252,13 @@ public:
 		numberOfOpenedMenus = 0;
 		equippedInstanceData = nullptr;
 	};
-
+	enum
+	{
+		bState_ReloadNotFinished = 0x0040,
+		bState_AnimNotFinished = 0x0400
+	};
+	UInt16 GetState() { return switchState; };
+	void SetState(UInt16 state) { switchState = state; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { equippedInstanceData = weaponInstance; };
 	void IncOpenedMenus() { numberOfOpenedMenus++; };
@@ -270,34 +270,57 @@ public:
 	{
 		if (!data)
 			return false;
-		queueLock.LockForWrite();
-		//find?
+		queueLock.Lock();
 		switchDataQueue.push_back(data);
-		queueLock.Unlock();
+		queueLock.Release();
 		return true;
 	};
 	bool FinishSwitch(SwitchData* data)
 	{
 		if (!data)
 			return false;
-		queueLock.LockForReadAndWrite();
-		//find?
+		queueLock.Lock();
 		auto it = std::find(switchDataQueue.begin(), switchDataQueue.end(), data);
 		if (it != switchDataQueue.end())
 			switchDataQueue.erase(it);
-		queueLock.Unlock();
+		queueLock.Release();
+		_MESSAGE("data: %p", data);
+		delete data;
 		return true;
 	};
 	SwitchData* GetNextSwitch()
 	{
 		SwitchData* result = nullptr;
-		queueLock.LockForReadAndWrite();
+		queueLock.Lock();
+		if (switchDataQueue.begin() != switchDataQueue.end())
+			result = switchDataQueue[0];
+		queueLock.Release();
+		return result;
+	};
+	bool ClearQueue()
+	{
+		queueLock.Lock(); //queueLock.LockForWrite();
 		for (auto it = switchDataQueue.begin(); it != switchDataQueue.end(); it++)
 		{
-
+			SwitchData* data = *it;
+			*it = nullptr;
+			delete data;
 		}
-		queueLock.Unlock();
-		return result;
+		switchDataQueue.clear();
+		switchState = 0;
+		_MESSAGE("unlock");
+		queueLock.Release(); //queueLock.Unlock();
+		return true;
+	};
+	UInt32 GetQueueCount() { return switchDataQueue.size(); };
+
+	void Reset()
+	{
+		ClearQueue();
+		switchState = 0;
+		openedMenu = nullptr;
+		numberOfOpenedMenus = 0;
+		equippedInstanceData = nullptr;
 	};
 };
 
@@ -314,7 +337,7 @@ public:
 
 	static ModSwitchManager modSwitchManager;
 
-	static SwitchData switchData;
+	//static SwitchData switchData;
 	static std::vector<BurstMode> burstMode;
 	static Utilities::Timer tmr;
 
@@ -384,9 +407,11 @@ namespace MSF_Data
 	void AddFloatSetting(std::string name, float value);
 	bool LoadPluginData();
 	bool ReadDataFromJSON(std::string fileName, std::string location);
-	bool GetNthAmmoMod(UInt32 num);
+	SwitchData* GetNthAmmoMod(UInt32 num);
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
+	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);
 	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack);
 	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP);
