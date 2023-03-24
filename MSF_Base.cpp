@@ -313,6 +313,18 @@ namespace MSF_Base
 		UpdateEquipData(actor->equipData, idStruct, nullptr);
 		InterlockedDecrement64(lockcnt);
 
+		UpdateEnchantments(actor, idStruct, newList);
+		UInt8 unk1 = 1;
+		ActorStruct actorStruct;
+		actorStruct.actor = actor;
+		actorStruct.unk08 = &unk1;
+		UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+
+		float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+		UpdateAnimValueFloat(&actor->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+		if (newInstanceData->firingData)
+			UpdateAnimValueFloat(&actor->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
+
 		//unkEquipSlotStruct equipSlotStruct;
 		//equipSlotStruct.unk00 = 0;
 		//equipSlotStruct.equipSlot = newInstanceData->equipSlot;
@@ -425,6 +437,16 @@ namespace MSF_Base
 							InterlockedIncrement64(lockcnt);
 							UpdateEquipData(owner->equipData, idStruct, nullptr);
 							InterlockedDecrement64(lockcnt);
+							UpdateEnchantments(owner, idStruct, newList);
+							UInt8 unk1 = 1;
+							ActorStruct actorStruct;
+							actorStruct.actor = owner;
+							actorStruct.unk08 = &unk1;
+							UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+							float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+							UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+							if (newInstanceData->firingData)
+								UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
 							//UpdateAnimGraph(actor, false);
 							bool bEquipped = false;
 							for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
@@ -563,6 +585,16 @@ namespace MSF_Base
 				InterlockedIncrement64(lockcnt);
 				UpdateEquipData(owner->equipData, idStruct, nullptr);
 				InterlockedDecrement64(lockcnt);
+				UpdateEnchantments(owner, idStruct, newList);
+				UInt8 unk1 = 1;
+				ActorStruct actorStruct;
+				actorStruct.actor = owner;
+				actorStruct.unk08 = &unk1;
+				UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+				float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+				UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+				if (newInstanceData->firingData)
+					UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
 				//UpdateAnimGraph(actor, false);
 				bool bEquipped = false;
 				for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
@@ -640,6 +672,16 @@ namespace MSF_Base
 						InterlockedIncrement64(lockcnt);
 						UpdateEquipData(owner->equipData, idStruct, nullptr);
 						InterlockedDecrement64(lockcnt);
+						UpdateEnchantments(owner, idStruct, newList);
+						UInt8 unk1 = 1;
+						ActorStruct actorStruct;
+						actorStruct.actor = owner;
+						actorStruct.unk08 = &unk1;
+						UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+						float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+						UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+						if (newInstanceData->firingData)
+							UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
 						//UpdateAnimGraph(actor, false);
 						bool bEquipped = false;
 						for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)

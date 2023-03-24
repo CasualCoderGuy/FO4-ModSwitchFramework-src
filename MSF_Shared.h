@@ -157,6 +157,12 @@ struct InstanceDataStruct
 	TBO_InstanceData* instanceData;
 };
 
+struct ActorStruct
+{
+	Actor* actor;
+	UInt8* unk08;
+};
+
 struct unkItemStruct
 {
 	TESForm* item;
@@ -460,12 +466,17 @@ typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor*
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, InstanceDataStruct weaponBaseStruct, BGSEquipSlot* equipSlot);
 typedef void(*_UpdateEquipData)(ActorEquipData* equipData, InstanceDataStruct instance, UInt32* r8d);
 typedef void(*_UpdateAnimGraph)(Actor* actor, bool rdx);
+typedef void(*_UpdateEnchantments)(Actor* actor, InstanceDataStruct instanceDataStruct, ExtraDataList* extraDataList);
+typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
+typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
+
 typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UniversalEquipHandler)(Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UnkSub_EFF9D0)(Actor* actor);
 typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
-typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordValue value);
 
+typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordValue value);
+typedef bool(*_HasPerkInternal)(Actor* actor, BGSPerk* perk);
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
 typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent);
 typedef void(*_RemoveItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent, TESObjectREFR* toContainer);
@@ -485,6 +496,7 @@ typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStr
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
 
+extern RelocAddr <_HasPerkInternal> HasPerkInternal;
 extern RelocAddr <_AddItem_Native> AddItemNative;
 extern RelocAddr <_RemoveItem_Native> RemoveItemNative;
 extern RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal; //0x140EA10
@@ -501,6 +513,9 @@ extern RelocAddr <_AttachModToStack> AttachRemoveModStack;
 extern RelocAddr <_UpdMidProc> UpdateMiddleProcess;
 extern RelocAddr <_UpdateEquipData> UpdateEquipData;
 extern RelocAddr <_UpdateAnimGraph> UpdateAnimGraph;
+extern RelocAddr <_UpdateEnchantments> UpdateEnchantments;
+extern RelocAddr <_UpdateAVModifiers> UpdateAVModifiers;
+extern RelocAddr <_UpdateAnimValueFloat> UpdateAnimValueFloat;
 extern RelocAddr <_EquipHandler> EquipHandler;
 extern RelocAddr <_UniversalEquipHandler> UniversalEquipHandler;
 extern RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0;
@@ -514,6 +529,9 @@ extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_ModAssociationKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray;
+extern RelocPtr <void*> g_sightedTransitionAnimValueHolder;
+extern RelocPtr <void*> g_reloadSpeedAnimValueHolder;
+extern RelocPtr <float> g_reloadSpeedMultiplier;
 
 
 //AddItem?shorter?: 0x143A0C0

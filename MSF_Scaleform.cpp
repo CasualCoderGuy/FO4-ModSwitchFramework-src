@@ -58,8 +58,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 		{
 			if ((*g_ui)->numPauseGame == 0)
 			{
-				//MSF_Test::ListModTable(*g_player);
-				MSF_Test::PrintStoredData();
+				MSF_Test::ListModTable(*g_player);
+				//MSF_Test::PrintStoredData();
 				//MSF_Test::DumpAttachParent();
 				//MSF_Test::GetWeaponState();
 				//MSF_Test::DumpAttachParent();
@@ -97,7 +97,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
-				//MSF_Test::CallAttachModToInvItem();
+				MSF_Test::CallAttachModToInvItem();
 				_MESSAGE("test2");
 			}
 		}
@@ -108,7 +108,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, false);
 				//CALL_MEMBER_FN((*g_player), QueueUpdate)(true, 0, true, 0);
-				MSF_Test::AttachModInternalTest(false, 2);
+				MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CallRemoveModFromInvItem();
 				_MESSAGE("test3");
 			}

@@ -2,6 +2,7 @@
 
 
 RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl(0x2C4BE10); // ??_7BGSObjectInstanceExtra@@6B@
+RelocAddr <_HasPerkInternal> HasPerkInternal(0x0DA6600);
 RelocAddr <_AddItem_Native> AddItemNative(0x1402B40); 
 RelocAddr <_RemoveItem_Native> RemoveItemNative(0x140D1F0);
 RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal(0x140EB30); //0x140EA10
@@ -17,6 +18,9 @@ RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
 RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
 RelocAddr <_UpdateEquipData> UpdateEquipData(0x01C0040);
 RelocAddr <_UpdateAnimGraph> UpdateAnimGraph(0x0D7EB20);
+RelocAddr <_UpdateEnchantments> UpdateEnchantments(0x0E12740);
+RelocAddr <_UpdateAVModifiers> UpdateAVModifiers(0x0DD9930);
+RelocAddr <_UpdateAnimValueFloat> UpdateAnimValueFloat(0x081D410);
 RelocAddr <_EquipHandler> EquipHandler(0x0E1D6D0);
 RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
 RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
@@ -30,6 +34,9 @@ RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
 RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420);
 RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438);
 RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498);
+RelocPtr <void*> g_sightedTransitionAnimValueHolder(0x58D5410);
+RelocPtr <void*> g_reloadSpeedAnimValueHolder(0x58D5390);
+RelocPtr <float> g_reloadSpeedMultiplier(0x2C48D60);
 
 RelocPtr  <DWORD> hkLifoAllocator_TLS(0x5B02960);
 RelocPtr  <DWORD> unk1_TLS(0x5B02F18);
