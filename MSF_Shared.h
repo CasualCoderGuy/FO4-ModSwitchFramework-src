@@ -17,6 +17,7 @@
 #include  <thread>
 #include  <chrono>
 #include  <sstream>
+#include <algorithm>
 
 
 UInt32 roundp(float a);

@@ -4,7 +4,6 @@
 #include "json/json.h"
 #include "RNG.h"
 #include <fstream>
-#include <algorithm>
 
 std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
@@ -14,17 +13,13 @@ std::unordered_map<UInt64, KeybindData*> MSF_MainData::keybindMap;
 std::unordered_map<std::string, KeybindData*> MSF_MainData::keybindIDMap;
 std::unordered_map<std::string, float> MSF_MainData::MCMfloatSettingMap;
 
-//std::vector<SingleModPair> MSF_MainData::singleModPairs;
-//std::vector<ModPairArray> MSF_MainData::modPairArrays;
-//std::vector<MultipleMod> MSF_MainData::multiModAssocs;
-
 std::vector<HUDFiringModeData> MSF_MainData::fmDisplayData;
 std::vector<HUDScopeData> MSF_MainData::scopeDisplayData;
 std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
 
 BGSKeyword* MSF_MainData::baseModCompatibilityKW;
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
-BGSKeyword* MSF_MainData::hasSecondaryAmmoKW;
+BGSKeyword* MSF_MainData::hasUniqueStateKW;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
@@ -1605,7 +1600,7 @@ namespace MSF_Data
 		return "";
 	}
 
-	KeybindData* GetKeyFunctionID(UInt16 keyCode, UInt8 modifiers)
+	KeybindData* GetKeybindDataForKey(UInt16 keyCode, UInt8 modifiers)
 	{
 		UInt64 key = ((UInt64)modifiers << 32) + keyCode;
 		return MSF_MainData::keybindMap[key];

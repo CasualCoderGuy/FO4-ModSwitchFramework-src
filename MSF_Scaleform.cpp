@@ -123,7 +123,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				if (GetAsyncKeyState(VK_SHIFT) & 0x8000)	modifiers |= 0x1;
 				if (GetAsyncKeyState(VK_CONTROL) & 0x8000)	modifiers |= 0x2;
 				if (GetAsyncKeyState(VK_MENU) & 0x8000)		modifiers |= 0x4;
-				KeybindData* keyFn = MSF_Data::GetKeyFunctionID(keyCode, modifiers);
+				KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
 				if (!keyFn)
 					break;
 				_MESSAGE("key: %i, type: %02X", keyFn->keyCode, keyFn->type);

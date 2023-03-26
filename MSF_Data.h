@@ -202,55 +202,24 @@ public:
 	AnimationData* animData;
 };
 
-class ExtraWeaponState : public BSExtraData
-{
-public:
-	virtual ~ExtraWeaponState() override {};
-	virtual void Unk_01() override {};
-	virtual void Unk_02() override {};
-	enum
-	{
-		kType_ExtraWeaponState = 0xF1
-	};
-	ExtraWeaponState()
-	{
-		type = kType_ExtraWeaponState;
-		unk10 = 0;
-		unk13 = 0;
-		unk14 = 0;
-		next = NULL;
-	};
-	struct AmmoState
-	{
-		TESAmmo* ammoType;
-		UInt64 magazineCount;
-	};
-	std::pair<AmmoState, AmmoState> chamberedRoundMP;
-	std::pair<AmmoState, AmmoState> magazineStateMP;
-	bool hasSecondaryAmmo;
-	//BGSMod::Attachment::Mod* baseMod;
-	//BGSMod::Attachment::Mod* functionMod;
-};
-
 class ModSwitchManager
 {
 private:
-	UInt16 switchState;
+	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
 
-	SimpleLock menuLock;
-	ModSelectionMenu* openedMenu;
-	int numberOfOpenedMenus;
+	ModSelectionMenu* volatile openedMenu;
+	volatile UInt16 numberOfOpenedMenus;
 
-	TESObjectWEAP::InstanceData* equippedInstanceData;
+	TESObjectWEAP::InstanceData* volatile equippedInstanceData;
 public:
 	ModSwitchManager()
 	{
-		switchState = 0;
-		openedMenu = nullptr;
-		numberOfOpenedMenus = 0;
-		equippedInstanceData = nullptr;
+		InterlockedExchange16((volatile short*)&switchState, 0);
+		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
+		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
+		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
 	};
 	enum
 	{
@@ -258,11 +227,11 @@ public:
 		bState_AnimNotFinished = 0x0400
 	};
 	UInt16 GetState() { return switchState; };
-	void SetState(UInt16 state) { switchState = state; };
+	void SetState(UInt16 state) { InterlockedExchange16((volatile short*)&switchState, state); };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
-	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { equippedInstanceData = weaponInstance; };
-	void IncOpenedMenus() { numberOfOpenedMenus++; };
-	void DecOpenedMenus() { numberOfOpenedMenus--; };
+	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
+	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)numberOfOpenedMenus); };
+	void DecOpenedMenus() { InterlockedDecrement16((volatile short*)numberOfOpenedMenus); };
 	int GetOpenedMenus() { return numberOfOpenedMenus; };
 	ModSelectionMenu* GetOpenedMenu() { return openedMenu; };
 	void SetOpenedMenu(ModSelectionMenu* menu) { openedMenu = menu; };
@@ -299,7 +268,7 @@ public:
 	};
 	bool ClearQueue()
 	{
-		queueLock.Lock(); //queueLock.LockForWrite();
+		queueLock.Lock();
 		for (auto it = switchDataQueue.begin(); it != switchDataQueue.end(); it++)
 		{
 			SwitchData* data = *it;
@@ -307,9 +276,9 @@ public:
 			delete data;
 		}
 		switchDataQueue.clear();
-		switchState = 0;
+		InterlockedExchange16((volatile short*)&switchState, 0);
 		_MESSAGE("unlock");
-		queueLock.Release(); //queueLock.Unlock();
+		queueLock.Release();
 		return true;
 	};
 	UInt32 GetQueueCount() { return switchDataQueue.size(); };
@@ -317,10 +286,9 @@ public:
 	void Reset()
 	{
 		ClearQueue();
-		switchState = 0;
-		openedMenu = nullptr;
-		numberOfOpenedMenus = 0;
-		equippedInstanceData = nullptr;
+		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
+		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
+		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
 	};
 };
 
@@ -356,7 +324,7 @@ public:
 	//Mandatory Data, filled during mod initialization
 	static BGSKeyword* baseModCompatibilityKW;
 	static BGSKeyword* hasSwitchedAmmoKW;
-	static BGSKeyword* hasSecondaryAmmoKW;
+	static BGSKeyword* hasUniqueStateKW;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
@@ -419,5 +387,5 @@ namespace MSF_Data
 	std::string GetFMString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetScopeString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetMuzzleString(TESObjectWEAP::InstanceData* instanceData);
-	KeybindData* GetKeyFunctionID(UInt16 keyCode, UInt8 modifiers);
+	KeybindData* GetKeybindDataForKey(UInt16 keyCode, UInt8 modifiers);
 }
