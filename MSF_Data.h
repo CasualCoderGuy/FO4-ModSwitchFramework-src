@@ -35,7 +35,7 @@ public:
 		{
 			bStandaloneAttach = 0x0001,
 			bStandaloneRemove = 0x0002,
-			bDrawEnabled = 0x1000,
+			bRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,
@@ -89,18 +89,25 @@ public:
 	std::vector<KeywordValue> addedFilters;
 };
 
-class BurstMode
+class BurstModeData
 {
 public:
-	Actor* actor;
-	UInt8 NumOfRoundsFired;
-	Utilities::Timer tmr;
-	TESIdleForm* fireIdle;
-	BGSAction* fireSingleAction;
-	UInt16 wait;
+	BurstModeData(UInt32 delay, UInt8 settings, UInt8 totalShots)
+	{
+		delayTime = delay;
+		flags = settings;
+		numOfTotalShots = totalShots;
+	}
+	enum
+	{
+		bOnePullBurst = 0x01, //If FALSE, upon releasing the trigger the firing is stopped; if TRUE, all the shots will be fired in a burst
+		bResetShotCountOnRelease = 0x02, //If TRUE, upon releasing the trigger the shot count will reset; if FALSE, the shot count will not reset(only applies if bOnePullBurst is FALSE)
+		bResetShotCountOnReload = 0x04,
+		bActive = 0x08
+	};
+	UInt32 delayTime; //Interval between two shots in a single burst(in milliseconds)
 	UInt8 flags;
-	UInt8 totalShots;
-	bool animReady;
+	UInt8 numOfTotalShots; //Number of shots fired during a single burst
 };
 
 class HUDDisplayData
@@ -116,19 +123,18 @@ class HUDMuzzleData : public HUDDisplayData {};
 class ModSelectionMenu
 {
 public:
-	std::string scaleformID;
-	std::string swfFilename;
-	UInt32 type;
+	std::string scaleformName;
+	UInt8 type;
 	UInt32 version;
 	enum
 	{
-		kType_Unspecified = 0,
+		kType_Widget = 0,
 		kType_AmmoMenu = 1,
 		kType_ModMenu = 2,
-		kType_Widget = 3
+		kType_All = 3
 	};
-	ModSelectionMenu(std::string id, std::string swf){
-		scaleformID = id; swfFilename = swf; type = 0; version = 0;
+	ModSelectionMenu(std::string name, UInt8 menuType){
+		scaleformName = name; type = menuType; version = 0;
 	};
 };
 
@@ -139,7 +145,7 @@ public:
 	enum
 	{
 		//lower 4 bits: Nth
-		bCancel = 0x10,
+		bGlobalMenu = 0x10,
 		bToggle = 0x20,
 		bHUDselection = 0x40,
 		bIsAmmo = 0x80,
@@ -150,9 +156,6 @@ public:
 	UInt16 keyCode;
 	UInt8 modifiers;
 	ModSelectionMenu* selectMenu;
-	//std::string swfPath;
-	//std::string menuScriptPath;
-	//std::vector<ModAssociationData*> modAssociations;
 	ModData* modData;
 };
 
@@ -230,11 +233,11 @@ public:
 	void SetState(UInt16 state) { InterlockedExchange16((volatile short*)&switchState, state); };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
-	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)numberOfOpenedMenus); };
-	void DecOpenedMenus() { InterlockedDecrement16((volatile short*)numberOfOpenedMenus); };
+	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
+	void DecOpenedMenus() { InterlockedDecrement16((volatile short*)&numberOfOpenedMenus); };
 	int GetOpenedMenus() { return numberOfOpenedMenus; };
 	ModSelectionMenu* GetOpenedMenu() { return openedMenu; };
-	void SetOpenedMenu(ModSelectionMenu* menu) { openedMenu = menu; };
+	void SetOpenedMenu(ModSelectionMenu* menu) { InterlockedExchangePointer((void* volatile*)&openedMenu, menu); };
 	bool QueueSwitch(SwitchData* data)
 	{
 		if (!data)
@@ -304,9 +307,8 @@ public:
 	static ModSelectionMenu* widgetMenu;
 
 	static ModSwitchManager modSwitchManager;
-
-	//static SwitchData switchData;
-	static std::vector<BurstMode> burstMode;
+	static UInt64 cancelSwitchHotkey;
+	static UInt64 lowerWeaponHotkey;
 	static Utilities::Timer tmr;
 
 	//Data added by plugins
@@ -320,8 +322,10 @@ public:
 	static std::vector<HUDMuzzleData> muzzleDisplayData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> compatibilityEdits;
 	static std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> instantiationRequirements;
+	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeData;
 
 	//Mandatory Data, filled during mod initialization
+	static KeywordValue ammoAP;
 	static BGSKeyword* baseModCompatibilityKW;
 	static BGSKeyword* hasSwitchedAmmoKW;
 	static BGSKeyword* hasUniqueStateKW;
@@ -329,10 +333,6 @@ public:
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
 	static BGSKeyword* FiringModeUnderbarrelKW;
-	static BGSMod::Attachment::Mod* PlaceholderMod;
-	static BGSMod::Attachment::Mod* PlaceholderModAmmo;
-	static ActorValueInfo*  BurstModeTime;
-	static ActorValueInfo*  BurstModeFlags;
 	static TESIdleForm* reloadIdle1stP;
 	static TESIdleForm* reloadIdle3rdP;
 	static TESIdleForm* fireIdle1stP; //single

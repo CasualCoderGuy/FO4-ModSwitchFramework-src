@@ -71,33 +71,17 @@ public:
 
 			_MESSAGE("Registering MSF menus.");
 			MSFWidgetMenu::RegisterMenu();
-			MSFAmmoMenu::RegisterMenu();
-			MSFModMenu::RegisterMenu();
+			//MSFAmmoMenu::RegisterMenu();
+			//MSFModMenu::RegisterMenu();
 			MSFWidgetMenu::OpenMenu();
-			//MSFMenu::OpenMenu();
-			//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::APbaseMod))
-			//{
-			//	MSF_MainData::switchData.SwitchFlags = SwitchData::bNeedInit;
-			//	//MSF_Base::InitWeapon();
-			//}
 			delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData);
-			//MSF_Scaleform::UpdateWidgetData();
-			// Inject translations
+
 			//BSScaleformTranslator * translator = (BSScaleformTranslator*)(*g_scaleformManager)->stateBag->GetStateAddRef(GFxState::kInterface_Translator);
 			//if (translator) {
 			//	SSWTranslator::LoadTranslations(translator);
 			//}
-			//MSFMenu::RegisterMenu();
-			//static BSFixedString menuName("MSFMenu");
-			//BSReadAndWriteLocker locker(&g_customMenuLock);
-			//g_customMenuData[menuName.c_str()].menuPath = menuName;
-			//g_customMenuData[menuName.c_str()].rootPath = "root1";
-			//g_customMenuData[menuName.c_str()].menuFlags = 2050;
-			//g_customMenuData[menuName.c_str()].movieFlags = 0;
-			//g_customMenuData[menuName.c_str()].extFlags = 0;
-			//g_customMenuData[menuName.c_str()].depth = 6;
-			//(*g_ui)->Register(menuName.c_str(), CreateCustomMenu);
-			//_MESSAGE("RegisterMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
+			MSFMenu::RegisterMenu();
+			MSFMenu::OpenMenu();
 		}
 		return kEvent_Continue;
 	}
@@ -176,7 +160,9 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 		return false;
 	}
 
-	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformCallback))
+	if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformCallback))
+		_MESSAGE("MSF scaleform registration failed");
+	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformTest))
 	//	_MESSAGE("MSF widget scaleform registration failed");
 
 	return true;

@@ -24,10 +24,6 @@ BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
 BGSKeyword* MSF_MainData::FiringModeUnderbarrelKW;
-BGSMod::Attachment::Mod* MSF_MainData::PlaceholderMod;
-BGSMod::Attachment::Mod* MSF_MainData::PlaceholderModAmmo;
-ActorValueInfo*  MSF_MainData::BurstModeTime;
-ActorValueInfo*  MSF_MainData::BurstModeFlags;
 TESIdleForm* MSF_MainData::reloadIdle1stP;
 TESIdleForm* MSF_MainData::reloadIdle3rdP;
 TESIdleForm* MSF_MainData::fireIdle1stP;
@@ -47,7 +43,10 @@ ModSelectionMenu* MSF_MainData::widgetMenu;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
-std::vector<BurstMode> MSF_MainData::burstMode;
+KeywordValue MSF_MainData::ammoAP = 0;
+UInt64 MSF_MainData::lowerWeaponHotkey = 0;
+UInt64 MSF_MainData::cancelSwitchHotkey = 0;
+std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -82,11 +81,12 @@ namespace MSF_Data
 			if (attachParent >= 0)
 				MSF_MainData::APbaseMod->unkC0 = attachParent;
 		}
+		BGSKeyword* ammoApkeyword = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x000000B);
+		MSF_MainData::ammoAP = Utilities::GetAttachValueForTypedKeyword(ammoApkeyword);
 		MSF_MainData::NullMuzzleMod = (BGSMod::Attachment::Mod*)LookupFormByID((UInt32)0x004F21D);
 		MSF_MainData::CanHaveNullMuzzleKW = (BGSKeyword*)LookupFormByID((UInt32)0x01C9E78);
 		MSF_MainData::FiringModeUnderbarrelKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000021);
-		MSF_MainData::BurstModeTime = (ActorValueInfo*)LookupFormByID(formIDbase | (UInt32)0x000006B); //& updateinstancedata, test if persists after unequipping weapon
-		MSF_MainData::BurstModeFlags = (ActorValueInfo*)LookupFormByID(formIDbase | (UInt32)0x000006C);
+		MSF_MainData::hasUniqueStateKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000001);
 		MSF_MainData::fireIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004AE1));
 		MSF_MainData::fireIdle3rdP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0018E1F));
 		MSF_MainData::reloadIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004D33));
@@ -96,11 +96,6 @@ namespace MSF_Data
 		MSF_MainData::ActionReload = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0004A56));
 		MSF_MainData::ActionDraw = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x00132AF));
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
-		//MSF_MainData::PlaceholderMod = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x000005F);
-		MSF_MainData::PlaceholderModAmmo = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x000005F);
-		//MSF_MainData::PlaceholderModFM = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000060);
-		//MSF_MainData::PlaceholderModUB = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000061);
-		//MSF_MainData::PlaceholderModZD = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000062);
 		
 		return true;
 	}
@@ -193,17 +188,35 @@ namespace MSF_Data
 					std::string id = keybind["id"].asString();
 					if (id == "")
 						continue;
-
-					KeybindData* kb = MSF_MainData::keybindIDMap[id];
-					if (kb)
+					else if (id == "MSF_CANCEL")
 					{
-						UInt64 key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
+						UInt64 keyCode = keybind["keycode"].asInt();
+						UInt64 modifiers = keybind["modifiers"].asInt();
+						UInt64 key = (modifiers << 32) + keyCode;
 						if (key)
-							MSF_MainData::keybindMap.erase(key);
-						kb->keyCode = keybind["keycode"].asInt();
-						kb->modifiers = keybind["modifiers"].asInt();
-						key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
-						MSF_MainData::keybindMap[key] = kb;
+							MSF_MainData::cancelSwitchHotkey = key;
+					}
+					else if (id == "MSF_LOWER")
+					{
+						UInt64 keyCode = keybind["keycode"].asInt();
+						UInt64 modifiers = keybind["modifiers"].asInt();
+						UInt64 key = (modifiers << 32) + keyCode;
+						if (key)
+							MSF_MainData::lowerWeaponHotkey = key;
+					}
+					else
+					{
+						KeybindData* kb = MSF_MainData::keybindIDMap[id];
+						if (kb)
+						{
+							UInt64 key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
+							if (key)
+								MSF_MainData::keybindMap.erase(key);
+							kb->keyCode = keybind["keycode"].asInt();
+							kb->modifiers = keybind["modifiers"].asInt();
+							key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
+							MSF_MainData::keybindMap[key] = kb;
+						}
 					}
 				}
 
@@ -277,40 +290,56 @@ namespace MSF_Data
 						if (kb)
 						{
 							std::string menuName = keybind["menuName"].asString();
-							std::string swfFilename = keybind["swfFilename"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
-							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
-							//	break;
-							//if (flags & KeybindData::bHUDselection)
-							//{
-							//	if (itKb->selectMenu)
-							//	{
-							//		itKb->selectMenu->scaleformID = menuName;
-							//		itKb->selectMenu->swfFilename = swfFilename;
-							//	}
-							//	else
-							//		itKb->selectMenu = new ModSelectionMenu(menuName, swfFilename);
-							//}
-							//else
-							kb->selectMenu = nullptr;
-							kb->type = flags;
+							if ((menuName == "") && (flags & KeybindData::bHUDselection))
+								break;
+							if (flags & KeybindData::bHUDselection)
+							{
+								UInt8 type = 0;
+								if (flags & KeybindData::bGlobalMenu)
+									type = ModSelectionMenu::kType_All;
+								else if (flags & KeybindData::bIsAmmo)
+									type = ModSelectionMenu::kType_AmmoMenu;
+								else
+									type = ModSelectionMenu::kType_ModMenu;
+								if (kb->selectMenu)
+								{
+									kb->selectMenu->scaleformName = menuName;
+									kb->selectMenu->type = type;
+								}
+								else
+									kb->selectMenu = new ModSelectionMenu(menuName, type);
+							}
+							else
+							{
+								kb->selectMenu = nullptr;
+								kb->type = flags;
+							}
 						}
 						else
 						{
 							std::string menuName = keybind["menuName"].asString();
-							std::string swfFilename = keybind["swfFilename"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
-							//if ((menuName == "" || swfFilename == "") && (flags & KeybindData::bHUDselection))
-							//	continue;
+							if (menuName == "" && (flags & KeybindData::bHUDselection))
+								continue;
 							kb = new KeybindData();
 							kb->functionID = id;
 							kb->type = flags;
 							kb->keyCode = 0;
 							kb->modifiers = 0;
-							//if (flags & KeybindData::bHUDselection)
-							//	kb.selectMenu = new ModSelectionMenu(menuName, swfFilename);
-							//else
-							kb->selectMenu = nullptr;
+							if (flags & KeybindData::bHUDselection)
+							{
+								UInt8 type = 0;
+								if (flags & KeybindData::bGlobalMenu)
+									type = ModSelectionMenu::kType_All;
+								else if (flags & KeybindData::bIsAmmo)
+									type = ModSelectionMenu::kType_AmmoMenu;
+								else
+									type = ModSelectionMenu::kType_ModMenu;
+								kb->selectMenu = new ModSelectionMenu(menuName, type);
+							}
+							else
+								kb->selectMenu = nullptr;
 							kb->modData = nullptr;
 							MSF_MainData::keybindIDMap[id] = kb;
 						}
@@ -329,7 +358,7 @@ namespace MSF_Data
 	bool ReadUserSettings() 
 	{
 
-		char* modSettingsDirectory = "Data\\MCM\\Settings\\anagy_ModSwitchFramework.ini";
+		char* modSettingsDirectory = "Data\\MCM\\Settings\\ModSwitchFramework.ini";
 
 		HANDLE hFind;
 		WIN32_FIND_DATA data;
@@ -345,7 +374,7 @@ namespace MSF_Data
 		// Extract all sections
 		std::vector<std::string> sections;
 		LPTSTR lpszReturnBuffer = new TCHAR[1024];
-		std::string iniLocation = "./Data/MCM/Settings/anagy_ModSwitchFramework.ini";
+		std::string iniLocation = "./Data/MCM/Settings/ModSwitchFramework.ini";
 		DWORD sizeWritten = GetPrivateProfileSectionNames(lpszReturnBuffer, 1024, iniLocation.c_str());
 		if (sizeWritten == (1024 - 2)) {
 			_WARNING("Warning: Too many sections. Settings will not be read.");
@@ -1345,7 +1374,7 @@ namespace MSF_Data
 			{
 				switchAttach->ModToRemove = modToRemove->mod;
 				switchAttach->LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
-				switchAttach->SwitchFlags &= (modToRemove->flags & ModData::Mod::bDrawEnabled) | ModData::Mod::bRequireLooseMod | ModData::Mod::bUpdateAnimGraph | ModData::Mod::bIgnoreAnimations;
+				switchAttach->SwitchFlags &= (modToRemove->flags & ModData::Mod::bRequireWeaponToBeDrawn) | ModData::Mod::bRequireLooseMod | ModData::Mod::bUpdateAnimGraph | ModData::Mod::bIgnoreAnimations;
 				switchAttach->SwitchFlags |= modToRemove->flags & ModData::Mod::bUpdateAnimGraph;
 			}
 			if (modToAttach->animData)

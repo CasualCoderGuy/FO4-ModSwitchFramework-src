@@ -21,12 +21,14 @@ namespace MSF_Scaleform
 {
 	void ReceiveKeyEvents();
 	bool RegisterScaleformCallback(GFxMovieView* view, GFxValue* f4se_root);
+	bool RegisterScaleformTest(GFxMovieView * view, GFxValue * f4se_root);
 	bool RegisterMCMCallback();
 	void RegisterMSFScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot);
 	bool StartWidgetHideCountdown(UInt32 delayTime);
 	bool UpdateWidgetData();
 	bool UpdateWidgetSettings();
-	UInt32 GetInterfaceVersion();
+	UInt32 GetInterfaceVersion(); 
+	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu);
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);
 }
@@ -279,7 +281,7 @@ public:
 		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFMenu", "root1", 0))
 		{
 
-			_MESSAGE("LoadMovie done");
+			_MESSAGE("MSF Menu loaded.");
 
 			CreateBaseShaderTarget(this->shaderTarget, this->stage);
 

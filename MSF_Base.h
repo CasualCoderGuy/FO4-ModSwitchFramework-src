@@ -5,7 +5,7 @@
 
 namespace MSF_Base
 {
-	bool SwitchToSelectedAmmo(void* obj, bool bAttach);
+	bool SwitchToSelectedAmmo(void* obj);
 	bool SwitchAmmoHotkey(UInt8 key);
 	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove, bool bNeedInit);
 	bool ToggleModHotkey(ModData* modData);
@@ -25,8 +25,6 @@ namespace MSF_Base
 	bool ReloadWeapon();
 	bool DrawWeapon();
 	bool PlayAnim(AnimationData* animData);
-	bool FireBurst(Actor* actor);
-	void BurstTest(BurstMode* data);
 }
 
 struct DataToAdd

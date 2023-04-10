@@ -5,7 +5,7 @@ namespace MSF_Base
 	//========================== Main Functions ===========================
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedAmmo(void* obj, bool bAttach)
+	bool SwitchToSelectedAmmo(void* obj)
 	{
 		AmmoData::AmmoMod* selectedAmmo = reinterpret_cast<AmmoData::AmmoMod*>(obj);
 
@@ -20,10 +20,17 @@ namespace MSF_Base
 
 		SwitchData* switchData = new SwitchData();
 		BGSMod::Attachment::Mod* mod = selectedAmmo->mod;
-		if (bAttach)
+		if (mod)
 			switchData->ModToAttach = mod;
 		else
-			switchData->ModToRemove = mod;
+		{
+			BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+			mod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
+			if (mod)
+				switchData->ModToRemove = mod;
+			else
+				return false;
+		}
 
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))
 		{
@@ -73,6 +80,8 @@ namespace MSF_Base
 			return false;
 
 		SwitchData* switchData = MSF_Data::GetNthAmmoMod(key);
+		if (!switchData)
+			return false;
 
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))
 		{
@@ -542,11 +551,12 @@ namespace MSF_Base
 			if (objectMod && MSF_MainData::instantiationRequirements.count(objectMod) > 0)
 			{
 				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
-				bool bRemove = true;
+				bool bRemove = false;
 				std::vector<BGSMod::Attachment::Mod*> parentMods;
 				Utilities::GetParentMods(mods, objectMod, &parentMods);
 				for (auto it = range.first; it != range.second; ++it)
 				{
+					bRemove = true;
 					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
 					{
 						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
@@ -563,6 +573,7 @@ namespace MSF_Base
 					toRemove.push_back(objectMod);
 			}
 		}
+		_MESSAGE("toremove: %i", toRemove.size());
 		for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = toRemove.begin(); itMod != toRemove.end(); itMod++)
 		{
 			UInt8 ret = 1;
@@ -627,7 +638,13 @@ namespace MSF_Base
 		{
 			std::vector<KeywordValue> attachPoints;
 			for (UInt32 i = 0; i < baseAP->kewordValueArray.count; i++)
+			{
 				attachPoints.push_back(baseAP->kewordValueArray[i]);
+				//BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, baseAP->kewordValueArray[i]);
+				//if (kw)
+				//	_MESSAGE("apkw: %s", kw->GetEditorID());
+			}
+			//_MESSAGE("baseap: %i", attachPoints.size());
 			//for (std::vector<KeywordValue>::iterator itValue = attachPoints.begin(); itValue != attachPoints.end(); itValue++)
 			for (UInt32 i = 0; i < attachPoints.size(); i++)
 			{
@@ -638,9 +655,14 @@ namespace MSF_Base
 						if ((*itMod)->unkC0 == attachPoints[i])
 						{
 							qualified.push_back(*itMod);
-							AttachParentArray* apArray = (AttachParentArray*)&baseWeap->attachParentArray;
+							AttachParentArray* apArray = (AttachParentArray*)&(*itMod)->unk98;
 							for (UInt32 i2 = 0; i2 < apArray->kewordValueArray.count; i2++)
-								attachPoints.push_back(baseAP->kewordValueArray[i2]);
+							{
+								attachPoints.push_back(apArray->kewordValueArray[i2]);
+								//BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, baseAP->kewordValueArray[i]);
+								//if (kw)
+								//	_MESSAGE("apkw: %s", kw->GetEditorID());
+							}
 							*itMod = nullptr;
 						}
 					}
@@ -648,6 +670,9 @@ namespace MSF_Base
 				if (qualified.size() == objectMods.size())
 					break;
 			}
+			_MESSAGE("ap: %i", attachPoints.size());
+			_MESSAGE("qualified: %i", qualified.size());
+			_MESSAGE("all: %i", objectMods.size());
 			for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = objectMods.begin(); itMod != objectMods.end(); itMod++)
 			{
 				if (*itMod)
@@ -793,98 +818,4 @@ namespace MSF_Base
 		return false;
 	}
 
-	void BurstWaitAndShoot(BurstMode* data)
-	{
-		if (!data)
-			return;
-		UInt8 totalShots = data->flags &= ~0xF0;
-		for (data->NumOfRoundsFired; data->NumOfRoundsFired < totalShots; data->NumOfRoundsFired++)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(data->wait));
-			if (data->animReady)
-			{
-				data->animReady = false;
-				Utilities::PlayIdle(data->actor, data->fireIdle);
-			}
-			//Onkeyup: if !enableonepullburst end thread, if resetshotcounts (AV) NumOfRoundsFired = 0;
-		}
-
-
-	}
-
-	void BurstTest(BurstMode* data)
-	{
-		if (!data)
-		{
-			data = new BurstMode();
-			data->actor = *g_player;
-			data->fireSingleAction = MSF_MainData::ActionFireSingle;
-			data->fireIdle = MSF_MainData::fireIdle1stP;
-			data->wait = 1000;
-			data->totalShots = 3;
-			data->NumOfRoundsFired = 1;
-			delayTask delay(data->wait, true, &BurstTest, data);
-			return;
-		}
-		Utilities::PlayIdle(data->actor, data->fireIdle);
-		data->NumOfRoundsFired++;
-		if (data->NumOfRoundsFired < data->totalShots)
-			delayTask delay(data->wait, false, &BurstTest, data);
-		else
-			delete data;
-	}
-
-
-
-	bool FireBurst(Actor* actor)
-	{
-		if (!actor)
-			return false;
-		float av = Utilities::GetActorValue(&actor->actorValueData, MSF_MainData::BurstModeTime->formID);
-		_MESSAGE("av: %f", av);
-		return true;
-
-		TESObjectWEAP* eqWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
-		if (!eqWeap)
-			return false;
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(actor->equipData->slots[41].instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!instanceData)
-			return false;
-		if (!actor->middleProcess || !actor->middleProcess->unk08->equipData || !actor->middleProcess->unk08->equipData->equippedData)
-			return false;
-		if (actor->middleProcess->unk08->equipData->equippedData->unk18 <= 0)
-			return false; //if resetshotcountsonreload
-		//isAnimPlaying
-		UInt16 wait = (UInt16)roundp(Utilities::GetActorValue(&actor->actorValueData, MSF_MainData::BurstModeTime->formID));
-		if (wait < 50)
-			return false;
-		// check if actor has burst data w/ iterator, if not, make new one
-		BurstMode* data = nullptr;
-		data->actor = actor;
-		data->wait = wait;
-		//
-		//if (MSF_MainData::tmr.IsRunning())
-		//	return false;
-		//MSF_MainData::tmr.start();
-		data->animReady = false;
-		SInt32 state = 8;
-		if (actor == *g_player)
-		{
-			PlayerCamera* playerCamera = *g_playerCamera;
-			state = playerCamera->GetCameraStateId(playerCamera->cameraState);
-			data->flags = (UInt8)roundp(Utilities::GetActorValue(&actor->actorValueData, MSF_MainData::BurstModeFlags->formID));
-		}
-		if (state == 0)
-		{
-			data->fireIdle = MSF_Data::GetFireAnimation(eqWeap, false);
-			std::thread(BurstWaitAndShoot, data);
-			return true;
-		}
-		else if (state == 7 || state == 8)
-		{
-			data->fireIdle = MSF_Data::GetFireAnimation(eqWeap, true);
-			std::thread(BurstWaitAndShoot, data);
-			return true;
-		}
-	}
 }

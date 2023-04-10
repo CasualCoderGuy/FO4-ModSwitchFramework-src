@@ -86,16 +86,16 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
 			//_MESSAGE("CloseMSFMenu");
-			//MSFMenu::CloseMenu();
+			MSFMenu::CloseMenu();
 			MSFWidgetMenu::CloseMenu();
-			MSFAmmoMenu::CloseMenu();
-			MSFModMenu::CloseMenu();
+			//MSFAmmoMenu::CloseMenu();
+			//MSFModMenu::CloseMenu();
 
 		}
 		else
 		{
 			//_MESSAGE("OpenMSFMenu from MenuOpenCloseHandler");
-			//MSFMenu::OpenMenu();
+			MSFMenu::OpenMenu();
 			MSFWidgetMenu::OpenMenu();
 		}
 	}

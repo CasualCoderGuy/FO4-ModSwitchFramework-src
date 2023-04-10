@@ -2,6 +2,17 @@
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
 
+class BurstModeManager : public BurstModeData
+{
+public:
+	BurstModeManager(BurstModeData* templateData, UInt8 bActive) : BurstModeData(templateData->delayTime, templateData->flags, templateData->numOfTotalShots) { numOfShotsFired = 0; SetState(bActive); }
+	bool HandleFireEvent();
+	bool ResetShotsOnReload();
+	bool SetState(UInt8 bActive);
+private:
+	volatile UInt8 numOfShotsFired;
+};
+
 class ExtraWeaponState : public BSExtraData
 {
 public:
@@ -14,6 +25,7 @@ public:
 	bool SetCurrentStateTemporary();
 	bool HandleFireEvent();
 	bool HandleReloadEvent();
+	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
 	enum
 	{
 		kType_ExtraWeaponState = 0xF1
@@ -31,6 +43,8 @@ public:
 		UInt32 flags; //state flags
 		UInt16 ammoCapacity;
 		UInt64 magazineCount;
+		TESAmmo* switchedAmmoType;
+		BGSMod::Attachment::Mod* switchedAmmoMod;
 	private:
 		TESAmmo* ammoType;
 		BGSImpactDataSet* impactDataSet; //unk58
@@ -49,6 +63,7 @@ public:
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	std::vector<std::tuple<BGSMod::Attachment::Mod*, WeaponState*, WeaponState*>> weaponStates;
+	BurstModeManager* burstModeManager;
 	//std::pair<WeaponState, WeaponState> primaryState; //temporaryState, baseState
 	//std::pair<WeaponState, WeaponState> secondaryState;
 	//bool hasSecondaryAmmo;
