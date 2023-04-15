@@ -5,9 +5,9 @@
 
 namespace MSF_Base
 {
-	bool SwitchToSelectedAmmo(void* obj);
+	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo);//(void* obj)(void* obj);
 	bool SwitchAmmoHotkey(UInt8 key);
-	bool SwitchToSelectedMod(void* modToAttach, void* modToRemove, bool bNeedInit);
+	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);//(void* modToAttach, void* modToRemove, bool bNeedInit);
 	bool ToggleModHotkey(ModData* modData);
 	bool SwitchModHotkey(UInt8 key, ModData* modData);
 	bool HandlePendingAnimations();

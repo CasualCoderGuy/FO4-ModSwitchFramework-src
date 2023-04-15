@@ -214,11 +214,16 @@ private:
 
 	ModSelectionMenu* volatile openedMenu;
 	volatile UInt16 numberOfOpenedMenus;
+	std::vector<AmmoData::AmmoMod*> displayedAmmoChoices;
+	std::vector<ModData::Mod*> displayedModChoices;
 
 	TESObjectWEAP::InstanceData* volatile equippedInstanceData;
 public:
+	SimpleLock menuLock;
 	ModSwitchManager()
 	{
+		displayedAmmoChoices.reserve(20);
+		displayedModChoices.reserve(20);
 		InterlockedExchange16((volatile short*)&switchState, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
@@ -286,11 +291,42 @@ public:
 	};
 	UInt32 GetQueueCount() { return switchDataQueue.size(); };
 
+	void AddDisplayedAmmoNoLock(AmmoData::AmmoMod* ammo) { displayedAmmoChoices.push_back(ammo); };
+	void AddDisplayedModNoLock(ModData::Mod* mod) { displayedModChoices.push_back(mod); };
+	AmmoData::AmmoMod* GetDisplayedAmmoByIndex(UInt32 idx) 
+	{ 
+		AmmoData::AmmoMod* ammo = nullptr;
+		menuLock.Lock();
+		if (idx < displayedAmmoChoices.size())
+			ammo = displayedAmmoChoices[idx];
+		menuLock.Release();
+		return ammo;
+	};
+	ModData::Mod* GetDisplayedModByIndex(UInt32 idx)
+	{
+		ModData::Mod* mod = nullptr;
+		menuLock.Lock();
+		if (idx < displayedModChoices.size())
+			mod = displayedModChoices[idx];
+		menuLock.Release();
+		return mod;
+	};
+	void ClearDisplayChioces()
+	{
+		menuLock.Lock();
+		displayedAmmoChoices.clear();
+		displayedModChoices.clear();
+		displayedAmmoChoices.reserve(20);
+		displayedModChoices.reserve(20);
+		menuLock.Release();
+	};
+
 	void Reset()
 	{
 		ClearQueue();
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
+		ClearDisplayChioces();
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
 	};
 };

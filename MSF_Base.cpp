@@ -5,9 +5,10 @@ namespace MSF_Base
 	//========================== Main Functions ===========================
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedAmmo(void* obj)
+	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo)//(void* obj)
 	{
-		AmmoData::AmmoMod* selectedAmmo = reinterpret_cast<AmmoData::AmmoMod*>(obj);
+		_MESSAGE("selectCalled");
+		//AmmoData::AmmoMod* selectedAmmo = reinterpret_cast<AmmoData::AmmoMod*>(obj);
 
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled) )// || (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled))
 		{
@@ -18,19 +19,24 @@ namespace MSF_Base
 		if (!MSF_Base::InitWeapon())
 			return false;
 
+		_MESSAGE("checksPassed");
 		SwitchData* switchData = new SwitchData();
 		BGSMod::Attachment::Mod* mod = selectedAmmo->mod;
+		_MESSAGE("mod: %p", mod);
 		if (mod)
 			switchData->ModToAttach = mod;
 		else
 		{
 			BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
 			mod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
+			_MESSAGE("modatAP: %p", mod);
 			if (mod)
 				switchData->ModToRemove = mod;
 			else
 				return false;
 		}
+
+		_MESSAGE("modOK");
 
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))
 		{
@@ -46,6 +52,7 @@ namespace MSF_Base
 
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
+			_MESSAGE("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			if (!MSF_Base::ReloadWeapon())
@@ -117,13 +124,13 @@ namespace MSF_Base
 	}
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedMod(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
+	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
 	{
-		if (!modDataToAttach && !modDataToRemove)
+		if (!modToAttach && !modToRemove)
 			return false;
 
-		ModData::Mod* modToAttach = reinterpret_cast<ModData::Mod*>(modDataToAttach);
-		ModData::Mod* modToRemove = reinterpret_cast<ModData::Mod*>(modDataToRemove);
+		//ModData::Mod* modToAttach = reinterpret_cast<ModData::Mod*>(modDataToAttach);
+		//ModData::Mod* modToRemove = reinterpret_cast<ModData::Mod*>(modDataToRemove);
 
 		//if (!MSF_Data::CheckSwitchRequirements(stack, modToAttach, modToRemove))
 		//	return false;
@@ -162,6 +169,7 @@ namespace MSF_Base
 		Actor* playerActor = *g_player;
 		if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
 		{
+			_MESSAGE("init");
 			if (!AttachModToEquippedWeapon(playerActor, MSF_MainData::APbaseMod, true, 0, false))
 				return false;
 			if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
