@@ -243,6 +243,25 @@ public:
 	int GetOpenedMenus() { return numberOfOpenedMenus; };
 	ModSelectionMenu* GetOpenedMenu() { return openedMenu; };
 	void SetOpenedMenu(ModSelectionMenu* menu) { InterlockedExchangePointer((void* volatile*)&openedMenu, menu); };
+	bool CloseOpenedMenu() 
+	{ 
+		if (!openedMenu)
+			return true;
+		static BSFixedString menuName("MSFMenu");
+		IMenu* MSFmenu = (*g_ui)->GetMenu(menuName);
+		if (!MSFmenu)
+			return false;
+		if (!MSFmenu->movie)
+			return false;
+		GFxMovieRoot* menuRoot = MSFmenu->movie->movieRoot;
+		if (!menuRoot)
+			return false;
+		std::string closePath = "root." + openedMenu->scaleformName + "_loader.content.Close";
+		GFxValue result;
+		menuRoot->Invoke(closePath.c_str(), &result, nullptr, 0);
+		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr); 
+		return result.data.boolean;
+	};
 	bool QueueSwitch(SwitchData* data)
 	{
 		if (!data)
@@ -320,6 +339,8 @@ public:
 		displayedModChoices.reserve(20);
 		menuLock.Release();
 	};
+	void ClearAmmoDisplayChioces() { menuLock.Lock(); displayedAmmoChoices.clear(); displayedAmmoChoices.reserve(20); menuLock.Release(); }
+	void ClearModDisplayChioces() { menuLock.Lock(); displayedModChoices.clear(); displayedModChoices.reserve(20); menuLock.Release(); }
 
 	void Reset()
 	{

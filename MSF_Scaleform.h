@@ -11,12 +11,6 @@
 #include "MSF_Data.h"
 #include "MSF_Base.h"
 
-//class GFxMovieRoot;
-//class GFxMovieView;
-//class GFxValue;
-
-//struct KeybindInfo;
-
 namespace MSF_Scaleform
 {
 	void ReceiveKeyEvents();
@@ -28,6 +22,7 @@ namespace MSF_Scaleform
 	bool UpdateWidgetData();
 	bool UpdateWidgetSettings();
 	UInt32 GetInterfaceVersion(); 
+	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);
 	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu);
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);
@@ -109,164 +104,6 @@ public:
 			(*g_ui)->Register("MSFwidget", CreateMSFMenu);
 		}
 		_MESSAGE("MSFwidget %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
-	}
-};
-
-class MSFAmmoMenu : public GameMenuBase
-{
-public:
-	MSFAmmoMenu() : GameMenuBase()
-	{
-		flags = kFlag_DoNotPreventGameSave;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000 | kFlag_DisableInteractive;// | 0x40000 | 0x80000 | 0x200000;
-		depth = 0x6;
-		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFAmmoMenu", "root1", 0))
-		{
-
-			_MESSAGE("MSF Ammo Menu loaded.");
-
-			CreateBaseShaderTarget(this->shaderTarget, this->stage);
-
-			//inherit_colors
-			this->shaderTarget->SetFilterColor(false);
-			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->shaderTarget);
-
-			if (flags & kFlag_ApplyDropDownFilter)
-				this->subcomponents.Push(this->shaderTarget);
-		}
-	}
-	virtual void	Invoke(Args * args) final
-	{
-		switch (args->optionID)
-		{
-		case 0:
-			break;
-		default:
-			break;
-		}
-	}
-
-	virtual void	RegisterFunctions() final
-	{
-		_MESSAGE("RegisterFunctions");
-	}
-
-	virtual UInt32	ProcessMessage(UIMessage * msg) final
-	{
-		GFxMovieRoot * root = movie->movieRoot;
-		GFxValue ValueToSet;
-		//_MESSAGE("message proc!!");
-		return this->GameMenuBase::ProcessMessage(msg);
-	};
-
-	virtual void	DrawNextFrame(float unk0, void * unk1) final
-	{
-		return this->GameMenuBase::DrawNextFrame(unk0, unk1);
-	};
-
-	static IMenu * CreateMSFMenu()
-	{
-		return new MSFAmmoMenu();
-	}
-
-	static void OpenMenu()
-	{
-		static BSFixedString menuName("MSFAmmoMenu");
-		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
-	}
-
-	static void CloseMenu()
-	{
-		static BSFixedString menuName("MSFAmmoMenu");
-		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Close);
-	}
-
-	static void RegisterMenu()
-	{
-		static BSFixedString menuName("MSFAmmoMenu");
-		if ((*g_ui) != nullptr && !(*g_ui)->IsMenuRegistered(menuName))
-		{
-			(*g_ui)->Register("MSFAmmoMenu", CreateMSFMenu);
-		}
-		_MESSAGE("MSFAmmoMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
-	}
-};
-
-class MSFModMenu : public GameMenuBase
-{
-public:
-	MSFModMenu() : GameMenuBase()
-	{
-		flags = kFlag_DoNotPreventGameSave;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000 | kFlag_DisableInteractive;// | 0x40000 | 0x80000 | 0x200000;
-		depth = 0x6;
-		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFModMenu", "root1", 0))
-		{
-
-			_MESSAGE("MSF Mod Menu loaded.");
-
-			CreateBaseShaderTarget(this->shaderTarget, this->stage);
-
-			//inherit_colors
-			this->shaderTarget->SetFilterColor(false);
-			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->shaderTarget);
-
-			if (flags & kFlag_ApplyDropDownFilter)
-				this->subcomponents.Push(this->shaderTarget);
-		}
-	}
-	virtual void	Invoke(Args * args) final
-	{
-		switch (args->optionID)
-		{
-		case 0:
-			break;
-		default:
-			break;
-		}
-	}
-
-	virtual void	RegisterFunctions() final
-	{
-		_MESSAGE("RegisterFunctions");
-	}
-
-	virtual UInt32	ProcessMessage(UIMessage * msg) final
-	{
-		GFxMovieRoot * root = movie->movieRoot;
-		GFxValue ValueToSet;
-		//_MESSAGE("message proc!!");
-		return this->GameMenuBase::ProcessMessage(msg);
-	};
-
-	virtual void	DrawNextFrame(float unk0, void * unk1) final
-	{
-		return this->GameMenuBase::DrawNextFrame(unk0, unk1);
-	};
-
-	static IMenu * CreateMSFMenu()
-	{
-		return new MSFModMenu();
-	}
-
-	static void OpenMenu()
-	{
-		static BSFixedString menuName("MSFModMenu");
-		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
-	}
-
-	static void CloseMenu()
-	{
-		static BSFixedString menuName("MSFModMenu");
-		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Close);
-	}
-
-	static void RegisterMenu()
-	{
-		static BSFixedString menuName("MSFModMenu");
-		if ((*g_ui) != nullptr && !(*g_ui)->IsMenuRegistered(menuName))
-		{
-			(*g_ui)->Register("MSFModMenu", CreateMSFMenu);
-		}
-		_MESSAGE("MSFModMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 	}
 };
 

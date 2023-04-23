@@ -49,7 +49,7 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 	{
 		MSF_MainData::modSwitchManager.SetCurrentWeapon(evn->weaponInstance);
 		MSF_MainData::modSwitchManager.ClearQueue();
-		//close menu
+		MSF_MainData::modSwitchManager.CloseOpenedMenu();
 		MSF_Scaleform::UpdateWidgetData();
 	}
 
@@ -86,10 +86,9 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
 			//_MESSAGE("CloseMSFMenu");
+			MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			MSFMenu::CloseMenu();
 			MSFWidgetMenu::CloseMenu();
-			//MSFAmmoMenu::CloseMenu();
-			//MSFModMenu::CloseMenu();
 
 		}
 		else
@@ -184,6 +183,7 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 			}
 		}
 	}
+	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	else if (!_strcmpi("weaponFire", name))
 	{
 		//if (MSF_MainData::tmr.IsRunning())

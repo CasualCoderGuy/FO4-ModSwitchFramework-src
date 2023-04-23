@@ -206,9 +206,10 @@ namespace MSF_Data
 					}
 					else
 					{
-						KeybindData* kb = MSF_MainData::keybindIDMap[id];
-						if (kb)
+						auto kbIt = MSF_MainData::keybindIDMap.find(id);
+						if (kbIt != MSF_MainData::keybindIDMap.end())
 						{
+							KeybindData* kb = kbIt->second;
 							UInt64 key = ((UInt64)kb->modifiers << 32) + kb->keyCode;
 							if (key)
 								MSF_MainData::keybindMap.erase(key);
@@ -286,9 +287,10 @@ namespace MSF_Data
 						if (id == "")
 							continue;
 
-						KeybindData* kb = MSF_MainData::keybindIDMap[id];
-						if (kb)
+						auto kbIt = MSF_MainData::keybindIDMap.find(id);
+						if (kbIt != MSF_MainData::keybindIDMap.end())
 						{
+							KeybindData* kb = kbIt->second;
 							std::string menuName = keybind["menuName"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
 							if ((menuName == "") && (flags & KeybindData::bHUDselection))
@@ -322,7 +324,7 @@ namespace MSF_Data
 							UInt8 flags = keybind["keyfunction"].asInt();
 							if (menuName == "" && (flags & KeybindData::bHUDselection))
 								continue;
-							kb = new KeybindData();
+							KeybindData* kb = new KeybindData();
 							kb->functionID = id;
 							kb->type = flags;
 							kb->keyCode = 0;
@@ -740,9 +742,10 @@ namespace MSF_Data
 						UInt16 ammoIDbase = ammoData["baseAmmoID"].asInt();
 						UInt8 spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
 
-						AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-						if (itAmmoData)
+						auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+						if (itAD != MSF_MainData::ammoDataMap.end())
 						{
+							AmmoData* itAmmoData = itAD->second;
 							itAmmoData->baseAmmoData.mod = baseMod;
 							itAmmoData->baseAmmoData.ammoID = ammoIDbase;
 							itAmmoData->baseAmmoData.spawnChance = spawnChanceBase;
@@ -859,9 +862,10 @@ namespace MSF_Data
 						std::string keyID = key["keyID"].asString();
 						if (keyID == "")
 							continue;
-						KeybindData* itKb = MSF_MainData::keybindIDMap[keyID];
-						if (!itKb)
+						auto kb = MSF_MainData::keybindIDMap.find(keyID);
+						if (kb == MSF_MainData::keybindIDMap.end())
 							continue;
+						KeybindData* itKb = kb->second;
 						if (itKb->type & KeybindData::bIsAmmo)
 							continue;
 						const Json::Value& modStruct = key["modData"];
@@ -901,12 +905,15 @@ namespace MSF_Data
 									if (ifValue < 0)
 										continue;
 									UInt16 ifflags = modCycle["ifFlags"].asInt();
-									ModData::ModCycle* cycle = modData->modCycleMap[ifValue];
-									if (!cycle)
+									auto itCycle = modData->modCycleMap.find(ifValue);
+									ModData::ModCycle* cycle = nullptr;
+									if (itCycle == modData->modCycleMap.end())
 									{
 										cycle = new ModData::ModCycle();
 										cycle->flags = ifflags;
 									}
+									else
+										cycle = itCycle->second;
 									const Json::Value& mods = modCycle["mods"];
 									if (mods.isArray())
 									{
@@ -1000,15 +1007,15 @@ namespace MSF_Data
 						if (!animIdle_3rdP)
 							continue;
 
-						AnimationData* animationData = MSF_MainData::reloadAnimDataMap[weapon];
-						if (animationData)
+						auto itAnim = MSF_MainData::reloadAnimDataMap.find(weapon);
+						if (itAnim != MSF_MainData::reloadAnimDataMap.end())
 						{
-							animationData->animIdle_1stP = animIdle_1stP;
-							animationData->animIdle_3rdP = animIdle_3rdP;
+							itAnim->second->animIdle_1stP = animIdle_1stP;
+							itAnim->second->animIdle_3rdP = animIdle_3rdP;
 						}
 						else
 						{
-							animationData = new AnimationData();
+							AnimationData* animationData = new AnimationData();
 							animationData->animIdle_1stP = animIdle_1stP;
 							animationData->animIdle_3rdP = animIdle_3rdP;
 							MSF_MainData::reloadAnimDataMap[weapon] = animationData;
@@ -1041,14 +1048,15 @@ namespace MSF_Data
 						if (!animIdle_3rdP)
 							continue;
 
-						AnimationData* animationData = MSF_MainData::fireAnimDataMap[weapon];
-						if (animationData)
+						auto itAnim = MSF_MainData::fireAnimDataMap.find(weapon);
+						if (itAnim != MSF_MainData::fireAnimDataMap.end())
 						{
-							animationData->animIdle_1stP = animIdle_1stP;
-							animationData->animIdle_3rdP = animIdle_3rdP;
+							itAnim->second->animIdle_1stP = animIdle_1stP;
+							itAnim->second->animIdle_3rdP = animIdle_3rdP;
 						}
 						else
 						{
+							AnimationData* animationData = new AnimationData();
 							animationData = new AnimationData();
 							animationData->animIdle_1stP = animIdle_1stP;
 							animationData->animIdle_3rdP = animIdle_3rdP;
@@ -1174,9 +1182,10 @@ namespace MSF_Data
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 		if (!baseAmmo)
 			return nullptr;
-		AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-		if (itAmmoData)
+		auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+		if (itAD != MSF_MainData::ammoDataMap.end())
 		{
+			AmmoData* itAmmoData = itAD->second;
 			if (num == 0)
 			{
 				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
@@ -1228,13 +1237,13 @@ namespace MSF_Data
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
-			ModData::ModCycle* currCycle = modData->modCycleMap[value];
-			if (currCycle && modCycle)
+			auto itCycle = modData->modCycleMap.find(value);
+			if (itCycle != modData->modCycleMap.end() && modCycle)
 			{
 				_MESSAGE("Ambiguity error");
 				return false;
 			}
-			modCycle = currCycle;
+			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return false;
@@ -1286,13 +1295,13 @@ namespace MSF_Data
 		{
 			KeywordValue value = *itData;
 			_MESSAGE("it: %i", value);
-			ModData::ModCycle* currCycle = modData->modCycleMap[value];
-			if (currCycle && modCycle)
+			auto itCycle = modData->modCycleMap.find(value);
+			if (itCycle != modData->modCycleMap.end() && modCycle)
 			{
 				_MESSAGE("Ambiguity error");
 				return false;
 			}
-			modCycle = currCycle;
+			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return false;
@@ -1511,9 +1520,10 @@ namespace MSF_Data
 		UInt32 chance = 0;
 		if (baseAmmo)
 		{
-			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-			if (itAmmoData)
+			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
+				AmmoData* itAmmoData = itAD->second;
 				chance += itAmmoData->baseAmmoData.spawnChance;
 				UInt32 _chance = 0;
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
@@ -1551,13 +1561,13 @@ namespace MSF_Data
 	//========================= Animations =======================
 	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
 	{
-		AnimationData* animationData = MSF_MainData::reloadAnimDataMap[equippedWeap];
-		if (animationData)
+		auto itAnim = MSF_MainData::reloadAnimDataMap.find(equippedWeap);
+		if (itAnim != MSF_MainData::reloadAnimDataMap.end())
 		{
 			if (get3rdP)
-				return animationData->animIdle_3rdP;
+				return itAnim->second->animIdle_3rdP;
 			else
-				return animationData->animIdle_1stP;
+				return itAnim->second->animIdle_1stP;
 		}
 		if (get3rdP)
 			return MSF_MainData::reloadIdle3rdP;
@@ -1567,13 +1577,13 @@ namespace MSF_Data
 
 	TESIdleForm* GetFireAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
 	{
-		AnimationData* animationData = MSF_MainData::fireAnimDataMap[equippedWeap];
-		if (animationData)
+		auto itAnim = MSF_MainData::fireAnimDataMap.find(equippedWeap);
+		if (itAnim != MSF_MainData::fireAnimDataMap.end())
 		{
 			if (get3rdP)
-				return animationData->animIdle_3rdP;
+				return itAnim->second->animIdle_3rdP;
 			else
-				return animationData->animIdle_1stP;
+				return itAnim->second->animIdle_1stP;
 		}
 		if (get3rdP)
 			return MSF_MainData::fireIdle3rdP;
@@ -1634,7 +1644,11 @@ namespace MSF_Data
 	KeybindData* GetKeybindDataForKey(UInt16 keyCode, UInt8 modifiers)
 	{
 		UInt64 key = ((UInt64)modifiers << 32) + keyCode;
-		return MSF_MainData::keybindMap[key];
+		auto itKey = MSF_MainData::keybindMap.find(key);
+		if (itKey != MSF_MainData::keybindMap.end())
+			return itKey->second;
+		else
+			return nullptr;
 	}
 }
 

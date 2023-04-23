@@ -420,9 +420,10 @@ namespace MSF_Base
 					bool found = false;
 					if (!baseAmmo)
 						continue;
-					AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-					if (itAmmoData)
+					auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+					if (itAD != MSF_MainData::ammoDataMap.end())
 					{
+						AmmoData* itAmmoData = itAD->second;
 						for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 						{
 							if (itAmmoMod->mod == mod)
@@ -521,9 +522,10 @@ namespace MSF_Base
 			bool found = false;
 			if (!baseAmmo)
 				return false;
-			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-			if (itAmmoData)
+			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
+				AmmoData* itAmmoData = itAD->second;
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
 					if (itAmmoMod->mod == mod)

@@ -58,21 +58,21 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 		{
 			if ((*g_ui)->numPauseGame == 0)
 			{
-				MSF_Test::ListModTable(*g_player);
-				//MSF_Test::PrintStoredData();
+				//MSF_Test::ListModTable(*g_player);
+				MSF_Test::PrintStoredData();
 				//MSF_Test::DumpAttachParent();
 				//MSF_Test::GetWeaponState();
 				//MSF_Test::DumpAttachParent();
 				//MSF_Test::DumpForms();
 				//MSF_Test::SetAmmoTest();
-				MSF_Scaleform::GetInterfaceVersion();
+				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
 				//MSF_Scaleform::SetWidgetVisibility(true);
 				//MSFMenu::OpenMenu();
 				//static BSFixedString menuName("MSFMenu");
 				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
 				//MSFAmmoMenu::OpenMenu();
-				MSFMenu::OpenMenu();
+				//MSFMenu::OpenMenu();
 				//MSF_Test::ListEquippedItemTypes();
 				//MSF_Test::ArmorAttachTest();
 				//MSF_Test::RemapAnimTest(); //sub_141387BE0
@@ -306,13 +306,13 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetBool(false);
 
-			if (args->numArgs != 3) return;
+			if (args->numArgs != 2) return;
 			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-			if (args->args[0].type == GFxValue::kType_UInt && args->args[1].type == GFxValue::kType_UInt, args->args[2].type == GFxValue::kType_Bool)
+			if (args->args[0].type == GFxValue::kType_UInt && args->args[1].type == GFxValue::kType_UInt) //, args->args[2].type == GFxValue::kType_Bool)
 			{
 				ModData::Mod* modAdd = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[0].data.u32);
 				ModData::Mod* modRem = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[1].data.u32);
-				MSF_Base::SwitchToSelectedMod(modAdd, modRem, args->args[2].data.boolean);
+				MSF_Base::SwitchToSelectedMod(modAdd, modRem, false);// args->args[2].data.boolean);
 			}
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			args->result->SetBool(true);
@@ -325,12 +325,12 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 3) return;
-			const char* cname = args->args[0].data.string;
 			const char* cmname = *args->args[0].data.managedString;
-			std::string name = cname;
 			UInt8 type = args->args[1].data.u32 & 0x3;
 			UInt32 version = args->args[2].data.u32;
-			_MESSAGE("scaleform prop: %s, %s, %02X, %08X", cname, cmname, type, version);
+			if (!cmname)
+				cmname = "";
+			_MESSAGE("scaleform prop: %s, %02X, %08X", cmname, type, version);
 			if (type == ModSelectionMenu::kType_Widget && version >= MIN_SUPPORTED_SWF_WIDGET_VERSION)
 				MSF_MainData::widgetMenu = nullptr; // = find args->args[0].data.string in array of Keybind; MSF_MainData::widgetMenu->type = type; MSF_MainData::widgetMenu->version = version;
 			else if ((type == ModSelectionMenu::kType_AmmoMenu && version >= MIN_SUPPORTED_SWF_AMMO_VERSION) || ((type & ModSelectionMenu::kType_ModMenu) && version >= MIN_SUPPORTED_SWF_MOD_VERSION))
@@ -509,67 +509,46 @@ namespace MSF_Scaleform
 		//out of ammo, full (+1?)
 	}
 
-	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu)
-	{
-		return false;
-	}
-
-	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu)
+	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu)
 	{
 		if (!selectMenu)
-			return false;
+			return nullptr;
 		//check conditions
-		
-		_MESSAGE("toggle ammo menu");
 		static BSFixedString menuName("MSFMenu");
 		IMenu* MSFmenu = (*g_ui)->GetMenu(menuName);
 		if (!MSFmenu)
-			return false;
+			return nullptr;
 		if (!MSFmenu->movie)
-			return false;
+			return nullptr;
 		GFxMovieRoot* menuRoot = MSFmenu->movie->movieRoot;
 		if (!menuRoot)
-			return false;
-
+			return nullptr;
 		if (MSF_MainData::modSwitchManager.GetOpenedMenu() == selectMenu)
 		{
-			std::string closePath = "root." + selectMenu->scaleformName + "_loader.content.close"; //visible
+			std::string closePath = "root." + selectMenu->scaleformName + "_loader.content.Close"; //visible
 			GFxValue result;
 			menuRoot->Invoke(closePath.c_str(), &result, nullptr, 0);
 			if (result.type == GFxValue::kType_Bool && result.data.boolean)
-			{
 				MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-				return true;
-			}
-			return false;
+			return nullptr;
 		}
 		else if (MSF_MainData::modSwitchManager.GetOpenedMenu() != nullptr)
-			return false;
+			return nullptr;
+		return menuRoot;
+	}
 
-		//if (!(*g_ui)->IsMenuOpen(menuName))
-		//{
-		//	MSFAmmoMenu::CloseMenu();
-		//	return true;
-		//}
-		//else if (!(*g_ui)->IsMenuOpen(BSFixedString("MSFModMenu")))
-		//{
-		//	MSFModMenu::CloseMenu();
-		//}
-
-		//if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
-		//	return false;
-
-		GFxValue args[1];
+	bool GetAmmoListForScaleform(GFxMovieRoot* menuRoot, GFxValue* dst)
+	{
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
-		GFxValue ammoData;
-		menuRoot->CreateArray(&ammoData);
+		menuRoot->CreateArray(dst);
 		if (baseAmmo)
 		{
 			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
-			AmmoData* itAmmoData = MSF_MainData::ammoDataMap[baseAmmo];
-			if (itAmmoData)
+			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
+				AmmoData* itAmmoData = itAD->second;
 				UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
 				MSF_MainData::modSwitchManager.menuLock.Lock();
 				if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
@@ -578,7 +557,189 @@ namespace MSF_Scaleform
 					menuRoot->CreateObject(&BammoArg);
 					RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
 					MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(&itAmmoData->baseAmmoData);
-					//RegisterObject(&BammoArg, menuRoot, "ammoObj", &itAmmoData->baseAmmoData);
+					RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
+					RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
+					dst->PushBack(&BammoArg);
+					_MESSAGE("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
+				}
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				{
+					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, itAmmoMod->ammo);
+					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0 || instanceData->ammo == itAmmoMod->ammo)
+					{
+						GFxValue ammoArg;
+						menuRoot->CreateObject(&ammoArg);
+						RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
+						MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(itAmmoMod._Ptr);
+						RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo); //weapState!
+						RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
+						dst->PushBack(&ammoArg);
+						_MESSAGE("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);
+					}
+				}
+				MSF_MainData::modSwitchManager.menuLock.Release();
+			}
+		}
+		if (!baseAmmo || dst->GetArraySize() < 2 || !MSF_Base::InitWeapon())
+		{
+			MSF_MainData::modSwitchManager.ClearAmmoDisplayChioces();
+			return false;
+		}
+		return true;
+	}
+
+	bool GetModListForScaleform(GFxMovieRoot* menuRoot, GFxValue* dst, ModData* mods)
+	{
+		if (!mods)
+			return false;
+		BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+		if (!modData)
+			return false;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return false;
+		std::vector<KeywordValue> instantiationValues;
+		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
+			return false;
+
+		menuRoot->CreateArray(dst);
+		ModData::ModCycle* modCycle = nullptr;
+		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
+		{
+			KeywordValue value = *itData;
+			auto itCycle = mods->modCycleMap.find(value);
+			if (itCycle != mods->modCycleMap.end() && modCycle)
+			{
+				_MESSAGE("Ambiguity error"); //or combine
+				return false;
+			}
+			modCycle = itCycle->second;
+		}
+		if (!modCycle)
+			return false;
+
+		if (mods->flags & ModData::bRequireAPmod)
+		{
+			if (!MSF_Base::InitWeapon())
+				return false;
+		}
+		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, mods->attachParentValue);
+		MSF_MainData::modSwitchManager.menuLock.Lock();
+		if (!(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod))
+		{
+			GFxValue modArg;
+			menuRoot->CreateObject(&modArg);
+			RegisterString(&modArg, menuRoot, "modName", "None");
+			MSF_MainData::modSwitchManager.AddDisplayedModNoLock(nullptr);
+			RegisterBool(&modArg, menuRoot, "isEquipped", attachedMod == nullptr);
+			bool reqsOK = true;
+			//check requirements
+			RegisterBool(&modArg, menuRoot, "reqsOK", reqsOK);
+			dst->PushBack(&modArg);
+		}
+		for (ModData::ModVector::iterator itMod = modCycle->mods.begin(); itMod != modCycle->mods.end(); itMod++) //idx, bShowAll, remove?
+		{
+			ModData::Mod* currMod = *itMod;
+			GFxValue modArg;
+			menuRoot->CreateObject(&modArg);
+			RegisterString(&modArg, menuRoot, "modName", currMod->mod->fullName.name.c_str());
+			MSF_MainData::modSwitchManager.AddDisplayedModNoLock(currMod);
+			RegisterBool(&modArg, menuRoot, "isEquipped", currMod->mod == attachedMod);
+			bool reqsOK = true;
+			if (currMod->mod->flags & ModData::Mod::bRequireLooseMod)
+			{
+				TESObjectMISC* looseMod = Utilities::GetLooseMod(currMod->mod);
+				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
+					reqsOK = false;
+			}
+			//check requirements
+			RegisterBool(&modArg, menuRoot, "reqsOK", reqsOK);
+			dst->PushBack(&modArg);
+		}
+		MSF_MainData::modSwitchManager.menuLock.Release();
+		if (dst->GetArraySize() == 0 || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && dst->GetArraySize() < 2))
+		{
+			MSF_MainData::modSwitchManager.ClearDisplayChioces();
+			return false;
+		}
+	}
+
+	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, UInt8 type, ModData* mods)
+	{
+		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
+		if (!menuRoot)
+			return false;
+		switch (type)
+		{
+		case ModSelectionMenu::kType_AmmoMenu:
+		{
+			GFxValue data;
+			if (!GetAmmoListForScaleform(menuRoot, &data))
+				return false;
+			std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveAmmoData";
+			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
+			if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
+				return true;
+		}
+		case ModSelectionMenu::kType_ModMenu:
+		{
+			GFxValue data;
+			if (!GetModListForScaleform(menuRoot, &data, mods))
+				return false;
+			std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveModData";
+			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
+			if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
+				return true;
+		}
+		case ModSelectionMenu::kType_All:
+		{
+			GFxValue data[4];
+			bool bAmmo = GetAmmoListForScaleform(menuRoot, &data[0]);
+			bool bMod = GetModListForScaleform(menuRoot, &data[1], mods);
+			if (!bAmmo && !bMod)
+				return false;
+			data[3].SetBool(bAmmo);
+			data[4].SetBool(bMod);
+			std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveGlobalData";
+			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
+			if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 4))
+				return true;
+		}
+		}
+		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
+		MSF_MainData::modSwitchManager.ClearDisplayChioces();
+		return false;
+	}
+
+	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu)
+	{
+		return false;
+	}
+
+	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu)
+	{
+		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
+		if (!menuRoot)
+			return false;
+		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+		GFxValue ammoData;
+		menuRoot->CreateArray(&ammoData);
+		if (baseAmmo)
+		{
+			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
+			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+			if (itAD != MSF_MainData::ammoDataMap.end())
+			{
+				AmmoData* itAmmoData = itAD->second;
+				UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo);
+				MSF_MainData::modSwitchManager.menuLock.Lock();
+				if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0)
+				{
+					GFxValue BammoArg;
+					menuRoot->CreateObject(&BammoArg);
+					RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
+					MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(&itAmmoData->baseAmmoData);
 					RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
 					RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
 					ammoData.PushBack(&BammoArg);
@@ -593,7 +754,6 @@ namespace MSF_Scaleform
 						menuRoot->CreateObject(&ammoArg);
 						RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
 						MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(itAmmoMod._Ptr);
-						//RegisterObject(&ammoArg, menuRoot, "ammoObj", itAmmoMod._Ptr);
 						RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo); //weapState!
 						RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
 						ammoData.PushBack(&ammoArg);
@@ -608,15 +768,9 @@ namespace MSF_Scaleform
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			return false;
 		}
-
-		//menuRoot->CreateObject(&args[0]);
-		//args[0].SetMember("ammoData", &ammoData);
 		std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveAmmoData";
 		MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
-		//MSFAmmoMenu::OpenMenu();
-		//std::string openPath = "root.ReceiveAmmoData";
-		_MESSAGE("ammo menu scaleform: %s", openPath.c_str());
-		if (menuRoot->Invoke(openPath.c_str(), nullptr, &ammoData, 1))//args, 1))
+		if (menuRoot->Invoke(openPath.c_str(), nullptr, &ammoData, 1))
 			return true;
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();
@@ -625,89 +779,65 @@ namespace MSF_Scaleform
 
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods)
 	{
-		if (!selectMenu || !mods)
+		if (!mods)
 			return false;
-		//check conditions
-
-		static BSFixedString menuName("MSFMenu");
-		IMenu* MSFmenu = (*g_ui)->GetMenu(menuName);
-		if (!MSFmenu)
-			return false;
-		GFxMovieRoot* menuRoot = MSFmenu->movie->movieRoot;
+		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
 		if (!menuRoot)
 			return false;
-
-		if (MSF_MainData::modSwitchManager.GetOpenedMenu() == selectMenu)
-		{
-			std::string closePath = "root." + selectMenu->scaleformName + "_loader.content.close"; //visible
-			GFxValue result;
-			menuRoot->Invoke(closePath.c_str(), &result, nullptr, 0);
-			if (result.type == GFxValue::kType_Bool && result.data.boolean)
-			{
-				MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-				return true;
-			}
-			return false;
-		}
-		else if (MSF_MainData::modSwitchManager.GetOpenedMenu() != nullptr)
-			return false;
-
 		BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
 		if (!modData)
 			return false;
 		auto data = modData->data;
 		if (!data || !data->forms)
 			return false;
-
-		//if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
-		//	return false;
+		std::vector<KeywordValue> instantiationValues;
+		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
+			return false;
 
 		GFxValue args[2];
 		GFxValue modPtrs;
 		menuRoot->CreateArray(&modPtrs);
-		//GFxValue bNoNull;
-		//menuRoot->CreateObject(&bNoNull);
-
-		std::vector<KeywordValue> instantiationValues;
-		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
+		ModData::ModCycle* modCycle = nullptr;
+		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
+		{
+			KeywordValue value = *itData;
+			auto itCycle = mods->modCycleMap.find(value);
+			if (itCycle != mods->modCycleMap.end() && modCycle)
+			{
+				_MESSAGE("Ambiguity error"); //or combine
+				return false;
+			}
+			modCycle = itCycle->second;
+		}
+		if (!modCycle)
 			return false;
+
 		if (mods->flags & ModData::bRequireAPmod)
 		{
 			if (!MSF_Base::InitWeapon())
 				return false;
 		}
-
-		ModData::ModCycle* modCycle = nullptr;
-		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
-		{
-			KeywordValue value = *itData;
-			ModData::ModCycle* currCycle = mods->modCycleMap[value];
-			if (currCycle && modCycle)
-			{
-				_MESSAGE("Ambiguity error"); //or combine
-				return false;
-			}
-			modCycle = currCycle;
-		}
-		if (!modCycle)
-			return false;
-
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, mods->attachParentValue);
 		MSF_MainData::modSwitchManager.menuLock.Lock();
+		if (!(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod))
+		{
+			GFxValue modArg;
+			menuRoot->CreateObject(&modArg);
+			RegisterString(&modArg, menuRoot, "modName", "None");
+			MSF_MainData::modSwitchManager.AddDisplayedModNoLock(nullptr);
+			RegisterBool(&modArg, menuRoot, "isEquipped", attachedMod == nullptr);
+			bool reqsOK = true;
+			//check requirements
+			RegisterBool(&modArg, menuRoot, "reqsOK", reqsOK);
+			modPtrs.PushBack(&modArg);
+		}
 		for (ModData::ModVector::iterator itMod = modCycle->mods.begin(); itMod != modCycle->mods.end(); itMod++) //idx, bShowAll, remove?
 		{
 			ModData::Mod* currMod = *itMod;
-			if (currMod->flags & ModData::Mod::bRequireLooseMod)
-			{
-				TESObjectMISC* looseMod = Utilities::GetLooseMod(currMod->mod);
-				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) != 0)
-					break;
-			}
 			GFxValue modArg;
 			menuRoot->CreateObject(&modArg);
 			RegisterString(&modArg, menuRoot, "modName", currMod->mod->fullName.name.c_str());
 			MSF_MainData::modSwitchManager.AddDisplayedModNoLock(currMod);
-			//RegisterObject(&modArg, menuRoot, "modObj", currMod);
 			RegisterBool(&modArg, menuRoot, "isEquipped", currMod->mod == attachedMod);
 			bool reqsOK = true;
 			if (currMod->mod->flags & ModData::Mod::bRequireLooseMod)
@@ -722,25 +852,16 @@ namespace MSF_Scaleform
 		}
 		MSF_MainData::modSwitchManager.menuLock.Release();
 
-		//RegisterBool(&bNoNull, menuRoot, "bNoNullMod", modCycle->flags & ModData::ModCycle::bCannotHaveNullMod);
-
 		if (modPtrs.GetArraySize() == 0 || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && modPtrs.GetArraySize() < 2))
 		{
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			return false;
 		}
-
-		//args[0].SetMember("modPtrs", &modPtrs);
-		//args[1].SetMember("cantHaveNullMod", &bNoNull);
 		args[0] = modPtrs;
-		args[1].SetBool(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod);
 		std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveModData";
 		MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
-		//MSFModMenu::OpenMenu();
-		//std::string openPath = "root.ReceiveModData";
-		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 2))
+		if (menuRoot->Invoke(openPath.c_str(), nullptr, args, 1))
 			return true;
-		//MSFModMenu::CloseMenu();
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();
 		return false;
