@@ -1,6 +1,7 @@
 #include "MSF_Data.h"
 #include "MSF_Scaleform.h"
-//#include "MCM/SettingStore.h"
+#include "MSF_Events.h"
+#include "MSF_WeaponState.h"
 #include "json/json.h"
 #include "RNG.h"
 #include <fstream>
@@ -43,6 +44,8 @@ ModSelectionMenu* MSF_MainData::widgetMenu;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
+PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
+WeaponStateStore weaponStateStore;
 KeywordValue MSF_MainData::ammoAP = 0;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;

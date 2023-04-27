@@ -9,21 +9,19 @@ namespace Serialization
 
 	void RevertCallback(const F4SESerializationInterface * intfc)
 	{
-		_DMESSAGE("Clearing MSF serialization data.");
+		_MESSAGE("Clearing MSF serialization data.");
 		readedNotes.clear();
 	}
 
 	void LoadCallback(const F4SESerializationInterface * intfc)
 	{
-		_DMESSAGE("Loading MSF serialization data.");
+		_MESSAGE("Loading MSF serialization data.");
 		UInt32 type, version, length;
 		while (intfc->GetNextRecordInfo(&type, &version, &length))
 		{
-			_DMESSAGE("type %i", type);
 			switch (type)
 			{
-			case 'PBT':
-				_DMESSAGE("Loading PBT type");
+			case 'MSF':
 				Serialization::Load(intfc, InternalEventVersion::kCurrentVersion);
 				break;
 			}
@@ -62,8 +60,8 @@ namespace Serialization
 
 	void SaveCallback(const F4SESerializationInterface * intfc)
 	{
-		_DMESSAGE("Save PBT serialization data.");
-		Serialization::Save(intfc, 'PBT', InternalEventVersion::kCurrentVersion);
+		_MESSAGE("Saving MSF serialization data.");
+		Serialization::Save(intfc, 'MSF', InternalEventVersion::kCurrentVersion);
 	}
 
 	bool Save(const F4SESerializationInterface * intfc, UInt32 type, UInt32 version)
@@ -84,18 +82,4 @@ namespace Serialization
 		return true;
 	}
 
-	void AddRN(UInt32 formID)
-	{
-		readedNotes.insert(formID);
-	}
-
-	void RemoveRN(UInt32 formID)
-	{
-		readedNotes.erase(formID);
-	}
-
-	bool CheckRN(UInt32 formID)
-	{
-		return readedNotes.find(formID) != readedNotes.end();
-	}
 }

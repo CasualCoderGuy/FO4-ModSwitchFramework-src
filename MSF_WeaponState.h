@@ -2,6 +2,13 @@
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
 
+class DataHolderParentInstance
+{
+	UInt32 formID;
+	UInt32 stackID;
+	ObjectRefHandle refHandle;
+};
+
 class BurstModeManager : public BurstModeData
 {
 public:
@@ -13,7 +20,7 @@ private:
 	volatile UInt8 numOfShotsFired;
 };
 
-class ExtraWeaponState : public BSExtraData
+class ExtraWeaponState : public BSExtraData, DataHolderParentInstance
 {
 public:
 	virtual ~ExtraWeaponState() override;
@@ -69,4 +76,18 @@ private:
 	//bool hasSecondaryAmmo;
 	//BGSMod::Attachment::Mod* baseMod;
 	//BGSMod::Attachment::Mod* functionMod;
+};
+
+typedef unsigned long WeaponStateID;
+class WeaponStateStore
+{
+public:
+	WeaponStateStore()
+	{
+		storage.reserve(100);
+	};
+	void Free() {};
+
+private:
+	std::unordered_map<WeaponStateID, ExtraWeaponState*> storage;
 };

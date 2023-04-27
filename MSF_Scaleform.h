@@ -23,6 +23,7 @@ namespace MSF_Scaleform
 	bool UpdateWidgetSettings();
 	UInt32 GetInterfaceVersion(); 
 	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);
+	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, ModData* mods);
 	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu);
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);

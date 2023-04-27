@@ -1,6 +1,7 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Test.h"
 
+
 RelocPtr <BSScaleformManager *> g_scaleformManager(0x058DE410);
 
 void HandleInputEvent(ButtonEvent * inputEvent)
@@ -68,7 +69,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
 				//MSF_Scaleform::SetWidgetVisibility(true);
-				//MSFMenu::OpenMenu();
+				MSFMenu::CloseMenu();
+				MSFMenu::OpenMenu();
 				//static BSFixedString menuName("MSFMenu");
 				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
 				//MSFAmmoMenu::OpenMenu();
@@ -97,7 +99,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
-				MSF_Test::CallAttachModToInvItem();
+				MSF_Test::MenuFlagTest();
+				//MSF_Test::CallAttachModToInvItem();
 				_MESSAGE("test2");
 			}
 		}
@@ -108,8 +111,10 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, false);
 				//CALL_MEMBER_FN((*g_player), QueueUpdate)(true, 0, true, 0);
-				MSF_Test::AttachModInternalTest(true, 2);
+				//MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CallRemoveModFromInvItem();
+				//MSF_Test::DamageEquippedWeapon(*g_player);
+				MSF_Test::ListExtraData();
 				_MESSAGE("test3");
 			}
 		}
@@ -132,17 +137,21 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				if (!keyFn)
 					break;
 				_MESSAGE("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
-				if (keyFn->type & KeybindData::bGlobalMenu)
-					MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu);
-				else if(keyFn->type & KeybindData::bIsAmmo)
-				{
-					if (keyFn->type & KeybindData::bHUDselection)
-						MSF_Scaleform::ToggleAmmoMenu(keyFn->selectMenu);
-					else
-						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
-				}
-				else if (keyFn->type & KeybindData::bHUDselection)
-					MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, keyFn->modData);
+				if (keyFn->type & KeybindData::bHUDselection)
+					MSF_Scaleform::ToggleSelectionMenu(keyFn->selectMenu, keyFn->modData);
+				else if (keyFn->type & KeybindData::bIsAmmo)
+					MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
+				//if (keyFn->type & KeybindData::bGlobalMenu)
+				//	MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu);
+				//else if(keyFn->type & KeybindData::bIsAmmo)
+				//{
+				//	if (keyFn->type & KeybindData::bHUDselection)
+				//		MSF_Scaleform::ToggleAmmoMenu(keyFn->selectMenu);
+				//	else
+				//		MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
+				//}
+				//else if (keyFn->type & KeybindData::bHUDselection)
+				//	MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, keyFn->modData);
 				else if (keyFn->type & KeybindData::bToggle)
 					MSF_Base::ToggleModHotkey(keyFn->modData);
 				else
@@ -662,14 +671,15 @@ namespace MSF_Scaleform
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			return false;
 		}
+		return true;
 	}
 
-	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, UInt8 type, ModData* mods)
+	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, ModData* mods)
 	{
 		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
 		if (!menuRoot)
 			return false;
-		switch (type)
+		switch (selectMenu->type)
 		{
 		case ModSelectionMenu::kType_AmmoMenu:
 		{
@@ -705,6 +715,7 @@ namespace MSF_Scaleform
 			if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 4))
 				return true;
 		}
+		default: return false;
 		}
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();

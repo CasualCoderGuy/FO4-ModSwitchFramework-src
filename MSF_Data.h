@@ -1,6 +1,8 @@
 #pragma once
 #include "MSF_Shared.h"
 
+class PlayerInventoryListEventSink;
+class WeaponStateStore;
 
 class AmmoData
 {
@@ -364,6 +366,8 @@ public:
 	static ModSelectionMenu* widgetMenu;
 
 	static ModSwitchManager modSwitchManager;
+	static WeaponStateStore weaponStateStore;
+	static PlayerInventoryListEventSink playerInventoryEventSink;
 	static UInt64 cancelSwitchHotkey;
 	static UInt64 lowerWeaponHotkey;
 	static Utilities::Timer tmr;

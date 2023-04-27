@@ -2,6 +2,10 @@
 
 
 RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl(0x2C4BE10); // ??_7BGSObjectInstanceExtra@@6B@
+RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl(0x2C52848); // ??_7ExtraUniqueID@@6B@
+RelocAddr <uintptr_t> s_ExtraModRankVtbl(0x2C52760); // ??_7ExtraModRank@@6B@
+RelocAddr <uintptr_t> s_ExtraRankVtbl(0x2C521A0); // ??_7ExtraRank@@6B@
+RelocAddr <uintptr_t> s_ExtraAmmoVtbl(0x2C52560); // ??_7ExtraAmmo@@6B@
 RelocAddr <_HasPerkInternal> HasPerkInternal(0x0DA6600);
 RelocAddr <_AddItem_Native> AddItemNative(0x1402B40); 
 RelocAddr <_RemoveItem_Native> RemoveItemNative(0x140D1F0);
@@ -10,6 +14,9 @@ RelocAddr <_PlayIdle> PlayIdleInternal(0x13864C0); //0x13863A0
 RelocAddr <_PlayIdle2> PlayIdleInternal2(0x13864C0);
 RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0 
 RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
+RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype(0x0CA5D20);
+RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor(0x0CA5ED0);
+RelocAddr <_CheckKeywordType> CheckKeywordType(0x0568FF0);
 RelocAddr <_IsInIronSights> IsInIronSights(0x13911D0);
 RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
@@ -88,6 +95,40 @@ BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* 
 	pInstanceData->type = kExtraData_ObjectInstance;
 	pInstanceData->data = data;
 	return pInstanceData;
+}
+
+ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form)
+{
+	ExtraUniqueID* extraID = (ExtraUniqueID*)BSExtraData::Create(sizeof(ExtraUniqueID), s_BGSObjectInstanceExtraVtbl.GetUIntPtr());
+	extraID->type = ExtraDataType::kExtraData_UniqueID;
+	extraID->uniqueId = id;
+	extraID->unk1A = form >> 16;
+	extraID->formOwner = form & 0xFFFF;
+	return extraID;
+}
+
+ExtraModRank* ExtraModRank::Create(UInt32 modrank)
+{
+	ExtraModRank* extraModRank = (ExtraModRank*)BSExtraData::Create(sizeof(ExtraModRank), s_ExtraModRankVtbl.GetUIntPtr());
+	extraModRank->type = ExtraDataType::kExtraData_ModRank;
+	extraModRank->rank = modrank;
+	return extraModRank;
+}
+
+ExtraRank* ExtraRank::Create(UInt32 rank)
+{
+	ExtraRank* extraRank = (ExtraRank*)BSExtraData::Create(sizeof(ExtraRank), s_ExtraRankVtbl.GetUIntPtr());
+	extraRank->type = ExtraDataType::kExtraData_Rank;
+	extraRank->rank = rank;
+	return extraRank;
+}
+
+ExtraAmmo* ExtraAmmo::Create(UInt32 ammo)
+{
+	ExtraAmmo* extraAmmo = (ExtraAmmo*)BSExtraData::Create(sizeof(ExtraAmmo), s_ExtraAmmoVtbl.GetUIntPtr());
+	extraAmmo->type = ExtraDataType::kExtraData_Ammo;
+	extraAmmo->ammo = ammo;
+	return extraAmmo;
 }
 
 namespace Utilities

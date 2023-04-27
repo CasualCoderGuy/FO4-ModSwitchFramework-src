@@ -11,6 +11,49 @@ public:
 	//etc
 };
 
+class BGSInventoryListEventData
+{
+public:
+	enum
+	{
+		kAddStack,
+		kChangedStack,
+		kAddNewItem,
+		kRemoveItem,
+		kClear,
+		UpdateWeight
+	};
+
+	struct Event
+	{
+	public:
+		// members
+		UInt16 type;  // 00
+		UInt16 changeType;
+		ObjectRefHandle owner;                      // 04
+		TESBoundObject* objAffected;                // 08
+		UInt32 count;                               // 10
+		UInt32 stackID;                             // 14
+	};
+	STATIC_ASSERT(sizeof(Event) == 0x18);
+};
+
+class InventoryList
+{
+public:
+	BSTEventDispatcher<BGSInventoryListEventData::Event> eventSource;	// 00
+	tArray<BGSInventoryItem> items;		// 58
+	float			inventoryWeight;	// 70 - is (-1) when not calculated
+	ObjectRefHandle owner;				// 74
+	BSReadWriteLock	inventoryLock;		// 78
+};
+
+class PlayerInventoryListEventSink : public BSTEventSink<BGSInventoryListEventData::Event>
+{
+public:
+	virtual	EventResult	ReceiveEvent(BGSInventoryListEventData::Event* evn, void * dispatcher) override;
+};
+
 struct BGSOnPlayerUseWorkBenchEvent {};
 class BGSOnPlayerUseWorkBenchEventSink : public BSTEventSink<BGSOnPlayerUseWorkBenchEvent>
 {
@@ -147,6 +190,7 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
 
+bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);
 #define GET_EVENT_DISPATCHER(EventName) (BSTEventDispatcher<EventName>*) GetGlobalEventDispatcher(*g_globalEvents, #EventName);
 

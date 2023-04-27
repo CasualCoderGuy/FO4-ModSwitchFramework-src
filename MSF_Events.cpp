@@ -56,6 +56,20 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 	return kEvent_Continue;
 }
 
+EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData::Event* evn, void * dispatcher)
+{
+	if (!evn)
+		return kEvent_Continue;
+	switch (evn->type)
+	{
+	case BGSInventoryListEventData::kAddStack: {_MESSAGE("kAddStack"); };
+	case BGSInventoryListEventData::kChangedStack: {_MESSAGE("kChangedStack"); };
+	case BGSInventoryListEventData::kAddNewItem: {_MESSAGE("kAddNewItem"); };
+	case BGSInventoryListEventData::kRemoveItem: {_MESSAGE("kRemoveItem"); };
+	}
+	return kEvent_Continue;
+}
+
 EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dispatcher)
 {
 	const char* name = evn->menuName.c_str();
@@ -111,6 +125,14 @@ BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents
 		}
 	}
 	return nullptr;
+}
+
+bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink)
+{
+	if (!list || !sink)
+		return false;
+	InventoryList* inv = (InventoryList*)list;
+	return inv->eventSource.AddEventSink(sink);
 }
 
 void* AttackBlockHandler_Hook(void* handler)

@@ -7,7 +7,8 @@ ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData
 	unk13 = 0;
 	unk14 = 0;
 	next = NULL;
-	extraDataList->Add(kType_ExtraWeaponState, this);
+	//extraDataList->Add(kType_ExtraWeaponState, this);
+	//this can cause unexpected ctd, we will use BGSObjectInstanceExtra::unk14 padding as unique ID store instead
 }
 
 ExtraWeaponState::~ExtraWeaponState()
@@ -32,6 +33,8 @@ ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeap
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	if (!attachedMods || !currInstanceData)
 		return nullptr;
+	if (extraDataList->HasType(ExtraWeaponState::kType_ExtraWeaponState))
+		return (ExtraWeaponState*)extraDataList->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
 	return new ExtraWeaponState(extraDataList, equipData);
 }
 

@@ -11,7 +11,4 @@ namespace Serialization
 
 	bool Load(const F4SESerializationInterface * intfc, UInt32 version);
 	bool Save(const F4SESerializationInterface * intfc, UInt32 type, UInt32 version);
-	void AddRN(UInt32 formID);
-	void RemoveRN(UInt32 formID);
-	bool CheckRN(UInt32 formID);
 }

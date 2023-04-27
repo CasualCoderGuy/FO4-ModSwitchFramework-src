@@ -1,5 +1,6 @@
 #include <shlobj.h>
 
+#include "AddressLibDecoder\versionlibdb.h"
 #include "rva/RVA.h"
 #include "rva/Hook/HookUtil.h"
 #include "Globals.h"
@@ -41,11 +42,17 @@ bool RegisterAfterLoadEvents()
 	else
 	{
 		_MESSAGE("MSF was unable to register for MenuOpenCloseEvent");
-		//return false;
+		return false;
 	}
 
 	REGISTER_EVENT(BGSOnPlayerModArmorWeaponEvent, modArmorWeaponEventSink);
 	REGISTER_EVENT(BGSOnPlayerUseWorkBenchEvent, useWorkbenchEventSink);
+
+	if (!RegisterInventoryEvent((*g_player)->inventoryList, &MSF_MainData::playerInventoryEventSink))
+	{
+		_MESSAGE("MSF was unable to register for PlayerInventoryEvent");
+		return false;
+	}
 
 	return true;
 }
@@ -117,6 +124,40 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 	}
 }
 
+bool InitializeOffsets()
+{
+	VersionDb db;
+	if (!db.Load())
+	{
+		_FATALERROR("Failed to load version database for current executable!");
+		return false;
+	}
+	else
+	{
+		// "SkyrimSE.exe", "1.5.97.0"
+		_MESSAGE("Loaded database for %s version %s.", db.GetModuleName().c_str(), db.GetLoadedVersionString().c_str());
+	}
+
+	// This address already includes the base address of module so we can use the address directly.
+	void* MyAddress = db.FindAddressById(123);
+	if (MyAddress == NULL)
+	{
+		_FATALERROR("Failed to find address!");
+		return false;
+	}
+
+	// This offset does not include base address. Actual address would be ModuleBase + MyOffset.
+	unsigned long long MyOffset = 0;
+	if (!db.FindOffsetById(123, MyOffset))
+	{
+		_FATALERROR("Failed to find offset for my thing!");
+		return false;
+	}
+
+	// Everything was successful.
+	return true;
+}
+
 bool InitPlugin(UInt32 runtimeVersion = 0) {
 	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
 	_MESSAGE("runtime version: %08X", runtimeVersion);
@@ -149,6 +190,8 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 	}
 
 	_MESSAGE("Base address: %p", reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
+
+	//InitializeOffsets();
 
 	tf1_Original = HookUtil::SafeWrite64(tf1_HookTarget.GetUIntPtr(), &tf1_Hook);
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);

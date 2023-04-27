@@ -22,8 +22,10 @@
 
 UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
+ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 
 typedef unsigned short KeywordValue;
+typedef unsigned long ObjectRefHandle;
 
 class TESIdleForm : public TESForm
 {
@@ -486,6 +488,9 @@ typedef bool(*_PlayIdle)(VirtualMachine* vm, UInt32 stackId, Actor* actor, TESId
 typedef bool(*_PlayIdle2)(Actor* actor, TESIdleForm* idle, UInt64 unk, VirtualMachine* vm, UInt32 stackId);
 typedef bool(*_PlayIdleAction)(Actor* actor, BGSAction* action, TESObjectREFR* target, VirtualMachine* vm, UInt32 stackId);
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
+typedef void(*_ChangeAnimArchetype)(Actor* target, BGSKeyword* archetypeKW);
+typedef void(*_ChangeAnimFlavor)(Actor* target, BGSKeyword* flavorKW);
+typedef void(*_CheckKeywordType)(BGSKeyword* keyword, UInt32 type); //7: AnimArchetype; 13: AnimFlavor
 typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
@@ -494,6 +499,12 @@ typedef UInt32(*_EquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStru
 typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStruct, SInt32 unk_r9d, void* equipslot, SInt8 unk_rsp28, SInt8 unk_rsp30, bool abPreventEquip, SInt8 unk_rsp40, SInt8 unk_rsp48, void* unk_rsp50);
 //typedef bool(*_UnEquipItem)(void* unkPtr, Actor* target, unkWeapBaseStruct baseWeap, UInt32 unk_r9d, UInt64 unk_rsp20, SInt32 unk_rsp28, UInt8 unk_rsp30, UInt8 unk_rsp38, UInt8 unk_rsp40, UInt8 unk_rsp48, UInt64 unk_rsp50);
 // sub_140E1BEF0(qword_145A10618, v7, &v25, 1, v16, -1, 1, a5, 1, 0, 0i64);
+//SetSubGraphFloatVariable: 138B430
+//SetAnimationVariableInt: 
+//SetAnimationVariableFloat: 
+//GetAnimationVariableBool:
+//GetAnimationVariableInt: 
+//GetAnimationVariableFloat: 
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
 
@@ -505,6 +516,9 @@ extern RelocAddr <_PlayIdle> PlayIdleInternal; //0x13863A0
 extern RelocAddr <_PlayIdle2> PlayIdleInternal2;
 extern RelocAddr <_PlayIdleAction> PlayIdleActionInternal; //0x13864A0 
 extern RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal; //0x138A130
+extern RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype; //1387C10(vm*,0,actor*,kw*)
+extern RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor; //1387CA0(vm*,0,actor*,kw*)
+extern RelocAddr <_CheckKeywordType> CheckKeywordType;
 extern RelocAddr <_IsInIronSights> IsInIronSights;
 extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
 extern RelocAddr <_FireWeaponInternal> FireWeaponInternal;
@@ -747,6 +761,30 @@ public:
 	UInt8				pad0F;			// 0F
 
 	static ExtraEnchantment* Create();
+};
+
+class ExtraModRank : public BSExtraData
+{
+public:
+	UInt32				rank;		// 18
+
+	static ExtraModRank* Create(UInt32 modrank);
+};
+
+class ExtraRank : public BSExtraData
+{
+public:
+	UInt32				rank;		// 18
+
+	static ExtraRank* Create(UInt32 rank);
+};
+
+class ExtraAmmo : public BSExtraData
+{
+public:
+	UInt32				ammo;		// 18
+
+	static ExtraAmmo* Create(UInt32 ammo);
 };
 
 class MagicalItem : public TESBoundObject
