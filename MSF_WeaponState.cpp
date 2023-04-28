@@ -1,6 +1,6 @@
 #include "MSF_WeaponState.h"
 
-ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData)
+ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, DataHolderParentInstance &instance)
 {
 	type = kType_ExtraWeaponState;
 	unk10 = 0;
@@ -9,38 +9,47 @@ ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData
 	next = NULL;
 	//extraDataList->Add(kType_ExtraWeaponState, this);
 	//this can cause unexpected ctd, we will use BGSObjectInstanceExtra::unk14 padding as unique ID store instead
+	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+	//ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	//parent.extraList = extraDataList;
+	//parent.formID = extraInstanceData->baseForm->formID;
+	parent = instance;
+	attachedMods->unk14 = MSF_MainData::weaponStateStore.Add(this);
+	//setweaponstate: init(noSwitch?),loadSave,beforeSwitchAmmo,afterSwitchAmmo,beforeSwitchMod,afterSwitchMod,fireWeaponAfterAmmoSwitch,fireWeaponAfterReload;;validate mod-weapstate pairs
 }
 
 ExtraWeaponState::~ExtraWeaponState()
 {
 	for (auto it = weaponStates.begin(); it != weaponStates.end(); it++)
 	{
-		delete std::get<1>(*it);
-		std::get<1>(*it) = nullptr;
 		delete std::get<2>(*it);
 		std::get<2>(*it) = nullptr;
+		delete std::get<3>(*it);
+		std::get<3>(*it) = nullptr;
 	}
 	weaponStates.clear();
 	delete burstModeManager;
 }
 
-ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeaponData* equipData)
+ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeaponData* equipData, DataHolderParentInstance &instance)
 {
 	if (!extraDataList || !equipData || !equipData->ammo)
 		return nullptr;
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-	if (!attachedMods || !currInstanceData)
+	if (!attachedMods || !currInstanceData || !extraInstanceData->baseForm)
 		return nullptr;
-	if (extraDataList->HasType(ExtraWeaponState::kType_ExtraWeaponState))
-		return (ExtraWeaponState*)extraDataList->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
-	return new ExtraWeaponState(extraDataList, equipData);
+	//if (extraDataList->HasType(ExtraWeaponState::kType_ExtraWeaponState))
+	//	return (ExtraWeaponState*)extraDataList->GetByType(ExtraWeaponState::kType_ExtraWeaponState);
+	ExtraWeaponState* state = MSF_MainData::weaponStateStore.GetValid(attachedMods->unk14);
+	if (state)
+		return state;
+	return new ExtraWeaponState(extraDataList, equipData, instance);
 }
 
-ExtraWeaponState::WeaponState::WeaponState(TESObjectWEAP::InstanceData* instanceData, UInt64 loadedAmmoCount)
+ExtraWeaponState::WeaponState::WeaponState(TESObjectWEAP::InstanceData* instanceData)
 {
-	magazineCount = loadedAmmoCount;
 	if (!instanceData)
 		return;
 	ammoCapacity = instanceData->ammoCapacity;
@@ -110,31 +119,31 @@ bool ExtraWeaponState::SetWeaponState(ExtraDataList* extraDataList, EquipWeaponD
 			}
 		}
 	}
-	auto it = std::find_if(weaponStates.begin(), weaponStates.end(), [activeStateMod](std::tuple<BGSMod::Attachment::Mod*, WeaponState*, WeaponState*> state){
+	auto it = std::find_if(weaponStates.begin(), weaponStates.end(), [activeStateMod](std::tuple<BGSMod::Attachment::Mod*, UInt64, WeaponState*, WeaponState*> state){
 		return std::get<0>(state) == activeStateMod;
 	});
-	WeaponState* weaponState = new WeaponState(currInstanceData, equipData->loadedAmmoCount);
+	WeaponState* weaponState = new WeaponState(currInstanceData);
 	if (it != weaponStates.end())
 	{
 		if (temporary)
 		{
-			WeaponState* oldState = std::get<1>(*it);
-			std::get<1>(*it) = weaponState;
+			WeaponState* oldState = std::get<2>(*it);
+			std::get<2>(*it) = weaponState;
 			delete oldState;
 		}
 		else
 		{
-			WeaponState* oldState = std::get<2>(*it);
-			std::get<2>(*it) = weaponState;
+			WeaponState* oldState = std::get<3>(*it);
+			std::get<3>(*it) = weaponState;
 			delete oldState;
 		}
 	}
 	else
 	{
 		if (temporary)
-			weaponStates.push_back(std::make_tuple(activeStateMod, weaponState, nullptr));
+			weaponStates.push_back(std::make_tuple(activeStateMod, equipData->loadedAmmoCount, weaponState, nullptr));
 		else
-			weaponStates.push_back(std::make_tuple(activeStateMod, nullptr, weaponState));
+			weaponStates.push_back(std::make_tuple(activeStateMod, equipData->loadedAmmoCount, nullptr, weaponState));
 	}
 	return true;
 }
@@ -167,6 +176,43 @@ bool ExtraWeaponState::HandleModChangeEvent(ExtraDataList* extraDataList, EquipW
 bool BurstModeManager::SetState(UInt8 bActive)
 {
 	flags ^= (-(bActive & BurstModeManager::bActive) ^ flags) & BurstModeManager::bActive;
+}
+
+bool ExtraWeaponState::SetParentRef(ObjectRefHandle refHandle)
+{
+	//validate refHandle
+	parent.refHandle = refHandle;
+	parent.extraList = nullptr;
+	return true;
+}
+
+bool ExtraWeaponState::SetParentInvItem(ExtraDataList* extraList)
+{
+	if (!extraList)
+		return false;
+	parent.refHandle = 0;
+	parent.extraList = extraList;
+	return true;
+}
+
+bool ExtraWeaponState::ValidateParent()
+{
+	if (parent.extraList)
+	{
+		ExtraDataList* extraList = dynamic_cast<ExtraDataList*>(parent.extraList);
+		if (!extraList)
+			return false;
+		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+		if (!attachedMods)
+			return false;
+		if (this == MSF_MainData::weaponStateStore.Get(attachedMods->unk14))
+			return true;
+		return false;
+	}
+	else 
+	{
+		return false;
+	}
 }
 
 /*

@@ -45,7 +45,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainDat
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
 PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
-WeaponStateStore weaponStateStore;
+WeaponStateStore MSF_MainData::weaponStateStore;
 KeywordValue MSF_MainData::ammoAP = 0;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
