@@ -317,7 +317,7 @@ namespace MSF_Base
 		ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 		TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 
-		InstanceDataStruct idStruct;
+		BGSObjectInstance idStruct;
 		idStruct.baseForm = weapBase;
 		idStruct.instanceData = newInstanceData;
 
@@ -445,7 +445,7 @@ namespace MSF_Base
 							ExtraDataList* newList = stack->extraData;
 							ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 							TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-							InstanceDataStruct idStruct;
+							BGSObjectInstance idStruct;
 							idStruct.baseForm = weapon;
 							idStruct.instanceData = newInstanceData;
 							owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
@@ -596,7 +596,7 @@ namespace MSF_Base
 				ExtraDataList* newList = stack->extraData;
 				ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 				TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-				InstanceDataStruct idStruct;
+				BGSObjectInstance idStruct;
 				idStruct.baseForm = baseWeap;
 				idStruct.instanceData = newInstanceData;
 				owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
@@ -697,7 +697,7 @@ namespace MSF_Base
 						ExtraDataList* newList = stack->extraData;
 						ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 						TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-						InstanceDataStruct idStruct;
+						BGSObjectInstance idStruct;
 						idStruct.baseForm = baseWeap;
 						idStruct.instanceData = newInstanceData;
 						owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;

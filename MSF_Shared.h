@@ -13,6 +13,7 @@
 #include "f4se/PapyrusEvents.h"
 #include "f4se/GameCamera.h"
 #include "rva/RVA.h"
+//#include "decomp\BSPointerHandle.h"
 #include "RNG.h"
 #include  <thread>
 #include  <chrono>
@@ -101,20 +102,37 @@ class EquipWeaponData : public EquippedItemData
 public:
 	virtual ~EquipWeaponData();
 
-	TESAmmo*	ammo;					// 10
-	UInt64		loadedAmmoCount;		// 18
-	void*		unk20;					// 20
-	UInt64		unk28;					// 28
-	NiAVObject*	object;					// 30
-	UInt64		unk38[4];				// 38
-	void*		unk58;					// 58 QueuedFile
-	void*		unk60;					// 60 QueuedFile
-	void*		unk68;					// 68 BSCloneReserver
-	UInt64		unk70[5];				// 70
-	BGSSoundKeywordMapping* firingSound;// 98
-	BGSKeyword*	unkKeyword;				// A0
+	TESAmmo* ammo;                                                                               // 10
+	UInt64 loadedAmmoCount;                                                                     // 18
+	MSFAimModel* aimModel;                                                                          // 20
+	void* muzzleFlash;                                                                    // 28
+	NiAVObject* fireNode;                                                                        // 30
+	UInt64 attackState;                                                               // 38
+	void* fireLocations[3];  // 40
+	void* weaponPreload;                                                         // 58
+	void* projectilePreload;                                                     // 60
+	void* reserveProjectileClones;                                          // 68
+	void* idleSound;                                                                     // 70
+	void* attackSound;                                                                   // 78
+	void* reverbSound;                                                                   // 80
+	void* prevAttack;                                                                    // 88
+	void* prevReverb;                                                                    // 90
+	BGSSoundKeywordMapping* attackSoundData;                                               // 98
+	bool reverbSoundIsTail;
+	//TESAmmo*	ammo;					// 10
+	//UInt64		loadedAmmoCount;		// 18
+	//void*		unk20;					// 20
+	//UInt64		unk28;					// 28
+	//NiAVObject*	object;					// 30
+	//UInt64		unk38[4];				// 38
+	//void*		unk58;					// 58 QueuedFile
+	//void*		unk60;					// 60 QueuedFile
+	//void*		unk68;					// 68 BSCloneReserver
+	//UInt64		unk70[5];				// 70
+	//BGSSoundKeywordMapping* firingSound;// 98
+	//BGSKeyword*	unkKeyword;				// A0
 };
-STATIC_ASSERT(offsetof(EquipWeaponData, firingSound) == 0x98);
+STATIC_ASSERT(offsetof(EquipWeaponData, attackSoundData) == 0x98);
 
 class CheckStackIDFunctor
 {
@@ -137,7 +155,7 @@ public:
 	//UInt16 pad0E;					//0E not set when calling sub_1401A84B0
 	BGSMod::Attachment::Mod* mod;	//10
 	TESObjectWEAP* baseWeap;		//18 set after calling sub_1401A84B0, no need to set in advance
-	UInt8* byteptr;					//20 set to 1, wth is this
+	UInt8* byteptr;					//20 set to 1, return value
 	UInt64 unk28;					//0x100 when attach, 0xFF when remove 
 	//UInt8 unk28;					//28 set to 0
 	//UInt8 unk29;					//29 set to 0x1, might be unk04 from BGSObjectInstanceExtra::Data::Form
@@ -154,9 +172,10 @@ struct unkTBOStruct
 	UInt64 unk08;
 };
 
-struct InstanceDataStruct
+class BGSObjectInstance
 {
-	TESBoundObject* baseForm;
+public:
+	TESForm* baseForm;
 	TBO_InstanceData* instanceData;
 };
 
@@ -466,15 +485,15 @@ public:
 
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, ModifyModDataFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
-typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, InstanceDataStruct weaponBaseStruct, BGSEquipSlot* equipSlot);
-typedef void(*_UpdateEquipData)(ActorEquipData* equipData, InstanceDataStruct instance, UInt32* r8d);
+typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
+typedef void(*_UpdateEquipData)(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
 typedef void(*_UpdateAnimGraph)(Actor* actor, bool rdx);
-typedef void(*_UpdateEnchantments)(Actor* actor, InstanceDataStruct instanceDataStruct, ExtraDataList* extraDataList);
+typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInstance, ExtraDataList* extraDataList);
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
 
-typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
-typedef void(*_UniversalEquipHandler)(Actor* actor, InstanceDataStruct weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
+typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
+typedef void(*_UniversalEquipHandler)(Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UnkSub_EFF9D0)(Actor* actor);
 typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
 
@@ -495,16 +514,29 @@ typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ShowNotification)(std::string text, UInt32 edx, UInt32 r8d);
-typedef UInt32(*_EquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStruct, SInt32 unk_r9d, SInt8 unk_rsp20, void* unk_rsp28, SInt8 unk_rsp30, bool forceequip, SInt8 unk_rsp40, SInt8 unk_rsp48, bool preventunequip);
-typedef UInt8(*_UnEquipItem)(void* unkmanager, Actor* actor, unkTBOStruct TBOStruct, SInt32 unk_r9d, void* equipslot, SInt8 unk_rsp28, SInt8 unk_rsp30, bool abPreventEquip, SInt8 unk_rsp40, SInt8 unk_rsp48, void* unk_rsp50);
+typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
+typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 //typedef bool(*_UnEquipItem)(void* unkPtr, Actor* target, unkWeapBaseStruct baseWeap, UInt32 unk_r9d, UInt64 unk_rsp20, SInt32 unk_rsp28, UInt8 unk_rsp30, UInt8 unk_rsp38, UInt8 unk_rsp40, UInt8 unk_rsp48, UInt64 unk_rsp50);
 // sub_140E1BEF0(qword_145A10618, v7, &v25, 1, v16, -1, 1, a5, 1, 0, 0i64);
 //SetSubGraphFloatVariable: 138B430
-//SetAnimationVariableInt: 
-//SetAnimationVariableFloat: 
-//GetAnimationVariableBool:
-//GetAnimationVariableInt: 
-//GetAnimationVariableFloat: 
+//SetAnimationVariableInt: 140EC70
+//SetAnimationVariableFloat: 140EBD0
+//SetAnimationVariableBool: 140EB30
+//GetAnimationVariableBool: 1406570 
+//GetAnimationVariableInt: 1406620
+//GetAnimationVariableFloat: 14066D0
+//onitemremoved: struct:5ADCD98 access:sub_1427953F0
+
+//actorEquipManager->GetSingleton: 59D75C8
+//ActorEquipManager->EquipObject: E1BCD0
+//
+
+typedef UInt32(*_GetHandle)(TESObjectREFR** ref);
+extern RelocAddr <_GetHandle> GetHandle;
+typedef bool(*_GetNiSmartPointer)(const UInt32& a_handle, TESObjectREFR*& a_smartPointerOut);
+extern RelocAddr <_GetNiSmartPointer> GetNiSmartPointer;
+typedef bool(*_GetSmartPointer)(const UInt32& a_handle, TESObjectREFR*& a_smartPointerOut);
+extern RelocAddr <_GetSmartPointer> GetSmartPointer;
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
 
@@ -539,7 +571,7 @@ extern RelocAddr <_UnkSub_DFE930> UnkSub_DFE930;
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;
-extern RelocPtr <void*> unk_05AB38D0; //unkmanager
+extern RelocPtr <void*> g_ActorEquipManager; 
 extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_ModAssociationKeywordArray;

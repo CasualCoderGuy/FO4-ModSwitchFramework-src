@@ -65,7 +65,22 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 	case BGSInventoryListEventData::kAddStack: {_MESSAGE("kAddStack"); };
 	case BGSInventoryListEventData::kChangedStack: {_MESSAGE("kChangedStack"); };
 	case BGSInventoryListEventData::kAddNewItem: {_MESSAGE("kAddNewItem"); };
-	case BGSInventoryListEventData::kRemoveItem: {_MESSAGE("kRemoveItem"); };
+	case BGSInventoryListEventData::kRemoveItem: {
+		//_MESSAGE("kRemoveItem"); 
+		//_MESSAGE("obj: %p", evn->objAffected);
+		//_MESSAGE("own: %p", evn->owner);
+		//Actor* player = *g_player;
+		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//_MESSAGE("ownRef2Handle: %p", GetHandle((TESObjectREFR**)&player));
+		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//TESObjectREFR* ref = nullptr;
+		//bool ret = GetNiSmartPointer(evn->owner, ref);
+		//_MESSAGE("ownHandle2RefNi: %02X, %p", ret, ref);
+		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//ref = nullptr;
+		//ret = GetSmartPointer(evn->owner, ref);
+		//_MESSAGE("ownHandle2Ref: %02X, %p", ret, ref);
+	};
 	}
 	return kEvent_Continue;
 }

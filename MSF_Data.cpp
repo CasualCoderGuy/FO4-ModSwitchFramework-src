@@ -137,7 +137,7 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = 0xDFF;
+		MSF_MainData::MCMSettingFlags = 0x1DFF;
 		AddFloatSetting("fSliderMainX", 950.0);
 		AddFloatSetting("fSliderMainY", 565.0);
 		AddFloatSetting("fPowerArmorOffsetX", 0.0);
@@ -469,6 +469,10 @@ namespace MSF_Data
 				flag = MSF_MainData::bCustomAnimEnabled;
 			else if (settingName == "bRequireAmmoToSwitch")
 				flag = MSF_MainData::bRequireAmmoToSwitch;
+			else if (settingName == "bAmmoRequireWeaponToBeDrawn")
+				flag = MSF_MainData::bAmmoRequireWeaponToBeDrawn;
+			else if (settingName == "bShowUnavailableMods")
+				flag = MSF_MainData::bShowUnavailableMods;
 
 			if (flagValue)
 				MSF_MainData::MCMSettingFlags |= flag;

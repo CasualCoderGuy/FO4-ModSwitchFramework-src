@@ -33,10 +33,14 @@ RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
 RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
 RelocAddr <_UnkSub_DFE930> UnkSub_DFE930(0xDFE930);
 
+RelocAddr <_GetHandle> GetHandle(0xAAC0);
+RelocAddr <_GetNiSmartPointer> GetNiSmartPointer(0xAC90);
+RelocAddr <_GetSmartPointer> GetSmartPointer(0xAB60);
+
 RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
 RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
 RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
-RelocPtr  <void*> unk_05AB38D0(0x5AB38D0);
+RelocPtr  <void*> g_ActorEquipManager(0x5AB38D0);
 RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
 RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420);
 RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438);

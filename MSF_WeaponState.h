@@ -2,6 +2,7 @@
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
 
+
 typedef unsigned long WeaponStateID;
 
 class DataHolderParentInstance

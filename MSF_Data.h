@@ -66,7 +66,8 @@ public:
 	{
 		enum
 		{
-			bCannotHaveNullMod = 0x0001
+			bCannotHaveNullMod = 0x0001,
+			bUIRequireWeaponToBeDrawn = 0x0002
 		};
 		ModVector mods;
 		UInt32 flags;
@@ -410,7 +411,8 @@ public:
 		bReloadEnabled = 0x0100,
 		bDrawEnabled = 0x0200,
 		bCustomAnimEnabled = 0x0400,
-		bRequireAmmoToSwitch = 0x0800,
+		bAmmoRequireWeaponToBeDrawn = 0x0800,
+		bRequireAmmoToSwitch = 0x1000,
 		bWidgetAlwaysVisible = 0x0001,
 		bShowAmmoIcon = 0x0002,
 		bShowMuzzleIcon = 0x0004,

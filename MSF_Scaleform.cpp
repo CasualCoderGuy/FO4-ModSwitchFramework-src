@@ -12,12 +12,16 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 	UInt32	deviceType = inputEvent->deviceType;
 	UInt32	keyMask = inputEvent->keyMask;
 
+	//_MESSAGE("mask: %08X", keyMask);
 	// Mouse
 	if (deviceType == InputEvent::kDeviceType_Mouse)
 		keyCode = InputMap::kMacro_MouseButtonOffset + keyMask;
 	// Gamepad
 	else if (deviceType == InputEvent::kDeviceType_Gamepad)
+	{
 		keyCode = InputMap::GamepadMaskToKeycode(keyMask);
+		//_MESSAGE("gamepad: %08X", keyCode);
+	}
 	// Keyboard
 	else
 		keyCode = keyMask;
@@ -95,11 +99,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
-				//MSF_Test::AttachModInternalTest(true, 2);
+				MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
-				MSF_Test::MenuFlagTest();
+				//MSF_Test::MenuFlagTest();
 				//MSF_Test::CallAttachModToInvItem();
 				_MESSAGE("test2");
 			}
@@ -548,6 +552,8 @@ namespace MSF_Scaleform
 
 	bool GetAmmoListForScaleform(GFxMovieRoot* menuRoot, GFxValue* dst)
 	{
+		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bAmmoRequireWeaponToBeDrawn) && !(*g_player)->actorState.IsWeaponDrawn())
+			return false;
 		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
 		menuRoot->CreateArray(dst);
@@ -625,6 +631,9 @@ namespace MSF_Scaleform
 			modCycle = itCycle->second;
 		}
 		if (!modCycle)
+			return false;
+
+		if ((modCycle->flags & ModData::ModCycle::bUIRequireWeaponToBeDrawn) && !(*g_player)->actorState.IsWeaponDrawn())
 			return false;
 
 		if (mods->flags & ModData::bRequireAPmod)
@@ -719,11 +728,6 @@ namespace MSF_Scaleform
 		}
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();
-		return false;
-	}
-
-	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu)
-	{
 		return false;
 	}
 
