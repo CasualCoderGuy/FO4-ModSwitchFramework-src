@@ -58,6 +58,7 @@ public:
 		};
 		BGSMod::Attachment::Mod* mod;
 		UInt16 flags;
+		KeywordValue animFlavor;
 		AttachRequirements* attachRequirements;
 		AnimationData* animData;
 	};
@@ -128,7 +129,9 @@ class ModSelectionMenu
 public:
 	std::string scaleformName;
 	UInt8 type;
+	UInt16 flags;
 	UInt32 version;
+	AnimationData* menuAnimation;
 	enum
 	{
 		kType_Widget = 0,
@@ -137,7 +140,7 @@ public:
 		kType_All = 3
 	};
 	ModSelectionMenu(std::string name, UInt8 menuType){
-		scaleformName = name; type = menuType; version = 0;
+		scaleformName = name; type = menuType; version = 0; flags = 0; menuAnimation = nullptr;
 	};
 };
 
@@ -179,6 +182,7 @@ public:
 		ModToRemove = nullptr;
 		LooseModToRemove = nullptr;
 		LooseModToAdd = nullptr;
+		animFlavor = 0;
 		animData = nullptr;
 	};
 	enum
@@ -201,6 +205,7 @@ public:
 		bIgnoreAnimations = 0x8000
 	};
 	UInt16 SwitchFlags;
+	KeywordValue animFlavor;
 	BGSMod::Attachment::Mod* ModToAttach;
 	BGSMod::Attachment::Mod* ModToRemove;
 	TESObjectMISC* LooseModToRemove;
@@ -307,7 +312,7 @@ public:
 		}
 		switchDataQueue.clear();
 		InterlockedExchange16((volatile short*)&switchState, 0);
-		_MESSAGE("unlock");
+		//_MESSAGE("unlock");
 		queueLock.Release();
 		return true;
 	};

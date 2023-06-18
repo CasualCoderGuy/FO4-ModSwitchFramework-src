@@ -62,9 +62,9 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 		return kEvent_Continue;
 	switch (evn->type)
 	{
-	case BGSInventoryListEventData::kAddStack: {_MESSAGE("kAddStack"); };
-	case BGSInventoryListEventData::kChangedStack: {_MESSAGE("kChangedStack"); };
-	case BGSInventoryListEventData::kAddNewItem: {_MESSAGE("kAddNewItem"); };
+	case BGSInventoryListEventData::kAddStack: {}; //_MESSAGE("kAddStack"); }; //
+	case BGSInventoryListEventData::kChangedStack: {}; //_MESSAGE("kChangedStack"); };
+	case BGSInventoryListEventData::kAddNewItem: {}; //_MESSAGE("kAddNewItem"); };
 	case BGSInventoryListEventData::kRemoveItem: {
 		//_MESSAGE("kRemoveItem"); 
 		//_MESSAGE("obj: %p", evn->objAffected);
@@ -175,19 +175,19 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
-			_MESSAGE("reloadCOMP %02X", switchData->SwitchFlags);
+			//_MESSAGE("reloadCOMP %02X", switchData->SwitchFlags);
 			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
 				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
 				MSF_Base::SwitchMod(switchData, true);
-				_MESSAGE("switchOK");
+				//_MESSAGE("switchOK");
 			}
 		}
 	}
 	if (!_strcmpi("reloadEnd", name))
 	{
-		_MESSAGE("reloadEnd");
+		//_MESSAGE("reloadEnd");
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
@@ -199,13 +199,13 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
-			_MESSAGE("drawFlags: %08X", switchData->SwitchFlags);
+			//_MESSAGE("drawFlags: %08X", switchData->SwitchFlags);
 			if (switchData->SwitchFlags & SwitchData::bDrawInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bDrawInProgress;
 				if ((switchData->SwitchFlags & SwitchData::bReloadNeeded))
 				{
-					_MESSAGE("reloading");
+					//_MESSAGE("reloading");
 					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
 					delayTask delayReload(400, true, &MSF_Base::ReloadWeapon);
 					//if (!MSF_Base::ReloadWeapon())
@@ -257,6 +257,9 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
 			delayTask delayEnd(10, true, &MSF_Base::EndSwitch, endFlag);
 		}
+	}
+	else if (!_strcmpi("toggleMenu", name))
+	{
 	}
 	return tf1_Original(arg1, arg2, arg3);
 }

@@ -378,6 +378,7 @@ namespace Utilities
 	bool GetParentMods(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod, std::vector<BGSMod::Attachment::Mod*>* parents);
 	KeywordValue GetAttachValueForTypedKeyword(BGSKeyword* keyword);
 	KeywordValue GetInstantiationValueForTypedKeyword(BGSKeyword* keyword);
+	KeywordValue GetAnimFlavorValueForTypedKeyword(BGSKeyword* keyword);
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
 	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW);
 	BGSMod::Attachment::Mod* GetModAtAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue keywordValue);
@@ -575,7 +576,9 @@ extern RelocPtr <void*> g_ActorEquipManager;
 extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_ModAssociationKeywordArray;
+extern RelocPtr <tArray<BGSKeyword*>> g_AnimArchetypeKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray;
+extern RelocPtr <tArray<BGSKeyword*>> g_AnimFlavorKeywordArray;
 extern RelocPtr <void*> g_sightedTransitionAnimValueHolder;
 extern RelocPtr <void*> g_reloadSpeedAnimValueHolder;
 extern RelocPtr <float> g_reloadSpeedMultiplier;
@@ -910,4 +913,55 @@ public:
 	UInt32 unk04;		// 04
 	UInt32 unk08;		// 08
 };
+
+struct BGSProjectileData
+{
+public:
+	// members
+	UInt32 flags;                      // 00
+	float gravity;                            // 04
+	float speed;                              // 08
+	float range;                              // 0C
+	TESObjectLIGH* light;                     // 10
+	TESObjectLIGH* muzzleFlashLight;          // 18
+	float explosionProximity;                 // 20
+	float explosionTimer;                     // 24
+	BGSExplosion* explosionType;              // 28
+	BGSSoundDescriptorForm* activeSoundLoop;  // 30
+	float muzzleFlashDuration;                // 38
+	float fadeOutTime;                        // 3C
+	float force;                              // 40
+	BGSSoundDescriptorForm* countdownSound;   // 48
+	BGSSoundDescriptorForm* deactivateSound;  // 50
+	TESObjectWEAP* defaultWeaponSource;       // 58
+	float coneSpread;                         // 60
+	float collisionRadius;                    // 64
+	float lifetime;                           // 68
+	float relaunchInterval;                   // 6C
+	BGSTextureSet* decalData;                 // 70
+	void* collisionLayer;        // 78 BGSCollisionLayer
+	BGSProjectile* vatsProjectile;            // 80
+	UInt64 tracerFrequency;              // 88
+};
+STATIC_ASSERT(sizeof(BGSProjectileData) == 0x90);
+
+class Projectile :
+	public TESBoundObject,            // 000
+	public TESFullName,               // 068
+	public TESModel,                  // 078
+	public BGSPreloadable,            // 0A8
+	public BGSDestructibleObjectForm  // 0B0
+{
+public:
+	//static constexpr auto RTTI{ RTTI::BGSProjectile };
+	//static constexpr auto VTABLE{ VTABLE::BGSProjectile };
+	//static constexpr auto FORM_ID{ ENUM_FORM_ID::kPROJ };
+
+	// members
+	BGSProjectileData data;                                  // 0C0
+	TESModel muzzleFlashModel;                               // 150
+	UInt64 soundLevel;  // 180
+};
+STATIC_ASSERT(sizeof(Projectile) == 0x188);
+
 	

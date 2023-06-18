@@ -41,10 +41,12 @@ RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
 RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
 RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
 RelocPtr  <void*> g_ActorEquipManager(0x5AB38D0);
-RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0);
-RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420);
-RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438);
-RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498);
+RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0); //2
+RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420); //4
+RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438); //5
+RelocPtr  <tArray<BGSKeyword*>> g_AnimArchetypeKeywordArray(0x59DA468); //7
+RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498); //9
+RelocPtr  <tArray<BGSKeyword*>> g_AnimFlavorKeywordArray(0x59DA588); //13
 RelocPtr <void*> g_sightedTransitionAnimValueHolder(0x58D5410);
 RelocPtr <void*> g_reloadSpeedAnimValueHolder(0x58D5390);
 RelocPtr <float> g_reloadSpeedMultiplier(0x2C48D60);
@@ -497,6 +499,13 @@ namespace Utilities
 		return g_InstantiationKeywordArray->GetItemIndex(keyword);
 	}
 
+	KeywordValue GetAnimFlavorValueForTypedKeyword(BGSKeyword* keyword)
+	{
+		if (!keyword)
+			return -1;
+		return g_AnimFlavorKeywordArray->GetItemIndex(keyword);
+	}
+
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
 	{
 		if (!attachPoints || !attachPointKW)
@@ -569,19 +578,19 @@ namespace Utilities
 			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
 			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 			{
-				_MESSAGE("api: %i", i);
+				//_MESSAGE("api: %i", i);
 				KeywordValue value = attachPoints->kewordValueArray[i];
 				if (value == parentValue)
 				{
 					KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&objectMod->unkB0);
-					_MESSAGE("if count: %i", instantiationData->count);
+					//_MESSAGE("if count: %i", instantiationData->count);
 					for (UInt32 i = 0; i < instantiationData->count; i++)
 						instantiationValues->push_back((*instantiationData)[i]);
 					break;
 				}
 			}
 		}
-		_MESSAGE("if counts: %i", instantiationValues->size());
+		//_MESSAGE("if counts: %i", instantiationValues->size());
 		return true;
 	}
 

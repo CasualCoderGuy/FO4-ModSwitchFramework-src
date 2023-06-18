@@ -244,7 +244,7 @@ namespace MSF_Base
 				bUpdateAnimGraph = true;
 			if (!AttachModToEquippedWeapon(playerActor, modToRemove, false, 2, bUpdateAnimGraph))
 			{
-				_MESSAGE("finishing1");
+				//_MESSAGE("finishing1");
 				MSF_MainData::modSwitchManager.FinishSwitch(switchData);
 				return false;
 			}
@@ -258,7 +258,7 @@ namespace MSF_Base
 			//	ClearSwitchFlags();
 			if (!AttachModToEquippedWeapon(playerActor, modToAttach, true, 2, (flags & SwitchData::bUpdateAnimGraph) != 0))
 			{
-				_MESSAGE("finishing2");
+				//_MESSAGE("finishing2");
 				MSF_MainData::modSwitchManager.FinishSwitch(switchData);
 				return false;
 			}

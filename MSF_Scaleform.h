@@ -241,7 +241,7 @@ public:
 	static void OpenMenu()
 	{
 		static BSFixedString menuName("MSFMenu");
-		_MESSAGE("opening menu");
+		//_MESSAGE("opening menu");
 		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
 	}
 

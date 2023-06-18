@@ -861,10 +861,10 @@ namespace MSF_Data
 				keydata = json["hotkeys"];
 				if (keydata.isArray())
 				{
-					_MESSAGE("hotkeys");
+					//_MESSAGE("hotkeys");
 					for (int i = 0; i < keydata.size(); i++)
 					{
-						_MESSAGE("i: %i", i);
+						//_MESSAGE("i: %i", i);
 						const Json::Value& key = keydata[i];
 						std::string keyID = key["keyID"].asString();
 						if (keyID == "")
@@ -876,10 +876,10 @@ namespace MSF_Data
 						if (itKb->type & KeybindData::bIsAmmo)
 							continue;
 						const Json::Value& modStruct = key["modData"];
-						_MESSAGE("beforeModStruct");
+						//_MESSAGE("beforeModStruct");
 						if (!modStruct.isArray()) /////!!!!!!
 						{
-							_MESSAGE("modStruct");
+							//_MESSAGE("modStruct");
 							std::string str = modStruct["apKeyword"].asString();
 							BGSKeyword* apKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
 							if (!apKeyword)
@@ -887,13 +887,13 @@ namespace MSF_Data
 							KeywordValue apValue = Utilities::GetAttachValueForTypedKeyword(apKeyword);
 							if (apValue < 0)
 								continue;
-							_MESSAGE("kw ok, modData: %p", itKb->modData);
+							//_MESSAGE("kw ok, modData: %p", itKb->modData);
 							UInt16 apflags = modStruct["apFlags"].asInt();
 							ModData* modData = itKb->modData;
 							//APattachReqs
 							if (!modData)
 							{
-								_MESSAGE("new ModData");
+								//_MESSAGE("new ModData");
 								modData = new ModData();
 								modData->attachParentValue = apValue;
 								modData->flags = apflags;
@@ -939,6 +939,15 @@ namespace MSF_Data
 											if (itMod != cycle->mods.end()) //overwrite?
 												continue;
 											UInt16 modflags = switchmod["modFlags"].asInt();
+											KeywordValue animFlavor = 0;
+											str = switchmod["animFlavor"].asString();
+											if (str != "")
+											{
+												BGSKeyword* flavor = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+												KeywordValue value = Utilities::GetAnimFlavorValueForTypedKeyword(flavor);
+												if (value != -1)
+													animFlavor = value;
+											}
 											//requirements
 											TESIdleForm* animIdle_1stP = nullptr;
 											TESIdleForm* animIdle_3rdP = nullptr;
