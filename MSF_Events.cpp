@@ -191,7 +191,7 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
-			delayTask delayEnd(10, true, &MSF_Base::EndSwitch, endFlag);
+			delayTask delayEnd(100, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -238,7 +238,6 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	}
 	else if (!_strcmpi("switchMod", name))
 	{
-		_MESSAGE("AnimSwitch");
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
@@ -249,15 +248,13 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 				MSF_Base::SwitchMod(switchData, true);
 			}
 		}
-		//_MESSAGE("Anim: switch");
 	}
 	else if (!_strcmpi("customAnimEnd", name))
 	{
-		_MESSAGE("customAnimEnd");
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_AnimNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
-			delayTask delayEnd(10, true, &MSF_Base::EndSwitch, endFlag);
+			delayTask delayEnd(100, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("toggleMenu", name))

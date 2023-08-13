@@ -1097,21 +1097,27 @@ namespace MSF_Data
 											//requirements
 											TESIdleForm* animIdle_1stP = nullptr;
 											TESIdleForm* animIdle_3rdP = nullptr;
+											TESIdleForm* animIdle_1stP_PA = nullptr;
+											TESIdleForm* animIdle_3rdP_PA = nullptr;
 											str = switchmod["animIdle_1stP"].asString();
 											if (str != "")
 												animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 											str = switchmod["animIdle_3rdP"].asString();
 											if (str != "")
 												animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+											str = switchmod["animIdle_1stP_PA"].asString();
+											if (str != "")
+												animIdle_1stP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+											str = switchmod["animIdle_3rdP_PA"].asString();
+											if (str != "")
+												animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 
 											ModData::Mod* modDataMod = new ModData::Mod();
 											modDataMod->mod = mod;
 											modDataMod->flags = modflags;
-											if (animIdle_1stP || animIdle_3rdP)
+											if (animIdle_1stP || animIdle_3rdP || animIdle_1stP_PA || animIdle_3rdP_PA)
 											{
-												AnimationData* animData = new AnimationData();
-												animData->animIdle_1stP = animIdle_1stP;
-												animData->animIdle_3rdP = animIdle_3rdP;
+												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA);
 												modDataMod->animData = animData;
 											}
 											cycle->mods.push_back(modDataMod);
@@ -1160,6 +1166,8 @@ namespace MSF_Data
 							continue;
 						TESIdleForm* animIdle_1stP = nullptr;
 						TESIdleForm* animIdle_3rdP = nullptr;
+						TESIdleForm* animIdle_1stP_PA = nullptr;
+						TESIdleForm* animIdle_3rdP_PA = nullptr;
 						str = animData["animIdle_1stP"].asString();
 						if (str != "")
 							animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
@@ -1170,6 +1178,16 @@ namespace MSF_Data
 							animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 						if (!animIdle_3rdP)
 							continue;
+						str = animData["animIdle_1stP_PA"].asString();
+						if (str != "")
+							animIdle_1stP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+						if (!animIdle_1stP_PA)
+							continue;
+						str = animData["animIdle_3rdP_PA"].asString();
+						if (str != "")
+							animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+						if (!animIdle_3rdP_PA)
+							continue;
 
 						auto itAnim = MSF_MainData::reloadAnimDataMap.find(weapon);
 						if (itAnim != MSF_MainData::reloadAnimDataMap.end())
@@ -1179,9 +1197,7 @@ namespace MSF_Data
 						}
 						else
 						{
-							AnimationData* animationData = new AnimationData();
-							animationData->animIdle_1stP = animIdle_1stP;
-							animationData->animIdle_3rdP = animIdle_3rdP;
+							AnimationData* animationData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA);
 							MSF_MainData::reloadAnimDataMap[weapon] = animationData;
 						}
 					}
@@ -1201,6 +1217,8 @@ namespace MSF_Data
 							continue;
 						TESIdleForm* animIdle_1stP = nullptr;
 						TESIdleForm* animIdle_3rdP = nullptr;
+						TESIdleForm* animIdle_1stP_PA = nullptr;
+						TESIdleForm* animIdle_3rdP_PA = nullptr;
 						str = animData["animIdle_1stP"].asString();
 						if (str != "")
 							animIdle_1stP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
@@ -1211,6 +1229,16 @@ namespace MSF_Data
 							animIdle_3rdP = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 						if (!animIdle_3rdP)
 							continue;
+						str = animData["animIdle_1stP_PA"].asString();
+						if (str != "")
+							animIdle_1stP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+						if (!animIdle_1stP_PA)
+							continue;
+						str = animData["animIdle_3rdP_PA"].asString();
+						if (str != "")
+							animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+						if (!animIdle_3rdP_PA)
+							continue;
 
 						auto itAnim = MSF_MainData::fireAnimDataMap.find(weapon);
 						if (itAnim != MSF_MainData::fireAnimDataMap.end())
@@ -1220,10 +1248,7 @@ namespace MSF_Data
 						}
 						else
 						{
-							AnimationData* animationData = new AnimationData();
-							animationData = new AnimationData();
-							animationData->animIdle_1stP = animIdle_1stP;
-							animationData->animIdle_3rdP = animIdle_3rdP;
+							AnimationData* animationData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA);
 							MSF_MainData::fireAnimDataMap[weapon] = animationData;
 						}
 					}
@@ -1787,36 +1812,84 @@ namespace MSF_Data
 	}
 
 	//========================= Animations =======================
-	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
+	TESIdleForm* GetReloadAnimation(Actor* actor)
 	{
+		if (!actor || !actor->equipData)
+			return nullptr;
+		SInt32 state = 7;
+		if (actor == *g_player)
+		{
+			PlayerCamera* playerCamera = *g_playerCamera;
+			SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
+		}
+		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+		if (!equippedWeap)
+			return nullptr;
+		bool isInPA = IsInPowerArmor(actor);
 		auto itAnim = MSF_MainData::reloadAnimDataMap.find(equippedWeap);
 		if (itAnim != MSF_MainData::reloadAnimDataMap.end())
 		{
-			if (get3rdP)
-				return itAnim->second->animIdle_3rdP;
-			else
-				return itAnim->second->animIdle_1stP;
+			if (state == 0)
+			{
+				if (isInPA)
+					return itAnim->second->animIdle_1stP_PA;
+				else
+					return itAnim->second->animIdle_1stP;
+			}
+			else if (state == 7 || state == 8)
+			{
+				if (isInPA)
+					return itAnim->second->animIdle_3rdP_PA;
+				else
+					return itAnim->second->animIdle_3rdP;
+			}
+			return nullptr;
 		}
-		if (get3rdP)
-			return MSF_MainData::reloadIdle3rdP;
-		else
+		if (state == 0)
 			return MSF_MainData::reloadIdle1stP;
+		else if (state == 7 || state == 8)
+			return MSF_MainData::reloadIdle3rdP;
+		return nullptr;
 	}
 
-	TESIdleForm* GetFireAnimation(TESObjectWEAP* equippedWeap, bool get3rdP)
+	TESIdleForm* GetFireAnimation(Actor* actor)
 	{
+		if (!actor || !actor->equipData)
+			return nullptr;
+		SInt32 state = 7;
+		if (actor == *g_player)
+		{
+			PlayerCamera* playerCamera = *g_playerCamera;
+			SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
+		}
+		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+		if (!equippedWeap)
+			return nullptr;
+		bool isInPA = IsInPowerArmor(actor);
 		auto itAnim = MSF_MainData::fireAnimDataMap.find(equippedWeap);
 		if (itAnim != MSF_MainData::fireAnimDataMap.end())
 		{
-			if (get3rdP)
-				return itAnim->second->animIdle_3rdP;
-			else
-				return itAnim->second->animIdle_1stP;
+			if (state == 0)
+			{
+				if (isInPA)
+					return itAnim->second->animIdle_1stP_PA;
+				else
+					return itAnim->second->animIdle_1stP;
+			}
+			else if (state == 7 || state == 8)
+			{
+				if (isInPA)
+					return itAnim->second->animIdle_3rdP_PA;
+				else
+					return itAnim->second->animIdle_3rdP;
+			}
+			return nullptr;
 		}
-		if (get3rdP)
-			return MSF_MainData::fireIdle3rdP;
-		else
-			return MSF_MainData::fireIdle1stP;
+		if (state == 0)
+			return MSF_MainData::reloadIdle1stP;
+		else if (state == 7 || state == 8)
+			return MSF_MainData::reloadIdle3rdP;
+		return nullptr;
 	}
 
 	//================= Interface Data ==================

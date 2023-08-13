@@ -780,20 +780,9 @@ namespace MSF_Base
 	bool ReloadWeapon()
 	{
 		Actor* playerActor = *g_player;
-		PlayerCamera* playerCamera = *g_playerCamera;
-		SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
-		TESObjectWEAP* eqWeap = DYNAMIC_CAST(playerActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
-		if (!eqWeap)
-			return false;
-		if (state == 0)
+		TESIdleForm* relIdle = MSF_Data::GetReloadAnimation(playerActor);
+		if (relIdle)
 		{
-			TESIdleForm* relIdle = MSF_Data::GetReloadAnimation(eqWeap, false);
-			Utilities::PlayIdle(playerActor, relIdle);
-			return true;
-		}
-		else if (state == 7 || state == 8)
-		{
-			TESIdleForm* relIdle = MSF_Data::GetReloadAnimation(eqWeap, true);
 			Utilities::PlayIdle(playerActor, relIdle);
 			return true;
 		}
@@ -813,16 +802,10 @@ namespace MSF_Base
 	{
 		if (!animData)
 			return false;
-		PlayerCamera* playerCamera = *g_playerCamera;
-		SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
-		if (state == 0 && animData->animIdle_1stP)
+		TESIdleForm* anim = animData->GetAnimation();
+		if (anim)
 		{
-			Utilities::PlayIdle(*g_player, animData->animIdle_1stP);
-			return true;
-		}
-		else if ((state == 7 || state == 8) && animData->animIdle_3rdP)
-		{
-			Utilities::PlayIdle(*g_player, animData->animIdle_3rdP);
+			Utilities::PlayIdle(*g_player, anim);
 			return true;
 		}
 		return false;

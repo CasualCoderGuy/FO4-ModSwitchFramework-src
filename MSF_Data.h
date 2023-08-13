@@ -21,9 +21,35 @@ public:
 class AnimationData
 {
 public:
-	// TESIdleForm* GetAnimation();
+	AnimationData(TESIdleForm* animIdle_1stP_in, TESIdleForm* animIdle_3rdP_in, TESIdleForm* animIdle_1stP_PA_in, TESIdleForm* animIdle_3rdP_PA_in)
+	{
+		animIdle_1stP = animIdle_1stP_in; animIdle_3rdP = animIdle_3rdP_in; animIdle_1stP_PA = animIdle_1stP_PA_in; animIdle_3rdP_PA = animIdle_3rdP_PA_in;
+	};
+	TESIdleForm* GetAnimation()
+	{
+		PlayerCamera* playerCamera = *g_playerCamera;
+		SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
+		bool isInPA = IsInPowerArmor(*g_player);
+		if (state == 0)
+		{
+			if (isInPA)
+				return animIdle_1stP_PA;
+			else
+				return animIdle_1stP;
+		}
+		else if (state == 7 || state == 8)
+		{
+			if (isInPA)
+				return animIdle_3rdP_PA;
+			else
+				return animIdle_3rdP;
+		}
+		return nullptr;
+	};
 	TESIdleForm* animIdle_1stP;
 	TESIdleForm* animIdle_3rdP;
+	TESIdleForm* animIdle_1stP_PA;
+	TESIdleForm* animIdle_3rdP_PA;
 	//BGSAction* animAction;
 };
 
@@ -455,8 +481,8 @@ namespace MSF_Data
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);
 	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack);
 	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
-	TESIdleForm* GetReloadAnimation(TESObjectWEAP* equippedWeap, bool get3rdP);
-	TESIdleForm* GetFireAnimation(TESObjectWEAP* equippedWeap, bool get3rdP);
+	TESIdleForm* GetReloadAnimation(Actor* actor);
+	TESIdleForm* GetFireAnimation(Actor* actor);
 	std::string GetFMString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetScopeString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetMuzzleString(TESObjectWEAP::InstanceData* instanceData);

@@ -512,6 +512,7 @@ typedef void(*_ChangeAnimArchetype)(Actor* target, BGSKeyword* archetypeKW);
 typedef void(*_ChangeAnimFlavor)(Actor* target, BGSKeyword* flavorKW);
 typedef void(*_CheckKeywordType)(BGSKeyword* keyword, UInt32 type); //7: AnimArchetype; 13: AnimFlavor
 typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
+typedef bool(*_IsInPowerArmor)(Actor* actor);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ShowNotification)(std::string text, UInt32 edx, UInt32 r8d);
@@ -553,6 +554,7 @@ extern RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype; //1387C10(vm*,0,act
 extern RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor; //1387CA0(vm*,0,actor*,kw*)
 extern RelocAddr <_CheckKeywordType> CheckKeywordType;
 extern RelocAddr <_IsInIronSights> IsInIronSights;
+extern RelocAddr <_IsInPowerArmor> IsInPowerArmor;
 extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
 extern RelocAddr <_FireWeaponInternal> FireWeaponInternal;
 extern RelocAddr <_ShowNotification> ShowNotification;
