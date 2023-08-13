@@ -49,6 +49,7 @@ WeaponStateStore MSF_MainData::weaponStateStore;
 KeywordValue MSF_MainData::ammoAP = 0;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
+UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
 std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
 Utilities::Timer MSF_MainData::tmr;
 
@@ -165,6 +166,22 @@ namespace MSF_Data
 		MSF_MainData::MCMfloatSettingMap[name] = value;
 	}
 
+	void ClearInternalKeybinds()
+	{
+		MSF_MainData::cancelSwitchHotkey = 0;
+		MSF_MainData::lowerWeaponHotkey = 0;
+		MSF_MainData::DEBUGprintStoredDataHotkey = 0;
+		MSF_MainData::keybindMap.clear();
+	}
+
+	void ClearNativeMSFKeybindsInMCM()
+	{
+	}
+
+	void ClearAllMSFKeybindsInMCM()
+	{
+	}
+
 	bool ReadMCMKeybindData()
 	{
 		try
@@ -177,12 +194,22 @@ namespace MSF_Data
 				Json::Reader reader;
 				reader.parse(file, json);
 
+				if (!reader.good())
+				{
+					std::string err = reader.getFormattedErrorMessages();
+					_ERROR("JSON data parser: Failed to read MCM keybind data. Detailed error message:");
+					_MESSAGE("%s", err.c_str());
+					return false;
+				}
+
 				if (json["version"].asInt() < 1)
 					return false;
 
 				keybinds = json["keybinds"];
 				if (!keybinds.isArray())
 					return false;
+
+				ClearInternalKeybinds();
 
 				for (int i = 0; i < keybinds.size(); i++)
 				{
@@ -206,6 +233,14 @@ namespace MSF_Data
 						UInt64 key = (modifiers << 32) + keyCode;
 						if (key)
 							MSF_MainData::lowerWeaponHotkey = key;
+					}
+					else if (id == "MSF_DATA")
+					{
+						UInt64 keyCode = keybind["keycode"].asInt();
+						UInt64 modifiers = keybind["modifiers"].asInt();
+						UInt64 key = (modifiers << 32) + keyCode;
+						if (key)
+							MSF_MainData::DEBUGprintStoredDataHotkey = key;
 					}
 					else
 					{
@@ -272,6 +307,14 @@ namespace MSF_Data
 					Json::Reader reader;
 					reader.parse(file, json);
 
+					if (!reader.good())
+					{
+						std::string err = reader.getFormattedErrorMessages();
+						_ERROR("JSON keybind parser: Syntax error in %s, skipping datafile. Detailed error message:", modName.c_str());
+						_MESSAGE("%s", err.c_str());
+						continue;
+					}
+				
 					if (json["version"].asInt() < MIN_SUPPORTED_KB_VERSION)
 					{
 						_ERROR("Unsupported keybind version: %s", keybindFiles[i].cFileName);
@@ -280,7 +323,10 @@ namespace MSF_Data
 
 					keybinds = json["keybinds"];
 					if (!keybinds.isArray())
-						return false;
+					{
+						_MESSAGE("Keybind read error in %s: 'keybinds' must be a json array", modName.c_str());
+						continue;
+					}
 
 					for (int i = 0; i < keybinds.size(); i++)
 					{
@@ -288,16 +334,23 @@ namespace MSF_Data
 
 						std::string id = keybind["id"].asString();
 						if (id == "")
+						{
+							_MESSAGE("Keybind read error in %s: 'id' can not be an empty string", modName.c_str());
 							continue;
+						}
 
 						auto kbIt = MSF_MainData::keybindIDMap.find(id);
 						if (kbIt != MSF_MainData::keybindIDMap.end())
 						{
+							_MESSAGE("Keybind read warning in %s: keybind with id '%s' has been overwritten", modName.c_str(), id.c_str());
 							KeybindData* kb = kbIt->second;
 							std::string menuName = keybind["menuName"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
 							if ((menuName == "") && (flags & KeybindData::bHUDselection))
-								break;
+							{
+								_MESSAGE("Keybind read error in %s: if 'bHUDselection' flag is set 'menuName' can not be an empty string", modName.c_str());
+								continue;
+							}
 							if (flags & KeybindData::bHUDselection)
 							{
 								UInt8 type = 0;
@@ -309,6 +362,7 @@ namespace MSF_Data
 									type = ModSelectionMenu::kType_ModMenu;
 								if (kb->selectMenu)
 								{
+									_MESSAGE("Keybind read warning in %s: mod selection menu data in keybind with id '%s' has been overwritten", modName.c_str(), id.c_str());
 									kb->selectMenu->scaleformName = menuName;
 									kb->selectMenu->type = type;
 								}
@@ -326,7 +380,10 @@ namespace MSF_Data
 							std::string menuName = keybind["menuName"].asString();
 							UInt8 flags = keybind["keyfunction"].asInt();
 							if (menuName == "" && (flags & KeybindData::bHUDselection))
+							{
+								_MESSAGE("Keybind read error in %s: if 'bHUDselection' flag is set 'menuName' can not be an empty string", modName.c_str());
 								continue;
+							}
 							KeybindData* kb = new KeybindData();
 							kb->functionID = id;
 							kb->type = flags;
@@ -536,10 +593,41 @@ namespace MSF_Data
 				Json::Reader reader;
 				reader.parse(file, json);
 
+				if (!reader.good())
+				{
+					std::string err = reader.getFormattedErrorMessages();
+					_ERROR("JSON data parser: Syntax error in %s, skipping datafile. Detailed error message:", fileName.c_str());
+					_MESSAGE("%s", err.c_str());
+					return false;
+				}
+
 				if (json["version"].asInt() < MIN_SUPPORTED_DATA_VERSION)
 				{
-					_ERROR("Unsupported data version: %s", fileName.c_str());
-					return true;
+					_ERROR("JSON data: Unsupported data version in %s", fileName.c_str());
+					return false;
+				}
+
+				data1 = json["plugins"];
+				if (data1.isArray())
+				{
+					for (int i = 0; i < data1.size(); i++)
+					{
+						//const Json::Value& dataN = data1[i];
+						//std::string pluginName = dataN["pluginName"].asString();
+						std::string pluginName = data1[i].asString();
+						if (pluginName == "")
+							continue;
+						UInt8 espModIndex = (*g_dataHandler)->GetLoadedModIndex(pluginName.c_str());
+						if (espModIndex == 0xFF)
+						{
+							UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(pluginName.c_str());
+							if (eslModIndex == 0xFFFF)
+							{
+								_ERROR("JSON data: Missing required plugin file (%s) in %s", pluginName.c_str(), fileName.c_str());
+								return false;
+							}
+						}
+					}
 				}
 
 				data1 = json["compatibility"];
@@ -556,7 +644,11 @@ namespace MSF_Data
 							else
 								MSF_MainData::baseModCompatibilityKW = apKW;
 						}
+						else
+							_MESSAGE("Data error in %s: keyword with identifier '%s' or its value could not be found in loaded game data", fileName.c_str(), apKWstr.c_str());
 					}
+					else 
+						_MESSAGE("Data error in %s: 'apKWstr' must have a non-empty string value", fileName.c_str());
 					data2 = data1["attachParent"];
 					if (data2.isArray())
 					{
@@ -565,17 +657,29 @@ namespace MSF_Data
 							const Json::Value& apData = data2[i];
 							std::string str = apData["mod"].asString();
 							if (str == "")
+							{
+								_MESSAGE("Data error in %s: 'compatibility->attachParent->mod' can not be an empty string", fileName.c_str());
 								continue;
+							}
 							BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 							if (!mod)
+							{
+								_MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), str.c_str());
 								continue;
+							}
 							str = apData["apKeyword"].asString();
 							if (str == "")
+							{
+								_MESSAGE("Data error in %s: 'compatibility->attachParent->apKeyword' can not be an empty string", fileName.c_str());
 								continue;
+							}
 							BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
 							KeywordValue value = Utilities::GetAttachValueForTypedKeyword(apKW);
 							if (!apKW || value < 0)
+							{
+								_MESSAGE("Data error in %s: attach parent keyword '%s' or its value could not be found in loaded game data", fileName.c_str(), str.c_str());
 								continue;
+							}
 							std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
 							if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
 							{
@@ -597,131 +701,134 @@ namespace MSF_Data
 							}
 						}
 					}
-				}
 
-				data2 = data1["attachChildren"];
-				if (data2.isArray())
-				{
-					for (int i = 0; i < data2.size(); i++)
+					data2 = data1["attachChildren"];
+					if (data2.isArray())
 					{
-						const Json::Value& apData = data2[i];
-						std::string str = apData["mod"].asString();
-						if (str == "")
-							continue;
-						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-						if (!mod)
-							continue;
-						str = apData["apKeyword"].asString();
-						if (str == "")
-							continue;
-						bool bRemove = apData["bRemove"].asBool();
-						BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
-						KeywordValue value = Utilities::GetAttachValueForTypedKeyword(apKW);
-						if (!apKW || value < 0)
-							continue;
-						std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
-						if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+						for (int i = 0; i < data2.size(); i++)
 						{
-							std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedAPslots.begin(), compIt->second->addedAPslots.end(), value);
-							const char* removedstr = "added";
-							if (foundEntry == compIt->second->addedAPslots.end())
+							const Json::Value& apData = data2[i];
+							std::string str = apData["mod"].asString();
+							if (str == "")
 							{
-								foundEntry = std::find(compIt->second->removedAPslots.begin(), compIt->second->removedAPslots.end(), value);
-								removedstr = "removed";
+								_MESSAGE("Data error in %s: 'compatibility->attachChildren->mod' can not be an empty string", fileName.c_str());
+								continue;
 							}
-							if (foundEntry != compIt->second->addedAPslots.end())
+							BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+							if (!mod)
 							{
-								_WARNING("Conflict: attach children for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
-									Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+								_MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), str.c_str());
+								continue;
 							}
-							else if (bRemove)
-								compIt->second->removedAPslots.push_back(value);
+							str = apData["apKeyword"].asString();
+							if (str == "")
+							{
+								_MESSAGE("Data error in %s: 'compatibility->attachChildren->apKeyword' can not be an empty string", fileName.c_str());
+								continue;
+							}
+							bool bRemove = apData["bRemove"].asBool();
+							BGSKeyword* apKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+							KeywordValue value = Utilities::GetAttachValueForTypedKeyword(apKW);
+							if (!apKW || value < 0)
+							{
+								_MESSAGE("Data error in %s: attach parent keyword '%s' or its value could not be found in loaded game data", fileName.c_str(), str.c_str());
+								continue;
+							}
+							std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
+							if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+							{
+								std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedAPslots.begin(), compIt->second->addedAPslots.end(), value);
+								const char* removedstr = "added";
+								if (foundEntry == compIt->second->addedAPslots.end())
+								{
+									foundEntry = std::find(compIt->second->removedAPslots.begin(), compIt->second->removedAPslots.end(), value);
+									removedstr = "removed";
+								}
+								if (foundEntry != compIt->second->addedAPslots.end())
+								{
+									_WARNING("Conflict: attach children for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
+										Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+								}
+								else if (bRemove)
+									compIt->second->removedAPslots.push_back(value);
+								else
+									compIt->second->addedAPslots.push_back(value);
+							}
 							else
-								compIt->second->addedAPslots.push_back(value);
-						}
-						else
-						{
-							ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
-							compatibility->attachParent = 0;
-							if (bRemove)
-								compatibility->removedAPslots.push_back(value);
-							else
-								compatibility->addedAPslots.push_back(value);
-							MSF_MainData::compatibilityEdits[mod] = compatibility;
+							{
+								ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
+								compatibility->attachParent = 0;
+								if (bRemove)
+									compatibility->removedAPslots.push_back(value);
+								else
+									compatibility->addedAPslots.push_back(value);
+								MSF_MainData::compatibilityEdits[mod] = compatibility;
+							}
 						}
 					}
-				}
 
-				data2 = data1["instantiationKWs"];
-				if (data2.isArray())
-				{
-					for (int i = 0; i < data2.size(); i++)
+					data2 = data1["instantiationKWs"];
+					if (data2.isArray())
 					{
-						const Json::Value& ifData = data2[i];
-						std::string str = ifData["mod"].asString();
-						if (str == "")
-							continue;
-						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-						if (!mod)
-							continue;
-						str = ifData["ifKeyword"].asString();
-						if (str == "")
-							continue;
-						bool bRemove = ifData["bRemove"].asBool();
-						BGSKeyword* ifKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
-						KeywordValue value = Utilities::GetInstantiationValueForTypedKeyword(ifKW);
-						if (!ifKW || value < 0)
-							continue;
-						std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
-						if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+						for (int i = 0; i < data2.size(); i++)
 						{
-							std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedFilters.begin(), compIt->second->addedFilters.end(), value);
-							const char* removedstr = "added";
-							if (foundEntry == compIt->second->addedFilters.end())
+							const Json::Value& ifData = data2[i];
+							std::string str = ifData["mod"].asString();
+							if (str == "")
 							{
-								foundEntry = std::find(compIt->second->removedFilters.begin(), compIt->second->removedFilters.end(), value);
-								removedstr = "removed";
+								_MESSAGE("Data error in %s: 'compatibility->instantiationKWs->mod' can not be an empty string", fileName.c_str());
+								continue;
 							}
-							if (foundEntry != compIt->second->addedFilters.end())
+							BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+							if (!mod)
 							{
-								_WARNING("Conflict: instantiation filter for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
-									Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+								_MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), str.c_str());
+								continue;
 							}
-							else if (bRemove)
-								compIt->second->removedFilters.push_back(value);
+							str = ifData["ifKeyword"].asString();
+							if (str == "")
+							{
+								_MESSAGE("Data error in %s: 'compatibility->instantiationKWs->apKeyword' can not be an empty string", fileName.c_str());
+								continue;
+							}
+							bool bRemove = ifData["bRemove"].asBool();
+							BGSKeyword* ifKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+							KeywordValue value = Utilities::GetInstantiationValueForTypedKeyword(ifKW);
+							if (!ifKW || value < 0)
+							{
+								_MESSAGE("Data error in %s: instantiation keyword '%s' or its value could not be found in loaded game data", fileName.c_str(), str.c_str());
+								continue;
+							}
+							std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*>::iterator compIt = MSF_MainData::compatibilityEdits.find(mod);
+							if (compIt != MSF_MainData::compatibilityEdits.end() && compIt->second)
+							{
+								std::vector<KeywordValue>::iterator foundEntry = std::find(compIt->second->addedFilters.begin(), compIt->second->addedFilters.end(), value);
+								const char* removedstr = "added";
+								if (foundEntry == compIt->second->addedFilters.end())
+								{
+									foundEntry = std::find(compIt->second->removedFilters.begin(), compIt->second->removedFilters.end(), value);
+									removedstr = "removed";
+								}
+								if (foundEntry != compIt->second->addedFilters.end())
+								{
+									_WARNING("Conflict: instantiation filter for mod with formID: %s already has %s keyword: %s. Ignoring keyword in file %s",
+										Utilities::GetIdentifierFromForm(compIt->first), removedstr, str.c_str(), fileName.c_str());
+								}
+								else if (bRemove)
+									compIt->second->removedFilters.push_back(value);
+								else
+									compIt->second->addedFilters.push_back(value);
+							}
 							else
-								compIt->second->addedFilters.push_back(value);
-						}
-						else
-						{
-							ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
-							compatibility->attachParent = 0;
-							if (bRemove)
-								compatibility->removedFilters.push_back(value);
-							else
-								compatibility->addedFilters.push_back(value);
-							MSF_MainData::compatibilityEdits[mod] = compatibility;
-						}
-					}
-				}
-
-				
-				data1 = json["plugins"];
-				if (data1.isArray())
-				{
-					for (int i = 0; i < data1.size(); i++)
-					{
-						//const Json::Value& dataN = data1[i];
-						//std::string pluginName = dataN["pluginName"].asString();
-						std::string pluginName = data1[i].asString();
-						if (pluginName == "")
-							continue;
-						UInt8 espModIndex = (*g_dataHandler)->GetLoadedModIndex(pluginName.c_str());
-						if (espModIndex == 0xFF)
-						{
-							UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(pluginName.c_str());
-							if (eslModIndex == 0xFFFF)
-								return false;
+							{
+								ModCompatibilityEdits* compatibility = new ModCompatibilityEdits();
+								compatibility->attachParent = 0;
+								if (bRemove)
+									compatibility->removedFilters.push_back(value);
+								else
+									compatibility->addedFilters.push_back(value);
+								MSF_MainData::compatibilityEdits[mod] = compatibility;
+							}
 						}
 					}
 				}
@@ -734,10 +841,10 @@ namespace MSF_Data
 						const Json::Value& ammoData = data1[i];
 						std::string str = ammoData["baseAmmo"].asString();
 						if (str == "")
-							continue;
+						{ _MESSAGE("Data error in %s: 'ammoData->baseAmmo' can not be an empty string", fileName.c_str()); continue; }
 						TESAmmo* baseAmmo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESAmmo);
 						if (!baseAmmo)
-							continue;
+						{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), str.c_str()); continue; }
 						BGSMod::Attachment::Mod* baseMod = nullptr;
 						//str = ammoData["baseMod"].asString();
 						//if (str != "")
@@ -752,6 +859,7 @@ namespace MSF_Data
 						auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 						if (itAD != MSF_MainData::ammoDataMap.end())
 						{
+							_MESSAGE("Data warning in %s: ammo data with base ammo '%s' has been overwritten", fileName.c_str(), str.c_str());
 							AmmoData* itAmmoData = itAD->second;
 							itAmmoData->baseAmmoData.mod = baseMod;
 							itAmmoData->baseAmmoData.ammoID = ammoIDbase;
@@ -764,29 +872,31 @@ namespace MSF_Data
 									const Json::Value& ammoType = data2[i2];
 									std::string type = ammoType["ammo"].asString();
 									if (type == "")
-										continue;
+									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->ammo' can not be an empty string", fileName.c_str()); continue; }
 									TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
 									if (!ammo)
-										continue;
+									{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									type = ammoType["mod"].asString();
 									if (type == "")
-										continue;
+									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->mod' can not be an empty string", fileName.c_str()); continue; }
 									BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(type), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 									if (!mod)
-										continue;
+									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-										continue;
+									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									UInt8 spawnChance = ammoType["spawnChance"].asInt();
 
 									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin();
 									for (itAmmoMod; itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 									{
+										_MESSAGE("Data warning in %s: ammo type '%s' with base ammo '%s' has been overwritten", fileName.c_str(), type.c_str(), str.c_str());
 										if (itAmmoMod->ammo == ammo)
 										{
 											itAmmoMod->mod = mod;
 											itAmmoMod->ammoID = ammoID;
 											itAmmoMod->spawnChance = spawnChance;
+											break;
 										}
 									}
 									if (itAmmoMod == itAmmoData->ammoMods.end())
@@ -816,18 +926,18 @@ namespace MSF_Data
 									const Json::Value& ammoType = data2[i2];
 									std::string type = ammoType["ammo"].asString();
 									if (type == "")
-										continue;
+									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->ammo' can not be an empty string", fileName.c_str()); continue; }
 									TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
 									if (!ammo)
-										continue;
+									{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									type = ammoType["mod"].asString();
 									if (type == "")
-										continue;
+									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->mod' can not be an empty string", fileName.c_str()); continue; }
 									BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(type), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 									if (!mod)
-										continue;
+									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-										continue;
+									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									UInt8 spawnChance = ammoType["spawnChance"].asInt();
 
@@ -836,9 +946,11 @@ namespace MSF_Data
 									{
 										if (itAmmoMod->ammo == ammo)
 										{
+											_MESSAGE("Data warning in %s: ammo type '%s' with base ammo '%s' has been overwritten", fileName.c_str(), type.c_str(), str.c_str());
 											itAmmoMod->mod = mod;
 											itAmmoMod->ammoID = ammoID;
 											itAmmoMod->spawnChance = spawnChance;
+											break;
 										}
 									}
 									if (itAmmoMod == ammoDataStruct->ammoMods.end())
@@ -854,6 +966,11 @@ namespace MSF_Data
 							}
 							if (ammoDataStruct->ammoMods.size() > 0)
 								MSF_MainData::ammoDataMap[baseAmmo] = ammoDataStruct;
+							else
+							{
+								_MESSAGE("Data error in %s: ignoring new base ammo '%s' because it has no associated ammo types", fileName.c_str(), str.c_str());
+								delete ammoDataStruct;
+							}
 						}
 					}
 				}
@@ -861,39 +978,49 @@ namespace MSF_Data
 				keydata = json["hotkeys"];
 				if (keydata.isArray())
 				{
-					//_MESSAGE("hotkeys");
 					for (int i = 0; i < keydata.size(); i++)
 					{
-						//_MESSAGE("i: %i", i);
 						const Json::Value& key = keydata[i];
 						std::string keyID = key["keyID"].asString();
 						if (keyID == "")
-							continue;
+						{
+							_MESSAGE("Data error in %s: 'hotkeys->keyID' can not be an empty string", fileName.c_str()); continue;
+						}
 						auto kb = MSF_MainData::keybindIDMap.find(keyID);
 						if (kb == MSF_MainData::keybindIDMap.end())
-							continue;
+						{
+							_MESSAGE("Data error in %s: keybind with keyID '%s' could not be found in the loaded keybind data files, skipping all of its data entirely", fileName.c_str(), keyID.c_str()); continue;
+						}
 						KeybindData* itKb = kb->second;
 						if (itKb->type & KeybindData::bIsAmmo)
-							continue;
+						{
+							_MESSAGE("Data error in %s: keybind with keyID '%s' is flagged as ammo, skipping all of its data in 'hotkeys' section", fileName.c_str(), keyID.c_str()); continue;
+						}
 						const Json::Value& modStruct = key["modData"];
-						//_MESSAGE("beforeModStruct");
 						if (!modStruct.isArray()) /////!!!!!!
 						{
-							//_MESSAGE("modStruct");
-							std::string str = modStruct["apKeyword"].asString();
-							BGSKeyword* apKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+							std::string apstr = modStruct["apKeyword"].asString();
+							if (apstr == "")
+							{
+								_MESSAGE("Data error in %s: 'hotkeys->modData->apKeyword' can not be an empty string", fileName.c_str()); continue;
+							}
+							BGSKeyword* apKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(apstr), TESForm, BGSKeyword);
 							if (!apKeyword)
+							{
+								_MESSAGE("Data error in %s: attach parent keyword '%s' could not be found in loaded game data", fileName.c_str(), apstr.c_str());
 								continue;
+							}
 							KeywordValue apValue = Utilities::GetAttachValueForTypedKeyword(apKeyword);
 							if (apValue < 0)
+							{
+								_MESSAGE("Data error in %s: attach parent keyword '%s' value could not be found in loaded game data", fileName.c_str(), apstr.c_str());
 								continue;
-							//_MESSAGE("kw ok, modData: %p", itKb->modData);
+							}
 							UInt16 apflags = modStruct["apFlags"].asInt();
 							ModData* modData = itKb->modData;
 							//APattachReqs
 							if (!modData)
 							{
-								//_MESSAGE("new ModData");
 								modData = new ModData();
 								modData->attachParentValue = apValue;
 								modData->flags = apflags;
@@ -904,13 +1031,23 @@ namespace MSF_Data
 								for (int i = 0; i < modCycles.size(); i++)
 								{
 									const Json::Value& modCycle = modCycles[i];
-									str = modCycle["ifKeyword"].asString();
-									BGSKeyword* ifKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+									std::string ifstr = modCycle["ifKeyword"].asString();
+									if (ifstr == "")
+									{
+										_MESSAGE("Data error in %s: 'hotkeys->modData->modArrays->ifKeyword' can not be an empty string", fileName.c_str()); continue;
+									}
+									BGSKeyword* ifKeyword = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(ifstr), TESForm, BGSKeyword);
 									if (!ifKeyword)
+									{
+										_MESSAGE("Data error in %s: instantiation keyword '%s' could not be found in loaded game data", fileName.c_str(), ifstr.c_str());
 										continue;
+									}
 									KeywordValue ifValue = Utilities::GetInstantiationValueForTypedKeyword(ifKeyword);
 									if (ifValue < 0)
+									{
+										_MESSAGE("Data error in %s: instantiation keyword value '%s' could not be found in loaded game data", fileName.c_str(), ifstr.c_str());
 										continue;
+									}
 									UInt16 ifflags = modCycle["ifFlags"].asInt();
 									auto itCycle = modData->modCycleMap.find(ifValue);
 									ModData::ModCycle* cycle = nullptr;
@@ -927,17 +1064,26 @@ namespace MSF_Data
 										for (int i = 0; i < mods.size(); i++)
 										{
 											const Json::Value& switchmod = mods[i];
-											str = switchmod["mod"].asString();
+											std::string str = switchmod["mod"].asString();
 											if (str == "")
-												continue;
+											{
+												_MESSAGE("Data error in %s: 'hotkeys->modData->modArrays->mods->mod' can not be an empty string", fileName.c_str()); continue;
+											}
 											BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 											if (!mod || mod->unkC0 != apValue)
+											{
+												_MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data or its attach parent is not %s", fileName.c_str(), str.c_str(), apstr.c_str());
 												continue;
+											}
 											ModData::ModVector::iterator itMod = std::find_if(cycle->mods.begin(), cycle->mods.end(), [mod](ModData::Mod* data){
 												return data->mod == mod;
 											});
 											if (itMod != cycle->mods.end()) //overwrite?
+											{
+												_WARNING("Conflict in %s: mod %s is already in mod cycle with instantiation filter %s", fileName.c_str(), str.c_str(), ifstr.c_str());
 												continue;
+											}
+										
 											UInt16 modflags = switchmod["modFlags"].asInt();
 											KeywordValue animFlavor = 0;
 											str = switchmod["animFlavor"].asString();
@@ -973,6 +1119,7 @@ namespace MSF_Data
 									}
 									if (cycle->mods.size() < 1 || ((cycle->flags & ModData::ModCycle::bCannotHaveNullMod) && cycle->mods.size() < 2))
 									{
+										_MESSAGE("Data error in %s: ignoring new mod cycle with instantiation keyword '%s' because its size is below the minimum size requirement", fileName.c_str(), ifstr.c_str());
 										for (ModData::ModVector::iterator itMod = cycle->mods.begin(); itMod != cycle->mods.end(); itMod++)
 										{
 											ModData::Mod* modDataMod = *itMod;
@@ -986,6 +1133,7 @@ namespace MSF_Data
 							}
 							if (modData->modCycleMap.size() < 1)
 							{
+								_MESSAGE("Data error in %s: ignoring new mod data map with attach parent keyword '%s' because its size is below the minimum size requirement", fileName.c_str(), apstr.c_str());
 								//deletereqs
 								delete modData;
 								continue;
@@ -1176,7 +1324,6 @@ namespace MSF_Data
 						}
 					}
 				}
-				_MESSAGE("end True");
 				return true;
 			}
 		}
@@ -1185,8 +1332,70 @@ namespace MSF_Data
 			_WARNING("Warning - Failed to load Gameplay Data from %s.json", fileName.c_str());
 			return false;
 		}
-		_MESSAGE("end False");
 		return false;
+	}
+
+	void PrintStoredData()
+	{
+		_MESSAGE("");
+		_MESSAGE("storedDATA:");
+		_MESSAGE("MCM settings: %04X", MSF_MainData::MCMSettingFlags);
+		for (std::unordered_map<TESAmmo*, AmmoData*>::iterator it = MSF_MainData::ammoDataMap.begin(); it != MSF_MainData::ammoDataMap.end(); it++)
+		{
+			AmmoData* itAmmoData = it->second;
+			if (!itAmmoData)
+				continue;
+			_MESSAGE("baseAmmo: %08X; size: %i", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size());
+		}
+		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
+		{
+			KeybindData* itKb = it->second;
+			if (!itKb)
+				continue;
+			if (itKb->selectMenu)
+				_MESSAGE("kbID: %s; flags: %i; key: %i; swfName: %s; swfType: %i; swfVer: %08X", itKb->functionID.c_str(), itKb->type, itKb->keyCode, itKb->selectMenu->scaleformName.c_str(), itKb->selectMenu->type, itKb->selectMenu->version);
+			else
+				_MESSAGE("kbID: %s; flags: %i; key: %i", itKb->functionID.c_str(), itKb->type, itKb->keyCode);
+			if (!itKb->modData)
+				continue;
+			BGSKeyword* kw = nullptr;
+			g_AttachPointKeywordArray->GetNthItem(itKb->modData->attachParentValue, kw);
+			if (kw)
+				_MESSAGE("modData: apkeyword: %08X, flags: %08X, cycleCount: %i", kw->formID, itKb->modData->flags, itKb->modData->modCycleMap.size());
+			for (std::unordered_map<KeywordValue, ModData::ModCycle*>::iterator itCycles = itKb->modData->modCycleMap.begin(); itCycles != itKb->modData->modCycleMap.end(); itCycles++)
+			{
+				BGSKeyword* ifkw = nullptr;
+				g_InstantiationKeywordArray->GetNthItem(itCycles->first, ifkw);
+				ModData::ModCycle* cycle = itCycles->second;
+				if (ifkw && cycle)
+					_MESSAGE("-modCycle: ifkeyword: %08X, flags: %08X, modCount: %i", ifkw->formID, cycle->flags, cycle->mods.size());
+				for (std::vector<ModData::Mod*>::iterator itData = cycle->mods.begin(); itData != cycle->mods.end(); itData++)
+				{
+					ModData::Mod* mod = *itData;
+					if (mod->mod)
+						_MESSAGE("--MOD: %08X, flags: %08X", mod->mod->formID, mod->flags);
+				}
+			}
+		}
+
+
+		_MESSAGE("MCM float Settings:");
+		for (std::unordered_map<std::string, float>::iterator itSettings = MSF_MainData::MCMfloatSettingMap.begin(); itSettings != MSF_MainData::MCMfloatSettingMap.end(); itSettings++)
+			_MESSAGE("- %s : %f", itSettings->first.c_str(), itSettings->second);
+		_MESSAGE("weap reload:");
+		for (std::unordered_map<TESObjectWEAP*, AnimationData*>::iterator itAnim = MSF_MainData::reloadAnimDataMap.begin(); itAnim != MSF_MainData::reloadAnimDataMap.end(); itAnim++)
+			_MESSAGE("- %08X", itAnim->first->formID);
+		_MESSAGE("weap fire:");
+		for (std::unordered_map<TESObjectWEAP*, AnimationData*>::iterator itAnim = MSF_MainData::fireAnimDataMap.begin(); itAnim != MSF_MainData::fireAnimDataMap.end(); itAnim++)
+			_MESSAGE("- %08X", itAnim->first->formID);
+		for (std::vector<HUDFiringModeData>::iterator itData = MSF_MainData::fmDisplayData.begin(); itData != MSF_MainData::fmDisplayData.end(); itData++)
+			_MESSAGE("fmKeyword: %08X, display: %s", itData->keyword->formID, itData->displayString.c_str());
+		for (std::vector<HUDScopeData>::iterator itData = MSF_MainData::scopeDisplayData.begin(); itData != MSF_MainData::scopeDisplayData.end(); itData++)
+			_MESSAGE("scKeyword: %08X, display: %s", itData->keyword->formID, itData->displayString.c_str());
+		for (std::vector<HUDMuzzleData>::iterator itData = MSF_MainData::muzzleDisplayData.begin(); itData != MSF_MainData::muzzleDisplayData.end(); itData++)
+			_MESSAGE("mzKeyword: %08X, display: %s", itData->keyword->formID, itData->displayString.c_str());
+
+		_MESSAGE("");
 	}
 
 	//========================= Select Object Mod =======================
@@ -1304,7 +1513,7 @@ namespace MSF_Data
 		std::vector<KeywordValue> instantiationValues;
 		if (!Utilities::GetParentInstantiationValues(attachedMods, modData->attachParentValue, &instantiationValues))
 			return false;
-		_MESSAGE("if counts: %i", instantiationValues.size());
+		_MESSAGE("if counts: %i / %i", instantiationValues.size(), instantiationValues.capacity());
 
 		ModData::ModCycle* modCycle = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
@@ -1312,12 +1521,15 @@ namespace MSF_Data
 			KeywordValue value = *itData;
 			_MESSAGE("it: %i", value);
 			auto itCycle = modData->modCycleMap.find(value);
-			if (itCycle != modData->modCycleMap.end() && modCycle)
+			if (itCycle != modData->modCycleMap.end())
 			{
-				_MESSAGE("Ambiguity error");
-				return false;
+				if (modCycle)
+				{
+					_MESSAGE("Ambiguity error");
+					return false;
+				}
+				modCycle = itCycle->second;
 			}
-			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return false;

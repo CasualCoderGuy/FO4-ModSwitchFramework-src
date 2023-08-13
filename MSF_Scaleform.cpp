@@ -64,7 +64,6 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//MSF_Test::ListModTable(*g_player);
-				MSF_Test::PrintStoredData();
 				//MSF_Test::DumpAttachParent();
 				//MSF_Test::GetWeaponState();
 				//MSF_Test::DumpAttachParent();
@@ -137,6 +136,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 					Utilities::PlayIdleAction(*g_player, MSF_MainData::ActionGunDown);
 				if (key && key == MSF_MainData::cancelSwitchHotkey)
 					MSF_MainData::modSwitchManager.ClearQueue();
+				if (key && key == MSF_MainData::DEBUGprintStoredDataHotkey)
+					MSF_Data::PrintStoredData();
 				KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
 				if (!keyFn)
 					break;

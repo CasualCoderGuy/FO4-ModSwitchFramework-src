@@ -376,6 +376,7 @@ public:
 	static PlayerInventoryListEventSink playerInventoryEventSink;
 	static UInt64 cancelSwitchHotkey;
 	static UInt64 lowerWeaponHotkey;
+	static UInt64 DEBUGprintStoredDataHotkey;
 	static Utilities::Timer tmr;
 
 	//Data added by plugins
@@ -436,6 +437,9 @@ namespace MSF_Data
 	bool InitData();
 	bool InitCompatibility();
 	bool InitMCMSettings();
+	void ClearInternalKeybinds();
+	void ClearNativeMSFKeybindsInMCM();
+	void ClearAllMSFKeybindsInMCM();
 	bool ReadMCMKeybindData();
 	bool ReadKeybindData();
 	bool ReadUserSettings();
@@ -443,6 +447,7 @@ namespace MSF_Data
 	void AddFloatSetting(std::string name, float value);
 	bool LoadPluginData();
 	bool ReadDataFromJSON(std::string fileName, std::string location);
+	void PrintStoredData();
 	SwitchData* GetNthAmmoMod(UInt32 num);
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);

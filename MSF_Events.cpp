@@ -238,6 +238,7 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	}
 	else if (!_strcmpi("switchMod", name))
 	{
+		_MESSAGE("AnimSwitch");
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
@@ -252,6 +253,7 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	}
 	else if (!_strcmpi("customAnimEnd", name))
 	{
+		_MESSAGE("customAnimEnd");
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_AnimNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
