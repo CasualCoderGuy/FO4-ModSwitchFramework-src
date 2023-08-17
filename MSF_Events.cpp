@@ -1,4 +1,5 @@
 #include "MSF_Events.h"
+#include "MSF_WeaponState.h"
 
 //RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F4B24C);
 //RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F48D00);
@@ -31,7 +32,7 @@ EventResult	BGSOnPlayerModArmorWeaponEventSink::ReceiveEvent(BGSOnPlayerModArmor
 
 EventResult	TESCellFullyLoadedEventSink::ReceiveEvent(TESCellFullyLoadedEvent * evn, void * dispatcher)
 {
-	//MSF_Base::SpawnRandomMods(evn->cell);
+	MSF_Base::SpawnRandomMods(evn->cell);
 	//_MESSAGE("Cell evn");
 	return kEvent_Continue;
 }
@@ -51,6 +52,7 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 		MSF_MainData::modSwitchManager.ClearQueue();
 		MSF_MainData::modSwitchManager.CloseOpenedMenu();
 		MSF_Scaleform::UpdateWidgetData();
+		MSF_MainData::burstTestManager->HandleEquipEvent(evn->weaponInstance);
 	}
 
 	return kEvent_Continue;
@@ -172,6 +174,8 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
 	{
+		if (MSF_MainData::burstTestManager->flags & BurstModeData::bActive)
+			MSF_MainData::burstTestManager->ResetShotsOnReload();
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
@@ -223,17 +227,13 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	else if (!_strcmpi("weaponFire", name))
 	{
+		if (MSF_MainData::burstTestManager->flags & BurstModeData::bActive)
+			MSF_MainData::burstTestManager->HandleFireEvent();
 		//if (MSF_MainData::tmr.IsRunning())
 		//{
 		//	if (MSF_MainData::tmr.stop() < 1000)
 		//		MSF_Base::FireBurst(*g_player);
 		//}
-		//InterlockedDecrement16(&count);
-		//if (count)
-		//	delayTask delayReload(80, true, &Utilities::PlayIdle, *g_player, MSF_MainData::fireIdle1stP);
-		//	//Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
-		//else
-		//	InterlockedExchange16(&count, 3);
 		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
 	}
 	else if (!_strcmpi("switchMod", name))

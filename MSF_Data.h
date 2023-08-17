@@ -127,17 +127,36 @@ public:
 		delayTime = delay;
 		flags = settings;
 		numOfTotalShots = totalShots;
-	}
+	};
 	enum
 	{
 		bOnePullBurst = 0x01, //If FALSE, upon releasing the trigger the firing is stopped; if TRUE, all the shots will be fired in a burst
 		bResetShotCountOnRelease = 0x02, //If TRUE, upon releasing the trigger the shot count will reset; if FALSE, the shot count will not reset(only applies if bOnePullBurst is FALSE)
 		bResetShotCountOnReload = 0x04,
-		bActive = 0x08
+		bTypeAuto = 0x08,
+		bActive = 0x10
 	};
 	UInt32 delayTime; //Interval between two shots in a single burst(in milliseconds)
 	UInt8 flags;
 	UInt8 numOfTotalShots; //Number of shots fired during a single burst
+protected:
+	BurstModeData() {}
+};
+
+class BurstModeManager : public BurstModeData
+{
+public:
+	//BurstModeManager(BurstModeData* templateData, UInt8 bActive) : BurstModeData(templateData->delayTime, templateData->flags, templateData->numOfTotalShots) { numOfShotsFired = 0; SetState(bActive); }
+	BurstModeManager(BurstModeData* templateData, UInt8 bActive) { delayTime = templateData->delayTime; flags = templateData->flags; numOfTotalShots = templateData->numOfTotalShots;  numOfShotsFired = 0; SetState(bActive); };
+	bool HandleFireEvent();
+	bool HandleReleaseEvent();
+	bool ResetShotsOnReload();
+	bool FireWeapon();
+	bool HandleEquipEvent(TESObjectWEAP::InstanceData* weaponInstance); //ExtraDataList* extraDataList
+	bool HandleModChangeEvent(ExtraDataList* extraDataList);
+	bool SetState(UInt8 bActive);
+private:
+	volatile short numOfShotsFired;
 };
 
 class HUDDisplayData
@@ -405,6 +424,8 @@ public:
 	static UInt64 DEBUGprintStoredDataHotkey;
 	static Utilities::Timer tmr;
 
+	static BurstModeManager* burstTestManager;
+
 	//Data added by plugins
 	static std::unordered_map<UInt64, KeybindData*> keybindMap;
 	static std::unordered_map<std::string, KeybindData*> keybindIDMap;
@@ -426,6 +447,7 @@ public:
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
+	static BGSKeyword* FiringModBurstKW;
 	static BGSKeyword* FiringModeUnderbarrelKW;
 	static TESIdleForm* reloadIdle1stP;
 	static TESIdleForm* reloadIdle3rdP;
@@ -434,6 +456,7 @@ public:
 	static BGSAction* ActionFireSingle;
 	static BGSAction* ActionFireAuto;
 	static BGSAction* ActionReload;
+	static BGSAction* ActionRightRelease;
 	static BGSAction* ActionDraw;
 	static BGSAction* ActionGunDown;
 
@@ -480,7 +503,7 @@ namespace MSF_Data
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);
 	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack);
-	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
+	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);
 	std::string GetFMString(TESObjectWEAP::InstanceData* instanceData);

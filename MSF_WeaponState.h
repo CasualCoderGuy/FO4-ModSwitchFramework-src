@@ -14,17 +14,6 @@ public:
 	ObjectRefHandle refHandle;
 };
 
-class BurstModeManager : public BurstModeData
-{
-public:
-	BurstModeManager(BurstModeData* templateData, UInt8 bActive) : BurstModeData(templateData->delayTime, templateData->flags, templateData->numOfTotalShots) { numOfShotsFired = 0; SetState(bActive); }
-	bool HandleFireEvent();
-	bool ResetShotsOnReload();
-	bool SetState(UInt8 bActive);
-private:
-	volatile UInt8 numOfShotsFired;
-};
-
 class ExtraWeaponState : public BSExtraData
 {
 public:

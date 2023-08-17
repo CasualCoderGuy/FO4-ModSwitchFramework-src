@@ -743,33 +743,25 @@ namespace MSF_Base
 		for (UInt32 i = 0; i < cell->objectList.count; i++)
 		{
 			Actor* randomActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
-			if (!randomActor || randomActor == (*g_player))
+			if (!randomActor || !randomActor->equipData || randomActor == (*g_player))
 				continue;
-			TESObjectWEAP* firearm = (TESObjectWEAP*)randomActor->equipData->slots[41].item;
+			TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
 			if (!firearm)
 				continue;
-			TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
-			tArray<BGSMod::Attachment::Mod*> mods;
-			UInt32 count = 0;
-			MSF_Data::PickRandomMods(&mods, &ammo, &count);
-			if (ammo)
+			if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData && randomActor->middleProcess->unk08->equipData->equippedData)
 			{
-				VMArray<VMVariable> args;
-				VMVariable var1; VMVariable var2;
-				var1.Set(&ammo); args.Push(&var1); var2.Set(&count); args.Push(&var2);
-				CallFunctionNoWait(randomActor, "AddItem", args);
-			}
-			if (mods.count > 0)
-			{
-				VMArray<VMVariable> args;
-				VMVariable var1; VMVariable var2;
-				for (UInt32 n = 0; n < mods.count; n++)
+				TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
+				std::vector<BGSMod::Attachment::Mod*> mods;
+				UInt32 count = 0;
+				MSF_Data::PickRandomMods(&mods, &ammo, &count);
+				if (ammo)
+					Utilities::AddItem(randomActor, ammo, count, true);
+				for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)
 				{
-					args.Clear(); var1.Set(&firearm); args.Push(&var1); var2.Set(&mods[n]); args.Push(&var2);
-					CallFunctionNoWait(randomActor, "AttachModToInventoryItem", args);
+					Utilities::AttachModToInventoryItem(randomActor, firearm, *itMods);
 				}
+				//check mod association or inject to TESObjectWEAP at start
 			}
-			//check mod association or inject to TESObjectWEAP at start
 		}
 	}
 

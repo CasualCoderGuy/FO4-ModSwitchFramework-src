@@ -1,5 +1,89 @@
 #include "MSF_WeaponState.h"
 
+
+bool BurstModeManager::SetState(UInt8 bActive)
+{
+	flags ^= (-(bActive & BurstModeManager::bActive) ^ flags) & BurstModeManager::bActive;
+	return true;
+}
+
+bool BurstModeManager::HandleFireEvent()
+{
+	InterlockedIncrement16(&numOfShotsFired);
+	if (numOfShotsFired < numOfTotalShots)
+	{
+		if (!(flags & BurstModeData::bTypeAuto))
+			delayTask delayNextShot(delayTime, true, &BurstModeManager::FireWeapon, this);
+	}
+	else
+		InterlockedExchange16(&numOfShotsFired, 0);
+	return true;
+}
+
+bool BurstModeManager::ResetShotsOnReload()
+{
+	if (flags & BurstModeData::bResetShotCountOnReload)
+		InterlockedExchange16(&numOfShotsFired, 0);
+	return true;
+}
+
+bool BurstModeManager::HandleReleaseEvent()
+{
+	if (flags & BurstModeData::bResetShotCountOnRelease)
+		InterlockedExchange16(&numOfShotsFired, 0);
+	return true;
+}
+
+bool BurstModeManager::FireWeapon()
+{
+	if (!(flags & BurstModeData::bOnePullBurst))
+	{
+		if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
+		{
+			if (flags & BurstModeData::bResetShotCountOnRelease)
+				InterlockedExchange16(&numOfShotsFired, 0);
+			return true;
+		}
+	}
+	Actor* player = *g_player;
+	TESIdleForm* fireIdle = MSF_Data::GetFireAnimation(player);
+	if (fireIdle)
+		return Utilities::PlayIdle(player, fireIdle);
+	return false;
+}
+
+bool BurstModeManager::HandleEquipEvent(TESObjectWEAP::InstanceData* weaponInstance) //ExtraDataList* extraDataList
+{
+	InterlockedExchange16(&numOfShotsFired, 0);
+	if (!weaponInstance)
+	{
+		flags &= ~BurstModeData::bActive;
+		return false;
+	}
+	if (Utilities::WeaponInstanceHasKeyword(weaponInstance, MSF_MainData::FiringModBurstKW))
+		flags |= BurstModeData::bActive;
+	else
+		flags &= ~BurstModeData::bActive;
+	return true;
+}
+
+bool BurstModeManager::HandleModChangeEvent(ExtraDataList* extraDataList)
+{
+	InterlockedExchange16(&numOfShotsFired, 0);
+	if (!extraDataList)
+	{
+		flags &= ~BurstModeData::bActive;
+		return false;
+	}
+	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::FiringModBurstKW))
+		flags |= BurstModeData::bActive;
+	else
+		flags &= ~BurstModeData::bActive;
+	return true;
+}
+
 ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, DataHolderParentInstance &instance)
 {
 	type = kType_ExtraWeaponState;
@@ -171,11 +255,6 @@ bool ExtraWeaponState::HandleReloadEvent()
 bool ExtraWeaponState::HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
 
-}
-
-bool BurstModeManager::SetState(UInt8 bActive)
-{
-	flags ^= (-(bActive & BurstModeManager::bActive) ^ flags) & BurstModeManager::bActive;
 }
 
 bool ExtraWeaponState::SetParentRef(ObjectRefHandle refHandle)

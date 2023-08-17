@@ -22,6 +22,7 @@ RelocAddr <_IsInPowerArmor> IsInPowerArmor(0x09CC980);
 RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
+RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal(0x14038B0);
 RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
 RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
 RelocAddr <_UpdateEquipData> UpdateEquipData(0x01C0040);
@@ -170,6 +171,13 @@ namespace Utilities
 		item.item = form;
 		item.unk08 = 0;
 		RemoveItemNative((*g_gameVM)->m_virtualMachine, 0, target, item, count, bSilent, toContainer);
+	}
+
+	void AttachModToInventoryItem(TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod)
+	{
+		if (!objRef || !invItem || !mod)
+			return;
+		//AttachModToInventoryItem_Internal()
 	}
 
 	TESForm* GetFormFromIdentifier(const std::string& identifier)
@@ -799,23 +807,6 @@ namespace Utilities
 		}
 		return -1;
 	}
-
-	BGSInventoryItem::Stack* AddInventoryStack(BGSInventoryItem::Stack* startStack) // not working
-	{
-		if (!startStack)
-			return nullptr;
-		SInt32 startCount = startStack->count;
-		BGSInventoryItem::Stack* stack = startStack;
-		do
-		{
-			stack = stack->next;
-		} while (stack);
-		*stack = *startStack;
-		stack->count = startCount - 1;
-		startStack->count = 1;
-		return stack;
-	}
-
 
 }
 

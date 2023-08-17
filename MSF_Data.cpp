@@ -5,6 +5,7 @@
 #include "json/json.h"
 #include "RNG.h"
 #include <fstream>
+#include <random>
 
 std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
@@ -24,6 +25,7 @@ BGSKeyword* MSF_MainData::hasUniqueStateKW;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
+BGSKeyword* MSF_MainData::FiringModBurstKW;
 BGSKeyword* MSF_MainData::FiringModeUnderbarrelKW;
 TESIdleForm* MSF_MainData::reloadIdle1stP;
 TESIdleForm* MSF_MainData::reloadIdle3rdP;
@@ -34,12 +36,15 @@ BGSAction* MSF_MainData::ActionFireAuto;
 BGSAction* MSF_MainData::ActionReload;
 BGSAction* MSF_MainData::ActionDraw;
 BGSAction* MSF_MainData::ActionGunDown;
+BGSAction* MSF_MainData::ActionRightRelease;
 
 bool MSF_MainData::IsInitialized = false;
 int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
+
+BurstModeManager* MSF_MainData::burstTestManager = nullptr;
 
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
@@ -89,6 +94,7 @@ namespace MSF_Data
 		MSF_MainData::ammoAP = Utilities::GetAttachValueForTypedKeyword(ammoApkeyword);
 		MSF_MainData::NullMuzzleMod = (BGSMod::Attachment::Mod*)LookupFormByID((UInt32)0x004F21D);
 		MSF_MainData::CanHaveNullMuzzleKW = (BGSKeyword*)LookupFormByID((UInt32)0x01C9E78);
+		MSF_MainData::FiringModBurstKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000024);
 		MSF_MainData::FiringModeUnderbarrelKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000021);
 		MSF_MainData::hasUniqueStateKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000001);
 		MSF_MainData::fireIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004AE1));
@@ -100,6 +106,10 @@ namespace MSF_Data
 		MSF_MainData::ActionReload = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0004A56));
 		MSF_MainData::ActionDraw = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x00132AF));
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
+		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
+
+		BurstModeData bm(80, 0x07, 3);
+		MSF_MainData::burstTestManager = new BurstModeManager(&bm, 0);
 		
 		return true;
 	}
@@ -1766,7 +1776,7 @@ namespace MSF_Data
 		return ammoConverted;
 	}
 
-	bool PickRandomMods(tArray<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
+	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
 	{
 		TESAmmo* baseAmmo = *ammo;
 		*ammo = nullptr;
@@ -1776,31 +1786,47 @@ namespace MSF_Data
 			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
+
 				AmmoData* itAmmoData = itAD->second;
-				chance += itAmmoData->baseAmmoData.spawnChance;
-				UInt32 _chance = 0;
+
+				std::mt19937 generator(std::random_device{}());
+				std::vector<double> chances;
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				{
-					_chance += itAmmoMod->spawnChance;
-				}
-				if (_chance == 0)
-					return false;
-				chance += _chance - 1;
-				UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
-				_chance = itAmmoData->baseAmmoData.spawnChance - 1;
-				if (picked <= _chance)
-					return false;
-				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				{
-					_chance += itAmmoMod->spawnChance;
-					if (picked <= _chance)
-					{
-						mods->Push(itAmmoMod->mod);
-						*ammo = itAmmoMod->ammo;
-						*count = MSF_MainData::rng.RandomInt(6, 48);
-						break;
-					}
-				}
+					chances.push_back(itAmmoMod->spawnChance);
+
+				std::discrete_distribution<> distribution ( chances.begin(), chances.end() );
+
+				AmmoData::AmmoMod* chosenAmmoMod = &itAmmoData->ammoMods[distribution(generator)];
+
+				mods->push_back(chosenAmmoMod->mod);
+				*ammo = chosenAmmoMod->ammo;
+				*count = MSF_MainData::rng.RandomInt(6, 48);
+
+				//AmmoData* itAmmoData = itAD->second;
+				//chance += itAmmoData->baseAmmoData.spawnChance;
+				//UInt32 _chance = 0;
+				//for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				//{
+				//	_chance += itAmmoMod->spawnChance;
+				//}
+				//if (_chance == 0)
+				//	return false;
+				//chance += _chance - 1;
+				//UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
+				//_chance = itAmmoData->baseAmmoData.spawnChance - 1;
+				//if (picked <= _chance)
+				//	return false;
+				//for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				//{
+				//	_chance += itAmmoMod->spawnChance;
+				//	if (picked <= _chance)
+				//	{
+				//		mods->push_back(itAmmoMod->mod);
+				//		*ammo = itAmmoMod->ammo;
+				//		*count = MSF_MainData::rng.RandomInt(6, 48);
+				//		break;
+				//	}
+				//}
 				return true;
 			}
 		}

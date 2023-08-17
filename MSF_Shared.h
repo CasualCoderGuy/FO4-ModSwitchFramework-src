@@ -396,12 +396,12 @@ namespace Utilities
 	//void ShowMessagebox(std::string asText);
 	void AddItem(TESObjectREFR* target, TESForm* form, SInt32 count, bool bSilent);
 	void RemoveItem(TESObjectREFR* target, TESForm* form, SInt32 count, bool bSilent, TESObjectREFR* toContainer = nullptr);
+	void AttachModToInventoryItem(TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod);
 	bool ModActorValue(Actor* actor, ActorValueInfo* av, float val);
 	bool AddRemActorValue(Actor* actor, ActorValueInfo* av, bool bAdd);
 	bool AddRemKeyword(BGSKeywordForm* keywordForm, BGSKeyword* keyword, bool bAdd);
 	UInt32 AddRemFlag(UInt32 flagHolder, UInt32 flag, UInt8 bAdd, UInt8 op = 0);
 	float GetActorValue(tArray<Actor::ActorValueData>* avdata, UInt32 formId);
-	BGSInventoryItem::Stack* AddInventoryStack(BGSInventoryItem::Stack* startStack);
 
 
 	class Timer
@@ -484,6 +484,7 @@ public:
 
 };
 
+typedef void(*_AttachModToInventoryItem)(TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod);
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, ModifyModDataFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
@@ -559,6 +560,7 @@ extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
 extern RelocAddr <_FireWeaponInternal> FireWeaponInternal;
 extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;
+extern RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal;
 extern RelocAddr <_AttachModToStack> AttachRemoveModStack;
 extern RelocAddr <_UpdMidProc> UpdateMiddleProcess;
 extern RelocAddr <_UpdateEquipData> UpdateEquipData;

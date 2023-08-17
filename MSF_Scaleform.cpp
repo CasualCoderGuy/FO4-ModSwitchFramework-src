@@ -170,7 +170,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 	{
 		if (keyCode == 256) 
 		{
-			//burst up
+			if (MSF_MainData::burstTestManager->flags & BurstModeData::bActive)
+				MSF_MainData::burstTestManager->HandleReleaseEvent();
 		}
 	}
 }
