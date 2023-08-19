@@ -5,10 +5,14 @@
 //RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F48D00);
 RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F494DA);
 RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F4B080);
+
+
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget(0x0A0E9D2);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original(0x0A22D00);
 RelocPtr <UInt32> uAmmoCounterFadeTimeMS(0x375CF30); //A0E9C9
 RelocAddr <_tf1> tf1_HookTarget(0x2D442E0);
+
+RelocAddr <EquipHandler_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget(0x0E1F030);
 
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
@@ -52,7 +56,9 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 		MSF_MainData::modSwitchManager.ClearQueue();
 		MSF_MainData::modSwitchManager.CloseOpenedMenu();
 		MSF_Scaleform::UpdateWidgetData();
-		MSF_MainData::burstTestManager->HandleEquipEvent(evn->weaponInstance);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+		if (instanceData == evn->weaponInstance)
+			MSF_MainData::burstTestManager->HandleEquipEvent(instanceData);
 	}
 
 	return kEvent_Continue;
@@ -167,7 +173,17 @@ UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime)
 	return HUDShowAmmoCounter_Original(ammoCounter, visibleTime);
 }
 
-volatile short count = 3;
+UInt64 EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
+{
+	if (MSF_MainData::modSwitchManager.GetIgnoreAnimGraph())
+	{
+		_MESSAGE("animGraph ignored");
+		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(false);
+	}
+	else
+		UpdateAnimGraph(actor, unk_rdx);
+	return 0;
+}
 
 UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 {

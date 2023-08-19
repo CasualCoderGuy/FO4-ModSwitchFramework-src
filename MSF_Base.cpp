@@ -304,7 +304,7 @@ namespace MSF_Base
 		TESAmmo* ammoType = eqData->ammo;
 
 		UInt8 ret = 1;
-		
+
 		CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
 		ModifyModDataFunctor modFunctor(mod, &ret, bAttach);
 
@@ -321,26 +321,50 @@ namespace MSF_Base
 		idStruct.baseForm = weapBase;
 		idStruct.instanceData = newInstanceData;
 
-		actor->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-		UpdateMiddleProcess(actor->middleProcess, actor, idStruct, newInstanceData->equipSlot);
-		actor->middleProcess->unk08->unk290[1] = actor->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
+		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
+		EquipItemInternal(g_ActorEquipManager, actor, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);;
+		//actor->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
+		//UpdateMiddleProcess(actor->middleProcess, actor, idStruct, newInstanceData->equipSlot);
+		//actor->middleProcess->unk08->unk290[1] = actor->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
 
-		volatile long long* lockcnt = (volatile long long*)&actor->equipData->unk00;
-		InterlockedIncrement64(lockcnt);
-		UpdateEquipData(actor->equipData, idStruct, nullptr);
-		InterlockedDecrement64(lockcnt);
+		//UpdateEquippedWeaponData(actor->middleProcess->unk08->equipData->equippedData);
 
-		UpdateEnchantments(actor, idStruct, newList);
-		UInt8 unk1 = 1;
-		ActorStruct actorStruct;
-		actorStruct.actor = actor;
-		actorStruct.unk08 = &unk1;
-		UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+		//unkEquipSlotStruct equipSlotStruct;
+		//equipSlotStruct.unk00 = 0;
+		////equipSlotStruct.unk04 = 1;
+		//equipSlotStruct.equipSlot = newInstanceData->equipSlot;
+		//equipSlotStruct.unk10 = 0;
+		//equipSlotStruct.unk18 = 0x10000;
+		//newInstanceData->equipSlot->unk38 &= ~0b100;
+		//MainEquipHandler(g_ActorEquipManager, actor, idStruct, equipSlotStruct);
+		//UniversalEquipHandler(actor, idStruct, equipSlotStruct);
 
-		float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-		UpdateAnimValueFloat(&actor->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-		if (newInstanceData->firingData)
-			UpdateAnimValueFloat(&actor->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
+		//volatile long long* lockcnt = (volatile long long*)&actor->equipData->unk00;
+		//InterlockedIncrement64(lockcnt);
+		//UpdateEquipData(actor->equipData, idStruct, nullptr);
+		//InterlockedDecrement64(lockcnt);
+		//if (actor == *g_player)
+		//{
+		//	lockcnt = (volatile long long*)&(*g_player)->playerEquipData->unk00;
+		//	InterlockedIncrement64(lockcnt);
+		//	UpdateEquipData((*g_player)->playerEquipData, idStruct, nullptr);
+		//	InterlockedDecrement64(lockcnt);
+		//}
+		
+		//InterlockedIncrement(&newList->m_refCount);
+		//NiStuff(*g_player, weapBase, &newList, 0, false, 0);
+
+		//UpdateEnchantments(actor, idStruct, newList);
+		//UInt8 unk1 = 1;
+		//ActorStruct actorStruct;
+		//actorStruct.actor = actor;
+		//actorStruct.unk08 = &unk1;
+		//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+		//
+		//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+		//UpdateAnimValueFloat(&actor->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+		//if (newInstanceData->firingData)
+		//	UpdateAnimValueFloat(&actor->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
 
 		//unkEquipSlotStruct equipSlotStruct;
 		//equipSlotStruct.unk00 = 0;

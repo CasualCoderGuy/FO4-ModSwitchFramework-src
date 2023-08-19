@@ -261,6 +261,7 @@ public:
 class ModSwitchManager
 {
 private:
+	volatile UInt16 ignoreAnimGraphUpdate;
 	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
@@ -278,6 +279,7 @@ public:
 		displayedAmmoChoices.reserve(20);
 		displayedModChoices.reserve(20);
 		InterlockedExchange16((volatile short*)&switchState, 0);
+		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
@@ -289,6 +291,8 @@ public:
 	};
 	UInt16 GetState() { return switchState; };
 	void SetState(UInt16 state) { InterlockedExchange16((volatile short*)&switchState, state); };
+	void SetIgnoreAnimGraph(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, bIgnore); };
+	bool GetIgnoreAnimGraph() { return ignoreAnimGraphUpdate; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -398,6 +402,7 @@ public:
 	void Reset()
 	{
 		ClearQueue();
+		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		ClearDisplayChioces();

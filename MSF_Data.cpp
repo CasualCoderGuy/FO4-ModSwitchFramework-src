@@ -1787,20 +1787,26 @@ namespace MSF_Data
 			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
 
-				AmmoData* itAmmoData = itAD->second;
+				AmmoData* ammoData = itAD->second;
 
 				std::mt19937 generator(std::random_device{}());
 				std::vector<double> chances;
-				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+				chances.push_back(ammoData->baseAmmoData.spawnChance);
+				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = ammoData->ammoMods.begin(); itAmmoMod != ammoData->ammoMods.end(); itAmmoMod++)
 					chances.push_back(itAmmoMod->spawnChance);
 
-				std::discrete_distribution<> distribution ( chances.begin(), chances.end() );
+				std::discrete_distribution<> distribution(chances.begin(), chances.end());
+				int idx = distribution(generator);
 
-				AmmoData::AmmoMod* chosenAmmoMod = &itAmmoData->ammoMods[distribution(generator)];
+				if (idx > 0)
+				{
+					idx--;
+					AmmoData::AmmoMod* chosenAmmoMod = &ammoData->ammoMods[idx];
 
-				mods->push_back(chosenAmmoMod->mod);
-				*ammo = chosenAmmoMod->ammo;
-				*count = MSF_MainData::rng.RandomInt(6, 48);
+					mods->push_back(chosenAmmoMod->mod);
+					*ammo = chosenAmmoMod->ammo;
+					*count = MSF_MainData::rng.RandomInt(6, 48);
+				}
 
 				//AmmoData* itAmmoData = itAD->second;
 				//chance += itAmmoData->baseAmmoData.spawnChance;
@@ -1912,9 +1918,9 @@ namespace MSF_Data
 			return nullptr;
 		}
 		if (state == 0)
-			return MSF_MainData::reloadIdle1stP;
+			return MSF_MainData::fireIdle1stP;
 		else if (state == 7 || state == 8)
-			return MSF_MainData::reloadIdle3rdP;
+			return MSF_MainData::fireIdle3rdP;
 		return nullptr;
 	}
 

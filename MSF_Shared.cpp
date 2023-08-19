@@ -20,6 +20,8 @@ RelocAddr <_CheckKeywordType> CheckKeywordType(0x0568FF0);
 RelocAddr <_IsInIronSights> IsInIronSights(0x13911D0);
 RelocAddr <_IsInPowerArmor> IsInPowerArmor(0x09CC980);
 RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
+RelocAddr <_UseAmmo> FireWeaponInternal(0x0EFCE90);
+RelocAddr <_ReloadWeapon> ReloadWeaponInternal(0x0E9BE00);
 RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
 RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
 RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal(0x14038B0);
@@ -32,10 +34,14 @@ RelocAddr <_UpdateAVModifiers> UpdateAVModifiers(0x0DD9930);
 RelocAddr <_UpdateAnimValueFloat> UpdateAnimValueFloat(0x081D410);
 RelocAddr <_EquipItem> EquipItemInternal(0x0E1BCD0);
 RelocAddr <_UnEquipItem> UnequipItemInternal(0x0E1C0B0);
+
+RelocAddr <_MainEquipHandler> MainEquipHandler(0x0E1EB50);
 RelocAddr <_EquipHandler> EquipHandler(0x0E1D6D0);
 RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
 RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
 RelocAddr <_UnkSub_DFE930> UnkSub_DFE930(0xDFE930);
+RelocAddr <_NiStuff> NiStuff(0x0EB8E80);
+RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData(0x1B94970);
 
 RelocAddr <_GetHandle> GetHandle(0xAAC0);
 RelocAddr <_GetNiSmartPointer> GetNiSmartPointer(0xAC90);
@@ -177,7 +183,7 @@ namespace Utilities
 	{
 		if (!objRef || !invItem || !mod)
 			return;
-		//AttachModToInventoryItem_Internal()
+		AttachModToInventoryItem_Internal((*g_gameVM)->m_virtualMachine, 0, objRef, invItem, mod, true);
 	}
 
 	TESForm* GetFormFromIdentifier(const std::string& identifier)
@@ -703,6 +709,40 @@ namespace Utilities
 	void DrawWeapon(Actor* actor)
 	{
 		return DrawWeaponInternal((*g_gameVM)->m_virtualMachine, 0, actor);
+	}
+
+	void FireWeapon(Actor* actor, UInt32 shots)
+	{
+		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(actor, 41);
+		if (!stack)
+			return;
+		ExtraDataList* dataList = stack->extraData;
+		if (!dataList)
+			return;
+		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		if (!extraInstanceData || !extraInstanceData->baseForm || !extraInstanceData->instanceData)
+			return;
+		BGSObjectInstance idStruct;
+		idStruct.baseForm = extraInstanceData->baseForm;
+		idStruct.instanceData = extraInstanceData->instanceData;
+		FireWeaponInternal(actor, idStruct, 41, shots);
+	}
+
+	void ReloadWeapon(Actor* actor)
+	{
+		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(actor, 41);
+		if (!stack)
+			return;
+		ExtraDataList* dataList = stack->extraData;
+		if (!dataList)
+			return;
+		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		if (!extraInstanceData || !extraInstanceData->baseForm || !extraInstanceData->instanceData)
+			return;
+		BGSObjectInstance idStruct;
+		idStruct.baseForm = extraInstanceData->baseForm;
+		idStruct.instanceData = extraInstanceData->instanceData;
+		ReloadWeaponInternal(actor, idStruct, 41);
 	}
 
 	bool ModActorValue(Actor* actor, ActorValueInfo* av, float val)

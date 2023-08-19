@@ -391,6 +391,8 @@ namespace Utilities
 	bool PlayIdle(Actor* actor, TESIdleForm* idle);
 	bool PlayIdleAction(Actor* actor, BGSAction* action);
 	void DrawWeapon(Actor* actor);
+	void FireWeapon(Actor* actor, UInt32 shots);
+	void ReloadWeapon(Actor* actor);
 	void SetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
 	void SendNotification(std::string asNotificationText);
 	//void ShowMessagebox(std::string asText);
@@ -484,7 +486,7 @@ public:
 
 };
 
-typedef void(*_AttachModToInventoryItem)(TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod);
+typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod, bool unkbool);
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, ModifyModDataFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
@@ -494,10 +496,16 @@ typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInst
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
 
+typedef void(*_UpdateEquippedWeaponData)(EquippedWeaponData* data);
+typedef bool(*_MainEquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UniversalEquipHandler)(Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
+typedef void(*_NiStuff)(PlayerCharacter* player, TESObjectWEAP* weapBase, ExtraDataList** extraDataList, UInt32 r9d, bool rbp20, UInt32 rbp28);
 typedef void(*_UnkSub_EFF9D0)(Actor* actor);
 typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
+// //virtual void AttachWeapon(const BGSObjectInstanceT<TESObjectWEAP>& a_weapon, BGSEquipIndex a_equipIndex);																							// A5
+//virtual void DoReparentWeapon(const TESObjectWEAP* a_weapon, BGSEquipIndex a_equipIndex, bool a_weaponDrawn);                                                                                    // 118
+
 
 typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordValue value);
 typedef bool(*_HasPerkInternal)(Actor* actor, BGSPerk* perk);
@@ -516,6 +524,8 @@ typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef bool(*_IsInPowerArmor)(Actor* actor);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
+typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex);                                                                                        // 0EF E9BE00
+typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex, UInt32 a_shotCount);                                                         // 0F0 EFCE90
 typedef void(*_ShowNotification)(std::string text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
@@ -543,6 +553,8 @@ extern RelocAddr <_GetSmartPointer> GetSmartPointer;
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
 
+extern RelocAddr <_EquipItem> EquipItemInternal;
+extern RelocAddr <_UnEquipItem> UnequipItemInternal;
 extern RelocAddr <_HasPerkInternal> HasPerkInternal;
 extern RelocAddr <_AddItem_Native> AddItemNative;
 extern RelocAddr <_RemoveItem_Native> RemoveItemNative;
@@ -557,7 +569,8 @@ extern RelocAddr <_CheckKeywordType> CheckKeywordType;
 extern RelocAddr <_IsInIronSights> IsInIronSights;
 extern RelocAddr <_IsInPowerArmor> IsInPowerArmor;
 extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
-extern RelocAddr <_FireWeaponInternal> FireWeaponInternal;
+extern RelocAddr <_UseAmmo> FireWeaponInternal;
+extern RelocAddr <_ReloadWeapon> ReloadWeaponInternal;
 extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;
 extern RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal;
@@ -572,6 +585,9 @@ extern RelocAddr <_EquipHandler> EquipHandler;
 extern RelocAddr <_UniversalEquipHandler> UniversalEquipHandler;
 extern RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0;
 extern RelocAddr <_UnkSub_DFE930> UnkSub_DFE930;
+extern RelocAddr <_MainEquipHandler> MainEquipHandler;
+extern RelocAddr <_NiStuff> NiStuff;
+extern RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData;
 
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;

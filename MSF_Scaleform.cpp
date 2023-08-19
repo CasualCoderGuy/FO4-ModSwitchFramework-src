@@ -72,8 +72,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Scaleform::GetInterfaceVersion();
 				//MSF_Scaleform::UpdateWidgetData(nullptr);
 				//MSF_Scaleform::SetWidgetVisibility(true);
-				MSFMenu::CloseMenu();
-				MSFMenu::OpenMenu();
+				//MSFMenu::CloseMenu();
+				//MSFMenu::OpenMenu();
 				//static BSFixedString menuName("MSFMenu");
 				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
 				//MSFAmmoMenu::OpenMenu();
@@ -87,7 +87,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::DumpUnknownData((*g_player));
 				//MSF_Test::DumpActorValue();
 				//MSF_Test::DumpExtraDataInfo();
-				//MSF_Test::CallAttachModToInvItem();
+				MSF_Test::CallAttachModToInvItem();
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
 				_MESSAGE("test1");
 			}
@@ -98,12 +98,13 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			if ((*g_ui)->numPauseGame == 0)
 			{
 				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
-				MSF_Test::AttachModInternalTest(true, 2);
+				//MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CreateWeaponState();
 				//MSF_Test::CallAddItem();
 				//MSF_Test::CallPlayAction();
 				//MSF_Test::MenuFlagTest();
 				//MSF_Test::CallAttachModToInvItem();
+				Utilities::ReloadWeapon(*g_player);
 				_MESSAGE("test2");
 			}
 		}
@@ -117,7 +118,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CallRemoveModFromInvItem();
 				//MSF_Test::DamageEquippedWeapon(*g_player);
-				MSF_Test::ListExtraData();
+				//MSF_Test::ListExtraData();
+				Utilities::FireWeapon(*g_player, 1);
 				_MESSAGE("test3");
 			}
 		}

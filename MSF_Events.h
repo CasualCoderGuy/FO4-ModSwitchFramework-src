@@ -181,14 +181,20 @@ STATIC_ASSERT(sizeof(HUDAmmoCounter) == 0x230);
 typedef void*(*AttackBlockHandler)(void* handler);
 extern RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget;
 extern RelocAddr <AttackBlockHandler> AttackBlockHandler_Original;
+
+
 typedef UInt64(*HUDShowAmmoCounter)(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget;
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original;
 extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 
+typedef void* (*EquipHandler_UpdateAnimGraph)(Actor* actor, bool unk_rdx);
+extern RelocAddr <EquipHandler_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget;
+
 UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
+UInt64 EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);
