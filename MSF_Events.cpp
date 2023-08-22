@@ -10,8 +10,7 @@ RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F4B080);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget(0x0A0E9D2);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original(0x0A22D00);
 RelocPtr <UInt32> uAmmoCounterFadeTimeMS(0x375CF30); //A0E9C9
-RelocAddr <_tf1> tf1_HookTarget(0x2D442E0);
-
+RelocAddr <_PlayerAnimationEvent> PlayerAnimationEvent_HookTarget(0x2D442E0);
 RelocAddr <EquipHandler_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget(0x0E1F030);
 
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
@@ -19,7 +18,7 @@ BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
 PlayerAmmoCountEventSink playerAmmoCountEventSink;
 MenuOpenCloseSink menuOpenCloseSink;
-_tf1 tf1_Original;
+_PlayerAnimationEvent PlayerAnimationEvent_Original;
 
 EventResult	BGSOnPlayerUseWorkBenchEventSink::ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher)
 {
@@ -176,16 +175,13 @@ UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime)
 UInt64 EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 {
 	if (MSF_MainData::modSwitchManager.GetIgnoreAnimGraph())
-	{
-		_MESSAGE("animGraph ignored");
 		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(false);
-	}
 	else
 		UpdateAnimGraph(actor, unk_rdx);
 	return 0;
 }
 
-UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
+UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 {
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
@@ -276,5 +272,5 @@ UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 	else if (!_strcmpi("toggleMenu", name))
 	{
 	}
-	return tf1_Original(arg1, arg2, arg3);
+	return PlayerAnimationEvent_Original(arg1, arg2, arg3);
 }

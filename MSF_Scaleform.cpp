@@ -58,7 +58,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			}
 		}
 			break;
-#ifdef DEBUG
+//#ifdef DEBUG
 		case 103:
 		{
 			if ((*g_ui)->numPauseGame == 0)
@@ -87,44 +87,45 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::DumpUnknownData((*g_player));
 				//MSF_Test::DumpActorValue();
 				//MSF_Test::DumpExtraDataInfo();
-				MSF_Test::CallAttachModToInvItem();
+				//MSF_Test::CallAttachModToInvItem();
+				MSF_Test::NPCtest();
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
 				_MESSAGE("test1");
 			}
 		}
 		break;
-		case 104:
-		{
-			if ((*g_ui)->numPauseGame == 0)
-			{
-				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
-				//MSF_Test::AttachModInternalTest(true, 2);
-				//MSF_Test::CreateWeaponState();
-				//MSF_Test::CallAddItem();
-				//MSF_Test::CallPlayAction();
-				//MSF_Test::MenuFlagTest();
-				//MSF_Test::CallAttachModToInvItem();
-				Utilities::ReloadWeapon(*g_player);
-				_MESSAGE("test2");
-			}
-		}
-		break;
-		case 105:
-		{
-			if ((*g_ui)->numPauseGame == 0)
-			{
-				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, false);
-				//CALL_MEMBER_FN((*g_player), QueueUpdate)(true, 0, true, 0);
-				//MSF_Test::AttachModInternalTest(true, 2);
-				//MSF_Test::CallRemoveModFromInvItem();
-				//MSF_Test::DamageEquippedWeapon(*g_player);
-				//MSF_Test::ListExtraData();
-				Utilities::FireWeapon(*g_player, 1);
-				_MESSAGE("test3");
-			}
-		}
-		break;
-#endif
+//		case 104:
+//		{
+//			if ((*g_ui)->numPauseGame == 0)
+//			{
+//				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
+//				//MSF_Test::AttachModInternalTest(true, 2);
+//				//MSF_Test::CreateWeaponState();
+//				//MSF_Test::CallAddItem();
+//				//MSF_Test::CallPlayAction();
+//				//MSF_Test::MenuFlagTest();
+//				//MSF_Test::CallAttachModToInvItem();
+//				Utilities::ReloadWeapon(*g_player);
+//				_MESSAGE("test2");
+//			}
+//		}
+//		break;
+//		case 105:
+//		{
+//			if ((*g_ui)->numPauseGame == 0)
+//			{
+//				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, false);
+//				//CALL_MEMBER_FN((*g_player), QueueUpdate)(true, 0, true, 0);
+//				//MSF_Test::AttachModInternalTest(true, 2);
+//				//MSF_Test::CallRemoveModFromInvItem();
+//				//MSF_Test::DamageEquippedWeapon(*g_player);
+//				//MSF_Test::ListExtraData();
+//				Utilities::FireWeapon(*g_player, 1);
+//				_MESSAGE("test3");
+//			}
+//		}
+//		break;
+//#endif
 		default: 
 		{
 			if ((*g_ui)->numPauseGame == 0)

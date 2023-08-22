@@ -322,7 +322,7 @@ namespace MSF_Base
 		idStruct.instanceData = newInstanceData;
 
 		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
-		EquipItemInternal(g_ActorEquipManager, actor, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);;
+		EquipItemInternal(g_ActorEquipManager, actor, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
 		//actor->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
 		//UpdateMiddleProcess(actor->middleProcess, actor, idStruct, newInstanceData->equipSlot);
 		//actor->middleProcess->unk08->unk290[1] = actor->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
@@ -472,24 +472,25 @@ namespace MSF_Base
 							BGSObjectInstance idStruct;
 							idStruct.baseForm = weapon;
 							idStruct.instanceData = newInstanceData;
-							owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-							UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-							owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-							volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-							InterlockedIncrement64(lockcnt);
-							UpdateEquipData(owner->equipData, idStruct, nullptr);
-							InterlockedDecrement64(lockcnt);
-							UpdateEnchantments(owner, idStruct, newList);
-							UInt8 unk1 = 1;
-							ActorStruct actorStruct;
-							actorStruct.actor = owner;
-							actorStruct.unk08 = &unk1;
-							UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-							float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-							UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-							if (newInstanceData->firingData)
-								UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-							//UpdateAnimGraph(actor, false);
+							EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
+							//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
+							//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
+							//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
+							//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
+							//InterlockedIncrement64(lockcnt);
+							//UpdateEquipData(owner->equipData, idStruct, nullptr);
+							//InterlockedDecrement64(lockcnt);
+							//UpdateEnchantments(owner, idStruct, newList);
+							//UInt8 unk1 = 1;
+							//ActorStruct actorStruct;
+							//actorStruct.actor = owner;
+							//actorStruct.unk08 = &unk1;
+							//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+							//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+							//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+							//if (newInstanceData->firingData)
+							//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
+							////UpdateAnimGraph(actor, false);
 							bool bEquipped = false;
 							for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
 							{
@@ -503,6 +504,13 @@ namespace MSF_Base
 									bEquipped = true;
 								}
 							}
+							EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
+							TESAmmo* newAmmoType = newEqData->ammo;
+							UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
+							if (ammoCount < newInstanceData->ammoCapacity)
+								newEqData->loadedAmmoCount = ammoCount;
+							else
+								newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
 						}
 					}
 				}
@@ -623,24 +631,25 @@ namespace MSF_Base
 				BGSObjectInstance idStruct;
 				idStruct.baseForm = baseWeap;
 				idStruct.instanceData = newInstanceData;
-				owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-				UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-				owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-				volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-				InterlockedIncrement64(lockcnt);
-				UpdateEquipData(owner->equipData, idStruct, nullptr);
-				InterlockedDecrement64(lockcnt);
-				UpdateEnchantments(owner, idStruct, newList);
-				UInt8 unk1 = 1;
-				ActorStruct actorStruct;
-				actorStruct.actor = owner;
-				actorStruct.unk08 = &unk1;
-				UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-				float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-				UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-				if (newInstanceData->firingData)
-					UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-				//UpdateAnimGraph(actor, false);
+				EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
+				//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
+				//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
+				//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
+				//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
+				//InterlockedIncrement64(lockcnt);
+				//UpdateEquipData(owner->equipData, idStruct, nullptr);
+				//InterlockedDecrement64(lockcnt);
+				//UpdateEnchantments(owner, idStruct, newList);
+				//UInt8 unk1 = 1;
+				//ActorStruct actorStruct;
+				//actorStruct.actor = owner;
+				//actorStruct.unk08 = &unk1;
+				//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+				//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+				//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+				//if (newInstanceData->firingData)
+				//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
+				////UpdateAnimGraph(actor, false);
 				bool bEquipped = false;
 				for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
 				{
@@ -654,6 +663,13 @@ namespace MSF_Base
 						bEquipped = true;
 					}
 				}
+				EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
+				TESAmmo* newAmmoType = newEqData->ammo;
+				UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
+				if (ammoCount < newInstanceData->ammoCapacity)
+					newEqData->loadedAmmoCount = ammoCount;
+				else
+					newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
 			}
 		}
 		BGSObjectInstanceExtra* newmods = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
@@ -724,24 +740,25 @@ namespace MSF_Base
 						BGSObjectInstance idStruct;
 						idStruct.baseForm = baseWeap;
 						idStruct.instanceData = newInstanceData;
-						owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-						UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-						owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-						volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-						InterlockedIncrement64(lockcnt);
-						UpdateEquipData(owner->equipData, idStruct, nullptr);
-						InterlockedDecrement64(lockcnt);
-						UpdateEnchantments(owner, idStruct, newList);
-						UInt8 unk1 = 1;
-						ActorStruct actorStruct;
-						actorStruct.actor = owner;
-						actorStruct.unk08 = &unk1;
-						UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-						float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-						UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-						if (newInstanceData->firingData)
-							UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-						//UpdateAnimGraph(actor, false);
+						EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
+						//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
+						//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
+						//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
+						//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
+						//InterlockedIncrement64(lockcnt);
+						//UpdateEquipData(owner->equipData, idStruct, nullptr);
+						//InterlockedDecrement64(lockcnt);
+						//UpdateEnchantments(owner, idStruct, newList);
+						//UInt8 unk1 = 1;
+						//ActorStruct actorStruct;
+						//actorStruct.actor = owner;
+						//actorStruct.unk08 = &unk1;
+						//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
+						//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
+						//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
+						//if (newInstanceData->firingData)
+						//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
+						////UpdateAnimGraph(actor, false);
 						bool bEquipped = false;
 						for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
 						{
@@ -755,6 +772,13 @@ namespace MSF_Base
 								bEquipped = true;
 							}
 						}
+						EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
+						TESAmmo* newAmmoType = newEqData->ammo;
+						UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
+						if (ammoCount < newInstanceData->ammoCapacity)
+							newEqData->loadedAmmoCount = ammoCount;
+						else
+							newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
 					}
 				}
 			}
@@ -764,25 +788,33 @@ namespace MSF_Base
 
 	void SpawnRandomMods(TESObjectCELL* cell)
 	{
+		_MESSAGE("mod spawn");
 		for (UInt32 i = 0; i < cell->objectList.count; i++)
 		{
 			Actor* randomActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
 			if (!randomActor || !randomActor->equipData || randomActor == (*g_player))
 				continue;
+			//check if unique
 			TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
 			if (!firearm)
 				continue;
 			if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData && randomActor->middleProcess->unk08->equipData->equippedData)
 			{
+				_MESSAGE("actor ok");
 				TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
 				std::vector<BGSMod::Attachment::Mod*> mods;
 				UInt32 count = 0;
 				MSF_Data::PickRandomMods(&mods, &ammo, &count);
+				_MESSAGE("picked ammo: %p, %i", ammo, count);
 				if (ammo)
+				{
 					Utilities::AddItem(randomActor, ammo, count, true);
+					Utilities::AttachModToInventoryItem(randomActor, firearm, MSF_MainData::APbaseMod);
+				}
 				for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)
 				{
 					Utilities::AttachModToInventoryItem(randomActor, firearm, *itMods);
+					_MESSAGE("mod added");
 				}
 				//check mod association or inject to TESObjectWEAP at start
 			}

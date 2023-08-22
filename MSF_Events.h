@@ -126,9 +126,12 @@ public:
 };
 extern MenuOpenCloseSink menuOpenCloseSink;
 
-typedef UInt8(*_tf1)(void * thissink, BSAnimationGraphEvent* evnstruct, void** dispatcher);
-extern RelocAddr <_tf1> tf1_HookTarget;
-extern _tf1 tf1_Original;
+typedef UInt8(*_PlayerAnimationEvent)(void * thissink, BSAnimationGraphEvent* evnstruct, void** dispatcher);
+extern RelocAddr <_PlayerAnimationEvent> PlayerAnimationEvent_HookTarget;
+extern _PlayerAnimationEvent PlayerAnimationEvent_Original;
+
+//BSTEventSource<InventoryInterface::CountChangedEvent>
+//BSTEventSource<ActorEquipManagerEvent::Event>
 
 struct PlayerWeaponReloadEvent
 {
@@ -191,7 +194,7 @@ extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 typedef void* (*EquipHandler_UpdateAnimGraph)(Actor* actor, bool unk_rdx);
 extern RelocAddr <EquipHandler_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget;
 
-UInt8 tf1_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
+UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
 UInt64 EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx);

@@ -175,17 +175,12 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 	RVAManager::UpdateAddresses(runtimeVersion);
 
 	if (!g_localTrampoline.Create(1024 * 64, nullptr)) {
-		_ERROR("couldn't create codegen buffer. this is fatal. skipping remainder of init process.");
+		_ERROR("Fatal Error - Couldn't create codegen buffer. Skipping remainder of init process.");
 		return false;
 	}
 
 	if (!g_branchTrampoline.Create(1024 * 64)) {
-		_ERROR("couldn't create branch trampoline. this is fatal. skipping remainder of init process.");
-		return false;
-	}
-	if (!g_localTrampoline.Create(1024 * 64, nullptr))
-	{
-		_ERROR("couldn't create codegen buffer. this is fatal. skipping remainder of init process.");
+		_ERROR("Fatal Error - Couldn't create branch trampoline. Skipping remainder of init process.");
 		return false;
 	}
 
@@ -193,7 +188,8 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 
 	//InitializeOffsets();
 
-	tf1_Original = HookUtil::SafeWrite64(tf1_HookTarget.GetUIntPtr(), &tf1_Hook);
+
+	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
@@ -208,6 +204,8 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 		_MESSAGE("MSF scaleform registration failed");
 	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformTest))
 	//	_MESSAGE("MSF widget scaleform registration failed");
+
+	srand(time(NULL));
 
 	return true;
 }

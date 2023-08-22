@@ -542,7 +542,10 @@ typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObje
 
 //actorEquipManager->GetSingleton: 59D75C8
 //ActorEquipManager->EquipObject: E1BCD0
-//
+//AddMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* a_newMod, std::uint8_t a_attachIndex, std::uint8_t a_rank, bool a_removeInvalidMods) 003BF70
+//std::uint32_t RemoveInvalidMods(BGSObjectInstanceExtra* modData, BGSAttachParentArray* a_baseObjectParents) 003C640
+//std::uint32_t RemoveMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* a_mod, std::uint8_t a_attachIndex) 003C3F0
+
 
 typedef UInt32(*_GetHandle)(TESObjectREFR** ref);
 extern RelocAddr <_GetHandle> GetHandle;

@@ -41,6 +41,8 @@ BGSAction* MSF_MainData::ActionRightRelease;
 bool MSF_MainData::IsInitialized = false;
 int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
+UInt16 MSF_MainData::iMinRandomAmmo = 5;
+UInt16 MSF_MainData::iMaxRandomAmmo = 50;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
 
@@ -864,7 +866,7 @@ namespace MSF_Data
 						//if (baseMod->priority != 125 || baseMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 						//	continue;
 						UInt16 ammoIDbase = ammoData["baseAmmoID"].asInt();
-						UInt8 spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
+						float spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
 
 						auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 						if (itAD != MSF_MainData::ammoDataMap.end())
@@ -895,7 +897,7 @@ namespace MSF_Data
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
-									UInt8 spawnChance = ammoType["spawnChance"].asInt();
+									float spawnChance = ammoType["spawnChance"].asFloat();
 
 									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin();
 									for (itAmmoMod; itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
@@ -949,7 +951,7 @@ namespace MSF_Data
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
-									UInt8 spawnChance = ammoType["spawnChance"].asInt();
+									float spawnChance = ammoType["spawnChance"].asFloat();
 
 									std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = ammoDataStruct->ammoMods.begin();
 									for (itAmmoMod; itAmmoMod != ammoDataStruct->ammoMods.end(); itAmmoMod++)
@@ -1805,7 +1807,8 @@ namespace MSF_Data
 
 					mods->push_back(chosenAmmoMod->mod);
 					*ammo = chosenAmmoMod->ammo;
-					*count = MSF_MainData::rng.RandomInt(6, 48);
+					*count = rand() % MSF_MainData::iMaxRandomAmmo + MSF_MainData::iMinRandomAmmo;
+
 				}
 
 				//AmmoData* itAmmoData = itAD->second;

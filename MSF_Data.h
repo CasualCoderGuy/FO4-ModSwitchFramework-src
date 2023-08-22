@@ -483,6 +483,8 @@ public:
 		bShowUnavailableMods = 0x0080
 	};
 	static UInt16 MCMSettingFlags;
+	static UInt16 iMinRandomAmmo;
+	static UInt16 iMaxRandomAmmo;
 	static std::unordered_map<std::string, float> MCMfloatSettingMap;
 };
 
