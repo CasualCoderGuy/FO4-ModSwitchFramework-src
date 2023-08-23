@@ -150,7 +150,9 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = 0x1DFF;
+		MSF_MainData::MCMSettingFlags = 0x7DFF;
+		AddFloatSetting("fBaseChanceMultiplier", 1.0);
+
 		AddFloatSetting("fSliderMainX", 950.0);
 		AddFloatSetting("fSliderMainY", 565.0);
 		AddFloatSetting("fPowerArmorOffsetX", 0.0);
@@ -1783,7 +1785,7 @@ namespace MSF_Data
 		TESAmmo* baseAmmo = *ammo;
 		*ammo = nullptr;
 		UInt32 chance = 0;
-		if (baseAmmo)
+		if (baseAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bSpawnRandomAmmo))
 		{
 			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 			if (itAD != MSF_MainData::ammoDataMap.end())
@@ -1793,7 +1795,11 @@ namespace MSF_Data
 
 				std::mt19937 generator(std::random_device{}());
 				std::vector<double> chances;
-				chances.push_back(ammoData->baseAmmoData.spawnChance);
+
+				float chanceMultiplier = MSF_MainData::MCMfloatSettingMap["fBaseChanceMultiplier"];
+				if (chanceMultiplier < 0.0)
+					chanceMultiplier = 1.0;
+				chances.push_back(ammoData->baseAmmoData.spawnChance * chanceMultiplier);
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = ammoData->ammoMods.begin(); itAmmoMod != ammoData->ammoMods.end(); itAmmoMod++)
 					chances.push_back(itAmmoMod->spawnChance);
 
@@ -1807,7 +1813,7 @@ namespace MSF_Data
 
 					mods->push_back(chosenAmmoMod->mod);
 					*ammo = chosenAmmoMod->ammo;
-					*count = rand() % MSF_MainData::iMaxRandomAmmo + MSF_MainData::iMinRandomAmmo;
+					*count = rand() % (MSF_MainData::iMaxRandomAmmo - MSF_MainData::iMinRandomAmmo + 1) + MSF_MainData::iMinRandomAmmo;
 
 				}
 

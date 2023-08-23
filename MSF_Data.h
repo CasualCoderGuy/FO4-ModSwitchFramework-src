@@ -473,6 +473,8 @@ public:
 		bCustomAnimEnabled = 0x0400,
 		bAmmoRequireWeaponToBeDrawn = 0x0800,
 		bRequireAmmoToSwitch = 0x1000,
+		bSpawnRandomAmmo = 0x2000,
+		bSpawnRandomMods = 0x4000,
 		bWidgetAlwaysVisible = 0x0001,
 		bShowAmmoIcon = 0x0002,
 		bShowMuzzleIcon = 0x0004,

@@ -59,41 +59,41 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 		}
 			break;
 //#ifdef DEBUG
-		case 103:
-		{
-			if ((*g_ui)->numPauseGame == 0)
-			{
-				//MSF_Test::ListModTable(*g_player);
-				//MSF_Test::DumpAttachParent();
-				//MSF_Test::GetWeaponState();
-				//MSF_Test::DumpAttachParent();
-				//MSF_Test::DumpForms();
-				//MSF_Test::SetAmmoTest();
-				//MSF_Scaleform::GetInterfaceVersion();
-				//MSF_Scaleform::UpdateWidgetData(nullptr);
-				//MSF_Scaleform::SetWidgetVisibility(true);
-				//MSFMenu::CloseMenu();
-				//MSFMenu::OpenMenu();
-				//static BSFixedString menuName("MSFMenu");
-				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
-				//MSFAmmoMenu::OpenMenu();
-				//MSFMenu::OpenMenu();
-				//MSF_Test::ListEquippedItemTypes();
-				//MSF_Test::ArmorAttachTest();
-				//MSF_Test::RemapAnimTest(); //sub_141387BE0
-				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x3B248));
-				//Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
-				//MSF_Base::BurstTest(nullptr);
-				//MSF_Test::DumpUnknownData((*g_player));
-				//MSF_Test::DumpActorValue();
-				//MSF_Test::DumpExtraDataInfo();
-				//MSF_Test::CallAttachModToInvItem();
-				MSF_Test::NPCtest();
-				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
-				_MESSAGE("test1");
-			}
-		}
-		break;
+//		case 103:
+//		{
+//			if ((*g_ui)->numPauseGame == 0)
+//			{
+//				//MSF_Test::ListModTable(*g_player);
+//				//MSF_Test::DumpAttachParent();
+//				//MSF_Test::GetWeaponState();
+//				//MSF_Test::DumpAttachParent();
+//				//MSF_Test::DumpForms();
+//				//MSF_Test::SetAmmoTest();
+//				//MSF_Scaleform::GetInterfaceVersion();
+//				//MSF_Scaleform::UpdateWidgetData(nullptr);
+//				//MSF_Scaleform::SetWidgetVisibility(true);
+//				//MSFMenu::CloseMenu();
+//				//MSFMenu::OpenMenu();
+//				//static BSFixedString menuName("MSFMenu");
+//				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
+//				//MSFAmmoMenu::OpenMenu();
+//				//MSFMenu::OpenMenu();
+//				//MSF_Test::ListEquippedItemTypes();
+//				//MSF_Test::ArmorAttachTest();
+//				//MSF_Test::RemapAnimTest(); //sub_141387BE0
+//				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x3B248));
+//				//Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
+//				//MSF_Base::BurstTest(nullptr);
+//				//MSF_Test::DumpUnknownData((*g_player));
+//				//MSF_Test::DumpActorValue();
+//				//MSF_Test::DumpExtraDataInfo();
+//				//MSF_Test::CallAttachModToInvItem();
+//				MSF_Test::NPCtest();
+//				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
+//				_MESSAGE("test1");
+//			}
+//		}
+//		break;
 //		case 104:
 //		{
 //			if ((*g_ui)->numPauseGame == 0)

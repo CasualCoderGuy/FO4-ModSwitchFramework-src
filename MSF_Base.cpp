@@ -788,35 +788,38 @@ namespace MSF_Base
 
 	void SpawnRandomMods(TESObjectCELL* cell)
 	{
-		_MESSAGE("mod spawn");
-		for (UInt32 i = 0; i < cell->objectList.count; i++)
+		if (MSF_MainData::MCMSettingFlags & (MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods))
 		{
-			Actor* randomActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
-			if (!randomActor || !randomActor->equipData || randomActor == (*g_player))
-				continue;
-			//check if unique
-			TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
-			if (!firearm)
-				continue;
-			if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData && randomActor->middleProcess->unk08->equipData->equippedData)
+			_MESSAGE("mod spawn");
+			for (UInt32 i = 0; i < cell->objectList.count; i++)
 			{
-				_MESSAGE("actor ok");
-				TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
-				std::vector<BGSMod::Attachment::Mod*> mods;
-				UInt32 count = 0;
-				MSF_Data::PickRandomMods(&mods, &ammo, &count);
-				_MESSAGE("picked ammo: %p, %i", ammo, count);
-				if (ammo)
+				Actor* randomActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
+				if (!randomActor || !randomActor->equipData || randomActor == (*g_player))
+					continue;
+				//check if unique
+				TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+				if (!firearm)
+					continue;
+				if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData && randomActor->middleProcess->unk08->equipData->equippedData)
 				{
-					Utilities::AddItem(randomActor, ammo, count, true);
-					Utilities::AttachModToInventoryItem(randomActor, firearm, MSF_MainData::APbaseMod);
+					_MESSAGE("actor ok");
+					TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
+					std::vector<BGSMod::Attachment::Mod*> mods;
+					UInt32 count = 0;
+					MSF_Data::PickRandomMods(&mods, &ammo, &count);
+					_MESSAGE("picked ammo: %p, %i", ammo, count);
+					if (ammo)
+					{
+						Utilities::AddItem(randomActor, ammo, count, true);
+						Utilities::AttachModToInventoryItem(randomActor, firearm, MSF_MainData::APbaseMod);
+					}
+					for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)
+					{
+						Utilities::AttachModToInventoryItem(randomActor, firearm, *itMods);
+						_MESSAGE("mod added");
+					}
+					//check mod association or inject to TESObjectWEAP at start
 				}
-				for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)
-				{
-					Utilities::AttachModToInventoryItem(randomActor, firearm, *itMods);
-					_MESSAGE("mod added");
-				}
-				//check mod association or inject to TESObjectWEAP at start
 			}
 		}
 	}
