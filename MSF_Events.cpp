@@ -51,13 +51,18 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 {
 	if (evn->weaponInstance != MSF_MainData::modSwitchManager.GetCurrentWeapon())
 	{
-		MSF_MainData::modSwitchManager.SetCurrentWeapon(evn->weaponInstance);
-		MSF_MainData::modSwitchManager.ClearQueue();
-		MSF_MainData::modSwitchManager.CloseOpenedMenu();
-		MSF_Scaleform::UpdateWidgetData();
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
-		if (instanceData == evn->weaponInstance)
-			MSF_MainData::burstTestManager->HandleEquipEvent(instanceData);
+		TESObjectWEAP::InstanceData* newWeapon = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->weaponInstance, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		_MESSAGE("equip: %p", newWeapon);
+		if (newWeapon)
+		{
+			MSF_MainData::modSwitchManager.SetCurrentWeapon(newWeapon);
+			MSF_MainData::modSwitchManager.ClearQueue();
+			MSF_MainData::modSwitchManager.CloseOpenedMenu();
+			MSF_Scaleform::UpdateWidgetData();
+			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+			if (instanceData == newWeapon)
+				MSF_MainData::burstTestManager->HandleEquipEvent(instanceData);
+		}
 	}
 
 	return kEvent_Continue;

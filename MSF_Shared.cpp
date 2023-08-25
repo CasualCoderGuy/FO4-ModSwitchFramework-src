@@ -152,7 +152,7 @@ namespace Utilities
 
 	void SendNotification(std::string asNotificationText)
 	{
-		ShowNotification(asNotificationText, 0, 1);
+		ShowNotification(asNotificationText.c_str(), 0, 1);
 	}
 
 	//void ShowMessagebox(std::string asText) {
@@ -373,6 +373,8 @@ namespace Utilities
 
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item)
 	{
+		if (!inventory || !item)
+			return 0;
 		UInt64 count = 0;
 		for (UInt32 i = 0; i < inventory->items.count; i++)
 		{

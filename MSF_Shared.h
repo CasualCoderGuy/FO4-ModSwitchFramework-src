@@ -526,7 +526,7 @@ typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex);                                                                                        // 0EF E9BE00
 typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex, UInt32 a_shotCount);                                                         // 0F0 EFCE90
-typedef void(*_ShowNotification)(std::string text, UInt32 edx, UInt32 r8d);
+typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 //typedef bool(*_UnEquipItem)(void* unkPtr, Actor* target, unkWeapBaseStruct baseWeap, UInt32 unk_r9d, UInt64 unk_rsp20, SInt32 unk_rsp28, UInt8 unk_rsp30, UInt8 unk_rsp38, UInt8 unk_rsp40, UInt8 unk_rsp48, UInt64 unk_rsp50);

@@ -1580,7 +1580,12 @@ namespace MSF_Data
 			return data->mod == attachedMod;
 		});
 		if (itMod == modCycle->mods.end())
-			modToAttach = modCycle->mods[0];
+		{
+			if (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod)
+				modToAttach = modCycle->mods[1];
+			else
+				modToAttach = modCycle->mods[0];
+		}
 		else
 		{
 			modToRemove = *itMod;
@@ -1631,7 +1636,8 @@ namespace MSF_Data
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
 				{
 					delete switchRemove;
-					return false; //missing loosemod
+					Utilities::SendNotification("Missing required loose mod.");
+					return false;
 				}
 			}
 			if (!(modToAttach->flags & SwitchData::bIgnoreAnimations) || ((!switchRemove && modToRemove) && !(modToRemove->flags & SwitchData::bIgnoreAnimations)))
