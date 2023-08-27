@@ -9,9 +9,11 @@ RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F4B080);
 
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget(0x0A0E9D2);
 RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original(0x0A22D00);
+HUDShowAmmoCounter HUDShowAmmoCounter_Copied;
 RelocPtr <UInt32> uAmmoCounterFadeTimeMS(0x375CF30); //A0E9C9
 RelocAddr <_PlayerAnimationEvent> PlayerAnimationEvent_HookTarget(0x2D442E0);
-RelocAddr <EquipHandler_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget(0x0E1F030);
+RelocAddr <_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget(0x0E1F030);
+_UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
@@ -51,17 +53,33 @@ EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, v
 {
 	if (evn->weaponInstance != MSF_MainData::modSwitchManager.GetCurrentWeapon())
 	{
-		TESObjectWEAP::InstanceData* newWeapon = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->weaponInstance, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		_MESSAGE("equip: %p", newWeapon);
-		if (newWeapon)
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+		if (instanceData != MSF_MainData::modSwitchManager.GetCurrentWeapon())
 		{
-			MSF_MainData::modSwitchManager.SetCurrentWeapon(newWeapon);
+			MSF_MainData::modSwitchManager.SetCurrentWeapon(instanceData);
 			MSF_MainData::modSwitchManager.ClearQueue();
 			MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			MSF_Scaleform::UpdateWidgetData();
-			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
-			if (instanceData == newWeapon)
-				MSF_MainData::burstTestManager->HandleEquipEvent(instanceData);
+			//if (MSF_MainData::activeBurstManager)
+			//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;
+			//if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::FiringModBurstKW))
+			//{
+			//	BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+			//	BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(modData, MSF_MainData::FiringModBurstKW);
+			//	if (mod)
+			//	{
+			//		auto it = MSF_MainData::burstModeData.find(mod);
+			//		if (it != MSF_MainData::burstModeData.end());
+			//		{
+			//			BurstModeData* burstMode = it->second;
+
+			//			if (MSF_MainData::activeBurstManager)
+			//				delete MSF_MainData::activeBurstManager;
+			//			MSF_MainData::activeBurstManager = new BurstModeManager(burstMode, true);
+			//			//MSF_MainData::activeBurstManager->HandleEquipEvent(instanceData);
+			//		}
+			//	}
+			//}
 		}
 	}
 
@@ -174,15 +192,17 @@ UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime)
 {
 	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
 		MSF_Scaleform::StartWidgetHideCountdown(visibleTime);
-	return HUDShowAmmoCounter_Original(ammoCounter, visibleTime);
+	return HUDShowAmmoCounter_Copied(ammoCounter, visibleTime);
+	//return HUDShowAmmoCounter_Original(ammoCounter, visibleTime);
 }
 
-UInt64 EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
+void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 {
 	if (MSF_MainData::modSwitchManager.GetIgnoreAnimGraph())
 		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(false);
 	else
-		UpdateAnimGraph(actor, unk_rdx);
+		return EquipHandler_UpdateAnimGraph_Copied(actor, unk_rdx);
+		//return UpdateAnimGraph(actor, unk_rdx);
 	return 0;
 }
 
@@ -191,8 +211,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
 	{
-		if (MSF_MainData::burstTestManager->flags & BurstModeData::bActive)
-			MSF_MainData::burstTestManager->ResetShotsOnReload();
+		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
+			MSF_MainData::activeBurstManager->ResetShotsOnReload();
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
@@ -244,8 +264,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	else if (!_strcmpi("weaponFire", name))
 	{
-		if (MSF_MainData::burstTestManager->flags & BurstModeData::bActive)
-			MSF_MainData::burstTestManager->HandleFireEvent();
+		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
+			MSF_MainData::activeBurstManager->HandleFireEvent();
 		//if (MSF_MainData::tmr.IsRunning())
 		//{
 		//	if (MSF_MainData::tmr.stop() < 1000)

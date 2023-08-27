@@ -412,6 +412,26 @@ namespace MSF_Base
 				newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
 		}
 
+		//if (MSF_MainData::activeBurstManager)
+		//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;
+		//if (Utilities::WeaponInstanceHasKeyword(newInstanceData, MSF_MainData::FiringModBurstKW))
+		//{
+		//	BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(newModList, MSF_MainData::FiringModBurstKW);
+		//	if (mod)
+		//	{
+		//		auto it = MSF_MainData::burstModeData.find(mod);
+		//		if (it != MSF_MainData::burstModeData.end());
+		//		{
+		//			BurstModeData* burstMode = it->second;
+
+		//			if (MSF_MainData::activeBurstManager)
+		//				delete MSF_MainData::activeBurstManager;
+		//			MSF_MainData::activeBurstManager = new BurstModeManager(burstMode, true);
+		//			//MSF_MainData::activeBurstManager->HandleEquipEvent(newInstanceData);
+		//		}
+		//	}
+		//}
+
 		return true;
 	}
 

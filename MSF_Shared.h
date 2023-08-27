@@ -491,7 +491,7 @@ typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckSta
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, ModifyModDataFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
 typedef void(*_UpdateEquipData)(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
-typedef void(*_UpdateAnimGraph)(Actor* actor, bool rdx);
+typedef void*(*_UpdateAnimGraph)(Actor* actor, bool rdx);
 typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInstance, ExtraDataList* extraDataList);
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);

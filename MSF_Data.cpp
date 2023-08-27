@@ -43,10 +43,11 @@ int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
 UInt16 MSF_MainData::iMinRandomAmmo = 5;
 UInt16 MSF_MainData::iMaxRandomAmmo = 50;
+UInt16 MSF_MainData::iAutolowerTimeSec = 0;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
 
-BurstModeManager* MSF_MainData::burstTestManager = nullptr;
+BurstModeManager* MSF_MainData::activeBurstManager = nullptr;
 
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
@@ -109,9 +110,6 @@ namespace MSF_Data
 		MSF_MainData::ActionDraw = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x00132AF));
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
 		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
-
-		BurstModeData bm(80, 0x07, 3);
-		MSF_MainData::burstTestManager = new BurstModeManager(&bm, 0);
 		
 		return true;
 	}
@@ -493,12 +491,14 @@ namespace MSF_Data
 
 			delete lpReturnedString;
 		}
+		if (MSF_MainData::iMinRandomAmmo > MSF_MainData::iMaxRandomAmmo)
+			MSF_MainData::iMinRandomAmmo = MSF_MainData::iMaxRandomAmmo;
 		return true;
 	}
 
 	bool SetUserModifiedValue(std::string section, std::string settingName, std::string settingValue)
 	{
-		if (section == "Gameplay" || section == "Display")
+		if (section == "Bool")
 		{
 			//auto delimiter = settingName.find_first_of('_');
 			//if (delimiter == -1)
@@ -544,6 +544,12 @@ namespace MSF_Data
 				flag = MSF_MainData::bAmmoRequireWeaponToBeDrawn;
 			else if (settingName == "bShowUnavailableMods")
 				flag = MSF_MainData::bShowUnavailableMods;
+			else if (settingName == "bSpawnRandomAmmo")
+				flag = MSF_MainData::bSpawnRandomAmmo;
+			else if (settingName == "bSpawnRandomMods")
+				flag = MSF_MainData::bSpawnRandomMods;
+			else
+				return false;
 
 			if (flagValue)
 				MSF_MainData::MCMSettingFlags |= flag;
@@ -551,7 +557,18 @@ namespace MSF_Data
 				MSF_MainData::MCMSettingFlags &= ~flag;
 			return true;
 		}
-		else if (section == "Position")
+		else if (section == "Int")
+		{
+			UInt16 value = 0;
+			if (settingName == "iAutolowerTimeSec")
+				MSF_MainData::iAutolowerTimeSec = std::stoi(settingValue);
+			else if (settingName == "iMinRandomAmmo")
+				MSF_MainData::iMinRandomAmmo = std::stoi(settingValue);
+			else if (settingName == "iMaxRandomAmmo")
+				MSF_MainData::iMaxRandomAmmo = std::stoi(settingValue);
+			return true;
+		}
+		else if (section == "Float")
 		{
 			std::unordered_map<std::string, float>::iterator setting = MSF_MainData::MCMfloatSettingMap.find(settingName);
 			if (setting != MSF_MainData::MCMfloatSettingMap.end())
@@ -1063,12 +1080,14 @@ namespace MSF_Data
 										continue;
 									}
 									UInt16 ifflags = modCycle["ifFlags"].asInt();
+									float spawnChanceBase = modCycle["spawnChanceBase"].asFloat();
 									auto itCycle = modData->modCycleMap.find(ifValue);
 									ModData::ModCycle* cycle = nullptr;
 									if (itCycle == modData->modCycleMap.end())
 									{
 										cycle = new ModData::ModCycle();
 										cycle->flags = ifflags;
+										cycle->spawnChanceBase = spawnChanceBase;
 									}
 									else
 										cycle = itCycle->second;
@@ -1099,6 +1118,7 @@ namespace MSF_Data
 											}
 										
 											UInt16 modflags = switchmod["modFlags"].asInt();
+											float spawnChance = modCycle["spawnChance"].asFloat();
 											KeywordValue animFlavor = 0;
 											str = switchmod["animFlavor"].asString();
 											if (str != "")
@@ -1127,8 +1147,9 @@ namespace MSF_Data
 												animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
 
 											ModData::Mod* modDataMod = new ModData::Mod();
-											modDataMod->mod = mod;
+											modDataMod->mod = mod; 
 											modDataMod->flags = modflags;
+											modDataMod->spawnChance = spawnChance;
 											if (animIdle_1stP || animIdle_3rdP || animIdle_1stP_PA || animIdle_3rdP_PA)
 											{
 												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA);

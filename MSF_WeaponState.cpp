@@ -29,7 +29,9 @@ bool BurstModeManager::ResetShotsOnReload()
 
 bool BurstModeManager::HandleReleaseEvent()
 {
-	if (flags & BurstModeData::bResetShotCountOnRelease)
+	if (flags & BurstModeData::bTypeAuto)
+		Utilities::PlayIdleAction(*g_player, MSF_MainData::ActionRightRelease);
+	if ((flags & BurstModeData::bResetShotCountOnRelease) && (flags & BurstModeData::bTypeAuto))
 		InterlockedExchange16(&numOfShotsFired, 0);
 	return true;
 }

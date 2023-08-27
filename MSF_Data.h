@@ -85,6 +85,7 @@ public:
 		BGSMod::Attachment::Mod* mod;
 		UInt16 flags;
 		KeywordValue animFlavor;
+		float spawnChance;
 		AttachRequirements* attachRequirements;
 		AnimationData* animData;
 	};
@@ -98,6 +99,7 @@ public:
 		};
 		ModVector mods;
 		UInt32 flags;
+		float spawnChanceBase;
 	};
 	enum
 	{
@@ -147,7 +149,7 @@ class BurstModeManager : public BurstModeData
 {
 public:
 	//BurstModeManager(BurstModeData* templateData, UInt8 bActive) : BurstModeData(templateData->delayTime, templateData->flags, templateData->numOfTotalShots) { numOfShotsFired = 0; SetState(bActive); }
-	BurstModeManager(BurstModeData* templateData, UInt8 bActive) { delayTime = templateData->delayTime; flags = templateData->flags; numOfTotalShots = templateData->numOfTotalShots;  numOfShotsFired = 0; SetState(bActive); };
+	BurstModeManager(BurstModeData* templateData, bool bActive) { delayTime = templateData->delayTime; flags = templateData->flags; numOfTotalShots = templateData->numOfTotalShots;  numOfShotsFired = 0; SetState(bActive << 4); };
 	bool HandleFireEvent();
 	bool HandleReleaseEvent();
 	bool ResetShotsOnReload();
@@ -429,7 +431,7 @@ public:
 	static UInt64 DEBUGprintStoredDataHotkey;
 	static Utilities::Timer tmr;
 
-	static BurstModeManager* burstTestManager;
+	static BurstModeManager* activeBurstManager;
 
 	//Data added by plugins
 	static std::unordered_map<UInt64, KeybindData*> keybindMap;
@@ -487,6 +489,7 @@ public:
 	static UInt16 MCMSettingFlags;
 	static UInt16 iMinRandomAmmo;
 	static UInt16 iMaxRandomAmmo;
+	static UInt16 iAutolowerTimeSec;
 	static std::unordered_map<std::string, float> MCMfloatSettingMap;
 };
 
