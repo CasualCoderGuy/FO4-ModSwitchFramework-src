@@ -1,70 +1,6 @@
 #include "MSF_Shared.h"
 
 
-RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl(0x2C4BE10); // ??_7BGSObjectInstanceExtra@@6B@
-RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl(0x2C52848); // ??_7ExtraUniqueID@@6B@
-RelocAddr <uintptr_t> s_ExtraModRankVtbl(0x2C52760); // ??_7ExtraModRank@@6B@
-RelocAddr <uintptr_t> s_ExtraRankVtbl(0x2C521A0); // ??_7ExtraRank@@6B@
-RelocAddr <uintptr_t> s_ExtraAmmoVtbl(0x2C52560); // ??_7ExtraAmmo@@6B@
-RelocAddr <_HasPerkInternal> HasPerkInternal(0x0DA6600);
-RelocAddr <_AddItem_Native> AddItemNative(0x1402B40); 
-RelocAddr <_RemoveItem_Native> RemoveItemNative(0x140D1F0);
-RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal(0x140EB30); //0x140EA10
-RelocAddr <_PlayIdle> PlayIdleInternal(0x13864C0); //0x13863A0
-RelocAddr <_PlayIdle2> PlayIdleInternal2(0x13864C0);
-RelocAddr <_PlayIdleAction> PlayIdleActionInternal(0x13865C0); //0x13864A0 
-RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal(0x138A250); //0x138A130
-RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype(0x0CA5D20);
-RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor(0x0CA5ED0);
-RelocAddr <_CheckKeywordType> CheckKeywordType(0x0568FF0);
-RelocAddr <_IsInIronSights> IsInIronSights(0x13911D0);
-RelocAddr <_IsInPowerArmor> IsInPowerArmor(0x09CC980);
-RelocAddr <_DrawWeapon> DrawWeaponInternal(0x138C700);
-RelocAddr <_UseAmmo> FireWeaponInternal(0x0EFCE90);
-RelocAddr <_ReloadWeapon> ReloadWeaponInternal(0x0E9BE00);
-RelocAddr <_ShowNotification> ShowNotification(0x0AE1E90);
-RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray(0x0569070);
-RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal(0x14038B0);
-RelocAddr <_AttachModToStack> AttachRemoveModStack(0x01A84B0);
-RelocAddr <_UpdMidProc> UpdateMiddleProcess(0x0E2C3E0);
-RelocAddr <_UpdateEquipData> UpdateEquipData(0x01C0040);
-RelocAddr <_UpdateAnimGraph> UpdateAnimGraph(0x0D7EB20);
-RelocAddr <_UpdateEnchantments> UpdateEnchantments(0x0E12740);
-RelocAddr <_UpdateAVModifiers> UpdateAVModifiers(0x0DD9930);
-RelocAddr <_UpdateAnimValueFloat> UpdateAnimValueFloat(0x081D410);
-RelocAddr <_EquipItem> EquipItemInternal(0x0E1BCD0);
-RelocAddr <_UnEquipItem> UnequipItemInternal(0x0E1C0B0);
-
-RelocAddr <_MainEquipHandler> MainEquipHandler(0x0E1EB50);
-RelocAddr <_EquipHandler> EquipHandler(0x0E1D6D0);
-RelocAddr <_UniversalEquipHandler> UniversalEquipHandler(0x0DBEA80);
-RelocAddr <_UnkSub_EFF9D0> UnkSub_EFF9D0(0xEFF9D0);
-RelocAddr <_UnkSub_DFE930> UnkSub_DFE930(0xDFE930);
-RelocAddr <_NiStuff> NiStuff(0x0EB8E80);
-RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData(0x1B94970);
-
-RelocAddr <_GetHandle> GetHandle(0xAAC0);
-RelocAddr <_GetNiSmartPointer> GetNiSmartPointer(0xAC90);
-RelocAddr <_GetSmartPointer> GetSmartPointer(0xAB60);
-
-RelocPtr  <void*> g_pipboyInventoryData(0x5ABCAB8); // 130
-RelocPtr  <void*> g_CheckStackIDFunctor(0x2C5C928);
-RelocPtr  <void*> g_ModifyModDataFunctor(0x2D11060);
-RelocPtr  <void*> g_ActorEquipManager(0x5AB38D0);
-RelocPtr  <tArray<BGSKeyword*>> g_AttachPointKeywordArray(0x59DA3F0); //2
-RelocPtr  <tArray<BGSKeyword*>> g_InstantiationKeywordArray(0x59DA420); //4
-RelocPtr  <tArray<BGSKeyword*>> g_ModAssociationKeywordArray(0x59DA438); //5
-RelocPtr  <tArray<BGSKeyword*>> g_AnimArchetypeKeywordArray(0x59DA468); //7
-RelocPtr  <tArray<BGSKeyword*>> g_RecipeFilterKeywordArray(0x59DA498); //9
-RelocPtr  <tArray<BGSKeyword*>> g_AnimFlavorKeywordArray(0x59DA588); //13
-RelocPtr <void*> g_sightedTransitionAnimValueHolder(0x58D5410);
-RelocPtr <void*> g_reloadSpeedAnimValueHolder(0x58D5390);
-RelocPtr <float> g_reloadSpeedMultiplier(0x2C48D60);
-
-RelocPtr  <DWORD> hkLifoAllocator_TLS(0x5B02960);
-RelocPtr  <DWORD> unk1_TLS(0x5B02F18);
-RelocPtr  <void*> hkLifoAllocator_vtbl(0x2DBD288);
-
 BSExtraData::~BSExtraData() {};
 void BSExtraData::Unk_01() {};
 void BSExtraData::Unk_02() {};
@@ -386,6 +322,13 @@ namespace Utilities
 				count += stack->count;
 		}
 		return count;
+	}
+
+	EquippedWeaponData* GetEquippedWeaponData(Actor* owner)
+	{
+		if (!owner || !owner->middleProcess || !owner->middleProcess->unk08 || !owner->middleProcess->unk08->equipData)
+			return nullptr;
+		return owner->middleProcess->unk08->equipData->equippedData;
 	}
 
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod)

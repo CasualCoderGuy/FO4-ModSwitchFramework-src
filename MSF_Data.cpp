@@ -143,6 +143,18 @@ namespace MSF_Data
 		return true;
 	}
 
+	bool InjectAttachPoints()
+	{
+		tArray<TESObjectWEAP*>* weaps = &(*g_dataHandler)->arrWEAP;
+		for (UInt64 idx = 0; idx < weaps->count; idx++)
+		{
+			TESObjectWEAP* weapForm = nullptr;
+			weaps->GetNthItem(idx, weapForm);
+			AttachParentArray* aps = (AttachParentArray*)&weapForm->attachParentArray;
+			aps->kewordValueArray.Push(MSF_MainData::ammoAP);
+		}
+	}
+
 	bool InitMCMSettings()
 	{
 		if (!ReadMCMKeybindData())

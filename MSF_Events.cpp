@@ -1,20 +1,8 @@
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
 
-//RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F4B24C);
-//RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F48D00);
-RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget(0x0F494DA);
-RelocAddr <AttackBlockHandler> AttackBlockHandler_Original(0x0F4B080);
-
-
-RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget(0x0A0E9D2);
-RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original(0x0A22D00);
 HUDShowAmmoCounter HUDShowAmmoCounter_Copied;
-RelocPtr <UInt32> uAmmoCounterFadeTimeMS(0x375CF30); //A0E9C9
-RelocAddr <_PlayerAnimationEvent> PlayerAnimationEvent_HookTarget(0x2D442E0);
-RelocAddr <_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget(0x0E1F030);
 _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
-
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
@@ -206,6 +194,16 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 	return 0;
 }
 
+bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03
+{
+	ExtraWeaponState* state1 = MSF_MainData::weaponStateStore.Get(extra1->rank);
+	ExtraWeaponState* state2 = MSF_MainData::weaponStateStore.Get(extra2->rank);
+	if (state1 || state2)
+		return false;
+	else
+		return extra1->rank != extra2->rank;
+}
+
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 {
 	const char* name = arg2->eventName.c_str();
@@ -266,6 +264,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	{
 		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
 			MSF_MainData::activeBurstManager->HandleFireEvent();
+		
 		//if (MSF_MainData::tmr.IsRunning())
 		//{
 		//	if (MSF_MainData::tmr.stop() < 1000)

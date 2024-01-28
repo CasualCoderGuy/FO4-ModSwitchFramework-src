@@ -3,7 +3,7 @@
 #include "MSF_Data.h"
 
 
-typedef unsigned long WeaponStateID;
+typedef UInt32 WeaponStateID;
 
 class DataHolderParentInstance
 {
@@ -14,60 +14,44 @@ public:
 	ObjectRefHandle refHandle;
 };
 
-class ExtraWeaponState : public BSExtraData
+class ExtraWeaponState
 {
 public:
-	virtual ~ExtraWeaponState() override;
-	virtual void Unk_01() override {};
-	virtual void Unk_02() override {};
-	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData, DataHolderParentInstance &instance);
-	bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
-	bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	bool SetCurrentStateTemporary();
-	bool HandleFireEvent();
-	bool HandleReloadEvent();
+	~ExtraWeaponState();
+	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	static ModData::Mod defaultStatePlaceholder;
+	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
+	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	//bool SetCurrentStateTemporary();
+	bool HandleEquipEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	bool HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
 	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
-	bool SetParentRef(ObjectRefHandle refHandle);
-	bool SetParentInvItem(ExtraDataList* extraList);
-	bool ValidateParent();
-	enum
-	{
-		kType_ExtraWeaponState = 0xF1
-	};
+
 	class WeaponState
 	{
 	public:
-		WeaponState(TESObjectWEAP::InstanceData* instanceData);
-		~WeaponState();
+		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		enum
 		{
 			bHasLevel = 0x01,
 			bActive = 0x02
 		};
-		UInt32 flags; //state flags
+		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
-		TESAmmo* switchedAmmoType;
-		BGSMod::Attachment::Mod* switchedAmmoMod;
-	private:
-		TESAmmo* ammoType;
-		BGSImpactDataSet* impactDataSet; //unk58
-		BGSProjectile* projectileOverride;
-		SpellItem* critEffect; //unk78
-		tArray<TBO_InstanceData::DamageTypes> damageTypes;
-		UInt16 baseDamage;
-		UInt32 numProjectiles;
-		float secondary;
-		float critDamageMult;
-		float minRange;
-		float maxRange;
-		float outOfRangeMultiplier;
-		UInt32 stagger;
+		UInt16 chamberSize;
+		volatile short shotCount; 
+		volatile long long loadedAmmo;
+		AmmoData::AmmoMod* switchToAmmoAfterFire;
+		AmmoData::AmmoMod* currentSwitchedAmmo;
+		std::vector<ModData::Mod*> attachedMods; //maybe later
 	};
 private:
-	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, DataHolderParentInstance &instance);
-	DataHolderParentInstance parent;
+	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	WeaponStateID ID;
-	std::vector<std::tuple<BGSMod::Attachment::Mod*, UInt64, WeaponState*, WeaponState*>> weaponStates;
+	ExtraRank* holder;
+	std::unordered_map<ModData::Mod*, WeaponState*> weaponStates;
+	WeaponState* currentState;
 	BurstModeManager* burstModeManager;
 	//std::pair<WeaponState, WeaponState> primaryState; //temporaryState, baseState
 	//std::pair<WeaponState, WeaponState> secondaryState;
@@ -103,7 +87,7 @@ public:
 		ExtraWeaponState* state = nullptr;
 		if (id && id <= vectorstorage.size())
 			state = vectorstorage[id - 1];
-		if (state && state->ValidateParent())
+		if (state)// && state->ValidateParent())
 			return state;
 		return nullptr;
 	};

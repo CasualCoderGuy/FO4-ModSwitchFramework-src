@@ -369,6 +369,7 @@ namespace Utilities
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex);
 	UInt64 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
+	EquippedWeaponData* GetEquippedWeaponData(Actor* owner);
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod);
 	BGSMod::Attachment::Mod* FindModByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
 	std::vector<BGSMod::Attachment::Mod*> FindModsByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
@@ -554,8 +555,11 @@ extern RelocAddr <_GetNiSmartPointer> GetNiSmartPointer;
 typedef bool(*_GetSmartPointer)(const UInt32& a_handle, TESObjectREFR*& a_smartPointerOut);
 extern RelocAddr <_GetSmartPointer> GetSmartPointer;
 
-extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl; // ??_7BGSObjectInstanceExtra@@6B@
-
+extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl;
+extern RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl;
+extern RelocAddr <uintptr_t> s_ExtraModRankVtbl;
+extern RelocAddr <uintptr_t> s_ExtraRankVtbl; 
+extern RelocAddr <uintptr_t> s_ExtraAmmoVtbl;
 extern RelocAddr <_EquipItem> EquipItemInternal;
 extern RelocAddr <_UnEquipItem> UnequipItemInternal;
 extern RelocAddr <_HasPerkInternal> HasPerkInternal;
@@ -605,7 +609,12 @@ extern RelocPtr <tArray<BGSKeyword*>> g_AnimFlavorKeywordArray;
 extern RelocPtr <void*> g_sightedTransitionAnimValueHolder;
 extern RelocPtr <void*> g_reloadSpeedAnimValueHolder;
 extern RelocPtr <float> g_reloadSpeedMultiplier;
+extern RelocPtr <std::unordered_map<UInt32, TESForm*>> g_FormMap;
+extern RelocPtr <BSReadWriteLock*> g_FormMapLock;
 
+extern RelocPtr  <DWORD> hkLifoAllocator_TLS;
+extern RelocPtr  <DWORD> unk1_TLS;
+extern RelocPtr  <void*> hkLifoAllocator_vtbl;
 
 //AddItem?shorter?: 0x143A0C0
 //RemItem?shorter?: 0x143AA60
