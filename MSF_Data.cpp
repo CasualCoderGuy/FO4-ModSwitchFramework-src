@@ -65,6 +65,22 @@ RandomNumber MSF_MainData::rng;
 
 namespace MSF_Data
 {
+
+	bool InjectAttachPoints()
+	{
+		if (!MSF_MainData::ammoAP)
+			return false;
+		tArray<TESObjectWEAP*>* weaps = &(*g_dataHandler)->arrWEAP;
+		for (UInt64 idx = 0; idx < weaps->count; idx++)
+		{
+			TESObjectWEAP* weapForm = nullptr;
+			weaps->GetNthItem(idx, weapForm);
+			AttachParentArray* aps = (AttachParentArray*)&weapForm->attachParentArray;
+			aps->kewordValueArray.Push(MSF_MainData::ammoAP);
+		}
+		return true;
+	}
+
 	bool InitData()
 	{
 		UInt32 formIDbase = 0;
@@ -111,7 +127,7 @@ namespace MSF_Data
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
 		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
 		
-		return true;
+		return InjectAttachPoints();
 	}
 
 	bool InitCompatibility()
@@ -141,18 +157,6 @@ namespace MSF_Data
 				attachParentArray->kewordValueArray.Push(*itValue);
 		}
 		return true;
-	}
-
-	bool InjectAttachPoints()
-	{
-		tArray<TESObjectWEAP*>* weaps = &(*g_dataHandler)->arrWEAP;
-		for (UInt64 idx = 0; idx < weaps->count; idx++)
-		{
-			TESObjectWEAP* weapForm = nullptr;
-			weaps->GetNthItem(idx, weapForm);
-			AttachParentArray* aps = (AttachParentArray*)&weapForm->attachParentArray;
-			aps->kewordValueArray.Push(MSF_MainData::ammoAP);
-		}
 	}
 
 	bool InitMCMSettings()
@@ -1192,8 +1196,8 @@ namespace MSF_Data
 								continue;
 							}
 							itKb->modData = modData;
-							if (modData->flags & ModData::bRequireAPmod)
-								Utilities::AddAttachValue((AttachParentArray*)&MSF_MainData::APbaseMod->unk98, apValue);
+							//if (modData->flags & ModData::bRequireAPmod)
+							//	Utilities::AddAttachValue((AttachParentArray*)&MSF_MainData::APbaseMod->unk98, apValue);
 
 						}
 					}

@@ -166,15 +166,15 @@ namespace MSF_Base
 
 	bool InitWeapon()
 	{
-		Actor* playerActor = *g_player;
-		if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
-		{
-			_MESSAGE("init");
-			if (!AttachModToEquippedWeapon(playerActor, MSF_MainData::APbaseMod, true, 0, false))
-				return false;
-			if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
-				return false;
-		}
+		//Actor* playerActor = *g_player;
+		//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
+		//{
+		//	_MESSAGE("init");
+		//	if (!AttachModToEquippedWeapon(playerActor, MSF_MainData::APbaseMod, true, 0, false))
+		//		return false;
+		//	if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
+		//		return false;
+		//}
 		return true;
 	}
 
@@ -831,7 +831,7 @@ namespace MSF_Base
 					if (ammo)
 					{
 						Utilities::AddItem(randomActor, ammo, count, true);
-						Utilities::AttachModToInventoryItem(randomActor, firearm, MSF_MainData::APbaseMod);
+						//Utilities::AttachModToInventoryItem(randomActor, firearm, MSF_MainData::APbaseMod);
 					}
 					for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)
 					{
