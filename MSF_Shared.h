@@ -138,33 +138,50 @@ class CheckStackIDFunctor
 {
 private:
 	void* vtbl;		//00
-	UInt64 stackID;	//08
-	UInt64 pad0C;	//0C
+	UInt32 stackID;	//08
 public:
-	CheckStackIDFunctor(UInt64 stackID);
+	CheckStackIDFunctor(UInt32 ID);
 };
 
-class ModifyModDataFunctor
+class StackDataWriteFunctor
 {
-private:
-	void* vtbl;						//00
+protected:
+	void* vtbl;								// 00
 public:
-	UInt64 unk08; //1
-	//UInt16 unk08;					//08 set to 1
-	//UInt32 pad0A;					//0A not set when calling sub_1401A84B0
-	//UInt16 pad0E;					//0E not set when calling sub_1401A84B0
-	BGSMod::Attachment::Mod* mod;	//10
-	TESObjectWEAP* baseWeap;		//18 set after calling sub_1401A84B0, no need to set in advance
-	UInt8* byteptr;					//20 set to 1, return value
-	UInt64 unk28;					//0x100 when attach, 0xFF when remove 
-	//UInt8 unk28;					//28 set to 0
-	//UInt8 unk29;					//29 set to 0x1, might be unk04 from BGSObjectInstanceExtra::Data::Form
-	//UInt8 unk2A;					//2A from BGSInventoryItem::Stack flag lsh3, filled after calling sub_1401A84B0, no need to set in advance
-	//UInt8 pad2B;					//2B set to 0
-	//UInt32 pad2C;					//2C set to 0
-	ModifyModDataFunctor(BGSMod::Attachment::Mod* modToAttach, UInt8* ret, bool Attach);
+	bool shouldSplitStacks{ true };              // 08
+	bool transferEquippedToSplitStack{ false };  // 09
+};
+STATIC_ASSERT(sizeof(StackDataWriteFunctor) == 0x10);
+
+class ModifyModDataFunctor : public StackDataWriteFunctor
+{
+public:
+	ModifyModDataFunctor(BGSMod::Attachment::Mod* mod, UInt8 slotIndex, bool bAttach, bool* success);
+
+	BGSMod::Attachment::Mod* mod;			// 10
+	TESBoundObject* foundObject{ nullptr };	// 18 not needed to set in advance
+	bool* success;							// 20 set to 1, return value
+	const UInt8 slotIndex;					// 28
+	const bool attach;						// 29
+	bool equipLocked{ false };				// 2A
 };
 STATIC_ASSERT(sizeof(ModifyModDataFunctor) == 0x30);
+STATIC_ASSERT(offsetof(ModifyModDataFunctor, mod) == 0x10);
+
+class ApplyChangesFunctor : public StackDataWriteFunctor
+{
+public:
+	ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, UInt8 unk28, UInt16 unk29, UInt8 unk2B);
+
+	BGSObjectInstanceExtra* moddata;		// 10
+	TESBoundObject* foundObject;			// 18
+	BGSMod::Attachment::Mod* mod;			// 20
+	UInt8 unk28;							// 28
+	UInt16 unk29;							// 29
+	UInt8 unk2B;							// 2B
+};
+STATIC_ASSERT(sizeof(ApplyChangesFunctor) == 0x30);
+STATIC_ASSERT(offsetof(ApplyChangesFunctor, mod) == 0x20);
 
 struct unkTBOStruct
 {
@@ -489,7 +506,7 @@ public:
 
 typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod, bool unkbool);
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
-typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, ModifyModDataFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
+typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
 typedef void(*_UpdateEquipData)(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
 typedef void*(*_UpdateAnimGraph)(Actor* actor, bool rdx);
@@ -599,6 +616,7 @@ extern RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData;
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;
+extern RelocPtr <void*> g_ApplyChangesFunctor;
 extern RelocPtr <void*> g_ActorEquipManager; 
 extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;

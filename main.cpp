@@ -96,13 +96,15 @@ public:
 
 void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 {
-	if (msg->type == F4SEMessagingInterface::kMessage_GameDataReady)
+	switch (msg->type)
+	{
+	case F4SEMessagingInterface::kMessage_GameDataReady:
 	{
 		if (msg->data == (void*)true)
 		{
 			//MSF_Scaleform::RegisterMCMCallback();
 			if (!MSF_Data::InitData())
-				_FATALERROR("MSF was unable to initialize plugin data"); 
+				_FATALERROR("MSF was unable to initialize plugin data");
 			else if (!MSF_Data::InitMCMSettings())
 				_FATALERROR("MSF was unable to initialize MCM settings");
 			else
@@ -111,7 +113,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				GetEventDispatcher<TESLoadGameEvent>()->AddEventSink(pLoadGameHandler);
 				MSF_Scaleform::ReceiveKeyEvents();
 
-				RVAUtils::Timer tmr; 
+				RVAUtils::Timer tmr;
 				tmr.start();
 				MSF_Data::LoadPluginData();
 				_MESSAGE("Plugin Data Loading Time: %llu ms.", tmr.stop());
@@ -122,6 +124,40 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 			}
 		}
 	}
+	break;
+	case F4SEMessagingInterface::kMessage_PreLoadGame: MSF_MainData::GameIsLoading = true; break;
+	case F4SEMessagingInterface::kMessage_PostLoadGame: MSF_MainData::GameIsLoading = false; break;
+	//case 363636:
+	//{
+	//	AttachModMessage* data = (AttachModMessage*)msg->data;
+	//	if (data)
+	//		MSF_Base::AttachModToEquippedWeapon(data->actor, data->mod, data->bAttach, data->modAmmoCount, data->updateAnimGraph);
+	//}
+	//break;
+	}
+}
+
+bool WriteHooks()
+{
+	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
+	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
+
+	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
+	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
+	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
+	AttachModToStack_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromWorkbenchUI_Hook);
+
+	//if (check copied address validity)
+	//	return false;
+
+	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
+	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
+	g_branchTrampoline.Write5Call(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromGameplay_Hook);
+	g_branchTrampoline.Write5Call(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromWorkbenchUI_Hook);
+
+	//if (check write success)
+	//	return false;
+	return true;
 }
 
 bool InitializeOffsets()
@@ -167,8 +203,9 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 
 	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
 	{
-		_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
-		return false;
+		_WARNING("Warning - Missing mcm.dll - Keybinds and settings are read from MCM files. While it is possible to maintain these manually, installing and using MCM is highly recommended.");
+		//_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
+		//return false;
 	}
 
 	Globals::Init();
@@ -188,14 +225,8 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 
 	//InitializeOffsets();
 
-
-	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
-	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
-
-	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
-	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
-	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
-	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
+	if (!WriteHooks())
+		return false;
 
 	if (!MSF_Data::ReadKeybindData())
 	{
@@ -280,6 +311,7 @@ bool F4SEPlugin_Load(const F4SEInterface *f4se)
 	if (g_messaging) 
 	{
 		g_messaging->RegisterListener(g_pluginHandle, "F4SE", F4SEMessageHandler);
+		//g_messaging->RegisterListener(g_pluginHandle, NULL, MSFMessageHandler);
 	}
 
 	if (g_papyrus) 

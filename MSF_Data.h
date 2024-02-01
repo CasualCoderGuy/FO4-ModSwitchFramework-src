@@ -416,6 +416,7 @@ class MSF_MainData
 {
 public:
 	static bool IsInitialized;
+	static bool GameIsLoading;
 
 	static RandomNumber rng;
 	static int iCheckDelayMS;

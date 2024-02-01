@@ -303,10 +303,10 @@ namespace MSF_Base
 		UInt64 loadedAmmoCount = eqData->loadedAmmoCount;
 		TESAmmo* ammoType = eqData->ammo;
 
-		UInt8 ret = 1;
+		bool ret = false;
 
 		CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-		ModifyModDataFunctor modFunctor(mod, &ret, bAttach);
+		ModifyModDataFunctor modFunctor(mod, 0, bAttach , &ret);
 
 		UInt32 unk = 0x00200000;
 		AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
@@ -479,9 +479,9 @@ namespace MSF_Base
 					}
 					if (!found)
 					{
-						UInt8 ret = 1;
+						bool ret = 0;
 						CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-						ModifyModDataFunctor modFunctor(mod, &ret, false);
+						ModifyModDataFunctor modFunctor(mod, 0, false, &ret);
 						UInt32 unk = 0x00200000;
 						AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
 						if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
@@ -638,9 +638,9 @@ namespace MSF_Base
 		_MESSAGE("toremove: %i", toRemove.size());
 		for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = toRemove.begin(); itMod != toRemove.end(); itMod++)
 		{
-			UInt8 ret = 1;
+			bool ret = 0;
 			CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-			ModifyModDataFunctor modFunctor(*itMod, &ret, false);
+			ModifyModDataFunctor modFunctor(*itMod, 0, false, &ret);
 			UInt32 unk = 0x00200000;
 			AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
 			if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
@@ -747,9 +747,9 @@ namespace MSF_Base
 			{
 				if (*itMod)
 				{
-					UInt8 ret = 1;
+					bool ret = 0;
 					CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-					ModifyModDataFunctor modFunctor(*itMod, &ret, false);
+					ModifyModDataFunctor modFunctor(*itMod, 0, false, &ret);
 					UInt32 unk = 0x00200000;
 					AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
 					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)

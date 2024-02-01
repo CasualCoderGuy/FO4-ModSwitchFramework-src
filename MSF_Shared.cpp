@@ -5,26 +5,34 @@ BSExtraData::~BSExtraData() {};
 void BSExtraData::Unk_01() {};
 void BSExtraData::Unk_02() {};
 
-CheckStackIDFunctor::CheckStackIDFunctor(UInt64 ID)
+CheckStackIDFunctor::CheckStackIDFunctor(UInt32 ID)
 {
 	vtbl = g_CheckStackIDFunctor;
 	stackID = ID;
-	pad0C = 0;
 }
 
-ModifyModDataFunctor::ModifyModDataFunctor(BGSMod::Attachment::Mod* modToAttach, UInt8* ret, bool Attach)
+ModifyModDataFunctor::ModifyModDataFunctor(BGSMod::Attachment::Mod* mod, UInt8 slotIndex, bool bAttach, bool* success) :
+	mod(mod),
+	success(success),
+	slotIndex(slotIndex),
+	attach(bAttach)
 {
 	vtbl = g_ModifyModDataFunctor;
-	unk08 = 1;
-	mod = modToAttach;
-	byteptr = ret;
-	*byteptr = 1;
-	unk28 = Attach * 0x100 + !Attach * 0xFF;//0xFF when remove 
-	//unk29 = 1;
-	//unk2A = 0;
-	//pad2B = 0;
-	//pad2C = 0;
+	if (success) {
+		*success = true;
+	}
 }
+ApplyChangesFunctor::ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, UInt8 unk28, UInt16 unk29, UInt8 unk2B) :
+	moddata(moddata),
+	foundObject(foundObject),
+	mod(mod),
+	unk28(unk28),
+	unk29(unk29),
+	unk2B(unk2B)
+{
+	vtbl = g_ApplyChangesFunctor;
+}
+
 
 UInt32 roundp(float a)
 {

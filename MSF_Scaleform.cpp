@@ -87,9 +87,13 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::DumpUnknownData((*g_player));
 				//MSF_Test::DumpActorValue();
 				//MSF_Test::DumpExtraDataInfo();
-				//MSF_Test::CallAttachModToInvItem();
+				MSF_Test::CallAttachModToInvItem();
 				//MSF_Test::NPCtest();
-				MSF_Test::ExtraDataTest();
+				
+				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
+				//Utilities::PlayIdle(*g_player, sw);
+
+				//MSF_Test::ExtraDataTest();
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
 				_MESSAGE("test1");
 			}

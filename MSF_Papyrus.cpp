@@ -382,6 +382,12 @@ bool MSF_Papyrus::RegisterPapyrus(VirtualMachine* vm)
 	return true;
 }
 
+//AttachModToStack
+//AttachModToEquippedWeapon
+//ToggleAmmoMenu
+//GetAttachParentKeyword +WEAP
+//GetAttachPointKeywords +WEAP
+//GetModAtAttachPoint
 
 void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 {

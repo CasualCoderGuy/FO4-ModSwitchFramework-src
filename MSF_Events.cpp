@@ -3,6 +3,8 @@
 
 HUDShowAmmoCounter HUDShowAmmoCounter_Copied;
 _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
+_AttachModToStack AttachModToStack_CallFromGameplay_Copied;
+_AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
@@ -192,6 +194,38 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 		return EquipHandler_UpdateAnimGraph_Copied(actor, unk_rdx);
 		//return UpdateAnimGraph(actor, unk_rdx);
 	return 0;
+}
+
+bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20)
+{
+	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu"))
+		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+
+	ModifyModDataFunctor* modWriteFunctor = (ModifyModDataFunctor*)modFunctor;
+
+	_MESSAGE("CALL from Gameplay");
+	return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+}
+
+bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20)
+{
+	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu"))
+		return AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
+
+	ApplyChangesFunctor* applyChangesFunctor = (ApplyChangesFunctor*)changesFunctor;
+	if (applyChangesFunctor)
+	{
+		TESBoundObject* item = applyChangesFunctor->foundObject;
+		BGSMod::Attachment::Mod* mod = applyChangesFunctor->mod;
+		_MESSAGE("APPLY CHANGES:");
+		if (item)
+			_MESSAGE("weap: %s", item->GetFullName());
+		if (mod)
+			_MESSAGE("mod: %s", mod->GetFullName());
+		_MESSAGE("split, transfer, 28, 29, 2B::: %02X, %02X, %02X, %04X, %02X", applyChangesFunctor->shouldSplitStacks, applyChangesFunctor->transferEquippedToSplitStack, applyChangesFunctor->unk28, applyChangesFunctor->unk29, applyChangesFunctor->unk2B);
+	}
+
+	return AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
 }
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03

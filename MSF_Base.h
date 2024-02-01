@@ -27,6 +27,15 @@ namespace MSF_Base
 	bool PlayAnim(AnimationData* animData);
 }
 
+struct AttachModMessage
+{
+	Actor* actor;
+	BGSMod::Attachment::Mod* mod;
+	bool bAttach;
+	UInt8 modAmmoCount;
+	bool updateAnimGraph;
+};
+
 struct DataToAdd
 {
 	UInt8 op;

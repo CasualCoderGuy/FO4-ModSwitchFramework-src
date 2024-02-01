@@ -196,10 +196,17 @@ extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 extern RelocAddr <_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget;
 extern _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 
+extern RelocAddr <_AttachModToStack> AttachModToStack_CallFromGameplay_HookTarget;
+extern RelocAddr <_AttachModToStack> AttachModToStack_CallFromWorkbenchUI_HookTarget;
+extern _AttachModToStack AttachModToStack_CallFromGameplay_Copied;
+extern _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
+
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx);
+bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
+bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

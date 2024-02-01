@@ -37,7 +37,7 @@ BGSAction* MSF_MainData::ActionReload;
 BGSAction* MSF_MainData::ActionDraw;
 BGSAction* MSF_MainData::ActionGunDown;
 BGSAction* MSF_MainData::ActionRightRelease;
-
+bool MSF_MainData::GameIsLoading = true;
 bool MSF_MainData::IsInitialized = false;
 int MSF_MainData::iCheckDelayMS = 10;
 UInt16 MSF_MainData::MCMSettingFlags = 0x000;
