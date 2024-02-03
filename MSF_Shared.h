@@ -186,6 +186,44 @@ public:
 STATIC_ASSERT(sizeof(ApplyChangesFunctor) == 0x30);
 STATIC_ASSERT(offsetof(ApplyChangesFunctor, remove) == 0x29);
 
+class ExtraEnchantment : public BSExtraData
+{
+public:
+	ExtraEnchantment();
+	virtual ~ExtraEnchantment();
+
+	EnchantmentItem* enchant;		// 08
+	UInt16				maxCharge;		// 0C
+	UInt8				unk0E;			// 0E - usually 0
+	UInt8				pad0F;			// 0F
+
+	static ExtraEnchantment* Create();
+};
+
+class ExtraModRank : public BSExtraData
+{
+public:
+	UInt32				rank;		// 18
+
+	static ExtraModRank* Create(UInt32 modrank);
+};
+
+class ExtraRank : public BSExtraData
+{
+public:
+	UInt32				rank;		// 18
+
+	static ExtraRank* Create(UInt32 rank);
+};
+
+class ExtraAmmo : public BSExtraData
+{
+public:
+	UInt32				ammo;		// 18
+
+	static ExtraAmmo* Create(UInt32 ammo);
+};
+
 struct unkTBOStruct
 {
 	TESBoundObject* baseForm;
@@ -388,7 +426,8 @@ namespace Utilities
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex);
 	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor);
-	UInt64 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
+	UInt32 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
+	BGSInventoryItem::Stack* GetStack(BGSInventoryItem* item, UInt32 stackID);
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
 	EquippedWeaponData* GetEquippedWeaponData(Actor* owner);
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod);
@@ -837,44 +876,6 @@ public:
 
 	AmmoSettings		settings;	// 8C
 	StringCache::Ref	unk98;	// 98
-};
-
-class ExtraEnchantment : public BSExtraData
-{
-public:
-	ExtraEnchantment();
-	virtual ~ExtraEnchantment();
-
-	EnchantmentItem*	enchant;		// 08
-	UInt16				maxCharge;		// 0C
-	UInt8				unk0E;			// 0E - usually 0
-	UInt8				pad0F;			// 0F
-
-	static ExtraEnchantment* Create();
-};
-
-class ExtraModRank : public BSExtraData
-{
-public:
-	UInt32				rank;		// 18
-
-	static ExtraModRank* Create(UInt32 modrank);
-};
-
-class ExtraRank : public BSExtraData
-{
-public:
-	UInt32				rank;		// 18
-
-	static ExtraRank* Create(UInt32 rank);
-};
-
-class ExtraAmmo : public BSExtraData
-{
-public:
-	UInt32				ammo;		// 18
-
-	static ExtraAmmo* Create(UInt32 ammo);
 };
 
 class MagicalItem : public TESBoundObject

@@ -147,7 +147,39 @@ bool WriteHooks()
 	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
 	AttachModToStack_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromWorkbenchUI_Hook);
 	DeleteExtraData_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &DeleteExtraData_CallFromWorkbenchUI_Hook);
+	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
 
+	if (LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
+	{
+		struct LoadExtraRank_InjectCode : Xbyak::CodeGenerator {
+			LoadExtraRank_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+			{
+				Xbyak::Label hook, retnLabel;
+
+				mov(edx, dword[r13 + 0x24]);
+				add(rdx, qword[r13 + 0x8]);
+				mov(r9, qword[rsp + 0x318]);
+				mov(r8, r12);
+				mov(edx, dword[rdx]);
+				mov(rcx, rax);
+				call(ptr[rip + hook]);
+				jmp(ptr[rip + retnLabel]);
+
+				L(hook);
+				dq((uintptr_t)LoadBuffer_ExtraDataList_ExtraRank_Hook);
+				L(retnLabel);
+				dq(LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr);
+			}
+		};
+		void* codeBuf = g_localTrampoline.StartAlloc();
+		LoadExtraRank_InjectCode code(codeBuf);
+		g_localTrampoline.EndAlloc(code.getCurr());
+
+		_MESSAGE("codeBuf: %p", codeBuf);
+
+		LoadBuffer_ExtraDataList_ExtraRank_BranchCode = (uintptr_t)codeBuf;
+		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
+	}
 	//if (! copied address validity)
 	//	return false;
 
