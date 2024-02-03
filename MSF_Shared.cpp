@@ -319,9 +319,9 @@ namespace Utilities
 		return eqStack;
 	}
 
-	UInt64 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack) //equipped stack ID should always be 0 but check nevertheless
+	UInt32 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack) //equipped stack ID should always be 0 but check nevertheless
 	{
-		UInt64 IDcount = 0;
+		UInt32 IDcount = 0;
 		for (BGSInventoryItem::Stack* currStack = item->stack; currStack; currStack = currStack->next)
 		{
 			if (currStack == stack)
@@ -329,6 +329,20 @@ namespace Utilities
 			IDcount++;
 		}
 		return 0;
+	}
+
+	BGSInventoryItem::Stack* GetStack(BGSInventoryItem* item, UInt32 stackID)
+	{
+		if (!item)
+			return nullptr;
+		UInt32 IDcount = 0;
+		for (BGSInventoryItem::Stack* currStack = item->stack; currStack; currStack = currStack->next)
+		{
+			if (IDcount == stackID)
+				return currStack;
+			IDcount++;
+		}
+		return nullptr;
 	}
 
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item)

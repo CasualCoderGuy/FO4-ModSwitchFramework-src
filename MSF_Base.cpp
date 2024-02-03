@@ -124,7 +124,7 @@ namespace MSF_Base
 	}
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
+	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
 	{
 		if (!modToAttach && !modToRemove)
 			return false;
@@ -135,7 +135,7 @@ namespace MSF_Base
 		//if (!MSF_Data::CheckSwitchRequirements(stack, modToAttach, modToRemove))
 		//	return false;
 
-		return MSF_Data::QueueModsToSwitch(modToAttach, modToRemove, bNeedInit);
+		return MSF_Data::QueueModsToSwitch(modToAttach, modToRemove);
 	}
 
 
@@ -248,7 +248,7 @@ namespace MSF_Base
 				MSF_MainData::modSwitchManager.FinishSwitch(switchData);
 				return false;
 			}
-			ReevalSwitchedWeapon(playerActor, modToRemove);
+			//ReevalSwitchedWeapon(playerActor, modToRemove);
 			if (looseModToAdd)
 				Utilities::AddItem(playerActor, looseModToAdd, 1, true);
 		}
@@ -316,6 +316,30 @@ namespace MSF_Base
 		BGSObjectInstanceExtra* newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
 		ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 		TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+
+		std::vector<BGSMod::Attachment::Mod*> invalidMods;
+		MSF_Base::GetInvalidMods(&invalidMods, newModList, weapBase, mod);
+		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+		{
+			BGSMod::Attachment::Mod* invalidMod = *itMods;
+			_MESSAGE("invalid mod: %08X", invalidMod->formID);
+			unk = 0x00200000;
+			bool success = false;
+			ModifyModDataFunctor modifyModFunctor(invalidMod, 0, false, &success);
+			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);
+		}
+
+		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(newModList, weapBase);
+		if (invalidAmmoMod)
+		{
+			_MESSAGE("invalid ammomod: %08X", invalidAmmoMod->formID);
+			unk = 0x00200000;
+			bool success = false;
+			ModifyModDataFunctor modifyModFunctor(invalidAmmoMod, 0, false, &success);
+			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);;
+		}
 
 		BGSObjectInstance idStruct;
 		idStruct.baseForm = weapBase;
@@ -432,378 +456,6 @@ namespace MSF_Base
 		//	}
 		//}
 
-		return true;
-	}
-
-	bool ReevalModdedWeapon(TESObjectWEAP* weapon)
-	{
-		if (!weapon)
-			return false;
-		Actor* owner = *g_player;
-		BGSInventoryItem* item = nullptr;
-		for (UInt32 i = 0; i < owner->inventoryList->items.count; i++)
-		{
-			item = &owner->inventoryList->items.entries[i];
-			TESObjectWEAP* baseWeapon = DYNAMIC_CAST(item->form, TESForm, TESObjectWEAP);
-			if (baseWeapon != weapon)
-				continue;
-			for (BGSInventoryItem::Stack* stack = item->stack; stack; stack = stack->next)
-			{
-				BGSObjectInstanceExtra * objectModData = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-				ExtraInstanceData* extraInstance = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-				TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstance->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-				if (!instanceData)
-					continue;
-				ReevalAttachedMods(owner, item, stack);
-				if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::hasSwitchedAmmoKW))
-				{
-					BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
-					if (!mod)
-						continue;
-					TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(objectModData, baseWeapon);
-					bool found = false;
-					if (!baseAmmo)
-						continue;
-					auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
-					if (itAD != MSF_MainData::ammoDataMap.end())
-					{
-						AmmoData* itAmmoData = itAD->second;
-						for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-						{
-							if (itAmmoMod->mod == mod)
-							{
-								found = true;
-								break;
-							}
-						}
-					}
-					if (!found)
-					{
-						bool ret = 0;
-						CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-						ModifyModDataFunctor modFunctor(mod, 0, false, &ret);
-						UInt32 unk = 0x00200000;
-						AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
-						if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
-						{
-							ExtraDataList* newList = stack->extraData;
-							ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-							TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-							BGSObjectInstance idStruct;
-							idStruct.baseForm = weapon;
-							idStruct.instanceData = newInstanceData;
-							EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
-							//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-							//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-							//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-							//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-							//InterlockedIncrement64(lockcnt);
-							//UpdateEquipData(owner->equipData, idStruct, nullptr);
-							//InterlockedDecrement64(lockcnt);
-							//UpdateEnchantments(owner, idStruct, newList);
-							//UInt8 unk1 = 1;
-							//ActorStruct actorStruct;
-							//actorStruct.actor = owner;
-							//actorStruct.unk08 = &unk1;
-							//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-							//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-							//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-							//if (newInstanceData->firingData)
-							//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-							////UpdateAnimGraph(actor, false);
-							bool bEquipped = false;
-							for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
-							{
-								if (stacks->flags & 1)
-								{
-									if (bEquipped)
-									{
-										volatile short* equipFlagPtr = (volatile short*)&stacks->flags;
-										InterlockedExchange16(equipFlagPtr, 0);
-									}
-									bEquipped = true;
-								}
-							}
-							EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
-							TESAmmo* newAmmoType = newEqData->ammo;
-							UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
-							if (ammoCount < newInstanceData->ammoCapacity)
-								newEqData->loadedAmmoCount = ammoCount;
-							else
-								newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
-						}
-					}
-				}
-			}
-		}
-		return true;
-	}
-
-	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod)
-	{
-		if (!changedMod)
-			return false;
-		bool doCheck = false;
-		for (UInt32 i4 = 0; i4 < changedMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
-		{
-			BGSMod::Container::Data * data = &changedMod->modContainer.data[i4];
-			if (data->target == 61 && data->value.form && data->op == 128)
-			{
-				doCheck = true;
-			}
-		}
-		if (!doCheck)
-			return true;
-
-		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(owner, 41);
-		if (!stack)
-			return false;
-		BGSObjectInstanceExtra * objectModData = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstance = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP* baseForm = DYNAMIC_CAST(extraInstance->baseForm, TESForm, TESObjectWEAP);
-		if (!extraInstance)
-			return false;
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstance->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!instanceData)
-			return false;
-		if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::hasSwitchedAmmoKW))
-		{
-			BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
-			if (!mod)
-				return false;
-			TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(objectModData, baseForm);
-			bool found = false;
-			if (!baseAmmo)
-				return false;
-			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
-			if (itAD != MSF_MainData::ammoDataMap.end())
-			{
-				AmmoData* itAmmoData = itAD->second;
-				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				{
-					if (itAmmoMod->mod == mod)
-					{
-						found = true;
-						break;
-					}
-				}
-			}
-			if (!found)
-				AttachModToEquippedWeapon(owner, mod, false, 2, false);
-		}
-		return true;
-	}
-
-	bool ReevalAttachedMods(Actor* owner, BGSInventoryItem* item, BGSInventoryItem::Stack* stack)
-	{
-		if (!owner || !item || !stack)
-			return false;
-		BGSObjectInstanceExtra* mods = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		TESObjectWEAP* baseWeap = DYNAMIC_CAST(item->form, TESForm, TESObjectWEAP);
-		if (!mods || !baseWeap)
-			return false;
-		auto data = mods->data;
-		if (!data || !data->forms)
-			return false;
-		std::vector<BGSMod::Attachment::Mod*> objectMods;
-		std::vector<BGSMod::Attachment::Mod*> toRemove;
-		std::vector<BGSMod::Attachment::Mod*> qualified;
-		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
-		{
-			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-			if (objectMod && MSF_MainData::instantiationRequirements.count(objectMod) > 0)
-			{
-				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
-				bool bRemove = false;
-				std::vector<BGSMod::Attachment::Mod*> parentMods;
-				Utilities::GetParentMods(mods, objectMod, &parentMods);
-				for (auto it = range.first; it != range.second; ++it)
-				{
-					bRemove = true;
-					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
-					{
-						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
-						if (instantiationData->GetItemIndex(it->second) >= 0)
-						{
-							bRemove = false;
-							break;
-						}
-					}
-					if (bRemove == false)
-						break;
-				}
-				if (bRemove)
-					toRemove.push_back(objectMod);
-			}
-		}
-		_MESSAGE("toremove: %i", toRemove.size());
-		for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = toRemove.begin(); itMod != toRemove.end(); itMod++)
-		{
-			bool ret = 0;
-			CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-			ModifyModDataFunctor modFunctor(*itMod, 0, false, &ret);
-			UInt32 unk = 0x00200000;
-			AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
-			if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
-			{
-				ExtraDataList* newList = stack->extraData;
-				ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-				TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-				BGSObjectInstance idStruct;
-				idStruct.baseForm = baseWeap;
-				idStruct.instanceData = newInstanceData;
-				EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
-				//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-				//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-				//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-				//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-				//InterlockedIncrement64(lockcnt);
-				//UpdateEquipData(owner->equipData, idStruct, nullptr);
-				//InterlockedDecrement64(lockcnt);
-				//UpdateEnchantments(owner, idStruct, newList);
-				//UInt8 unk1 = 1;
-				//ActorStruct actorStruct;
-				//actorStruct.actor = owner;
-				//actorStruct.unk08 = &unk1;
-				//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-				//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-				//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-				//if (newInstanceData->firingData)
-				//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-				////UpdateAnimGraph(actor, false);
-				bool bEquipped = false;
-				for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
-				{
-					if (stacks->flags & 1)
-					{
-						if (bEquipped)
-						{
-							volatile short* equipFlagPtr = (volatile short*)&stacks->flags;
-							InterlockedExchange16(equipFlagPtr, 0);
-						}
-						bEquipped = true;
-					}
-				}
-				EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
-				TESAmmo* newAmmoType = newEqData->ammo;
-				UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
-				if (ammoCount < newInstanceData->ammoCapacity)
-					newEqData->loadedAmmoCount = ammoCount;
-				else
-					newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
-			}
-		}
-		BGSObjectInstanceExtra* newmods = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		if (!newmods)
-			return false;
-		auto newdata = mods->data;
-		if (!newdata || !newdata->forms)
-			return false;
-		for (UInt32 i3 = 0; i3 < newdata->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
-		{
-			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(newdata->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-			objectMods.push_back(objectMod);
-		}
-		AttachParentArray* baseAP = (AttachParentArray*)&baseWeap->attachParentArray;
-		if (baseAP->kewordValueArray.count > 0)
-		{
-			std::vector<KeywordValue> attachPoints;
-			for (UInt32 i = 0; i < baseAP->kewordValueArray.count; i++)
-			{
-				attachPoints.push_back(baseAP->kewordValueArray[i]);
-				//BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, baseAP->kewordValueArray[i]);
-				//if (kw)
-				//	_MESSAGE("apkw: %s", kw->GetEditorID());
-			}
-			//_MESSAGE("baseap: %i", attachPoints.size());
-			//for (std::vector<KeywordValue>::iterator itValue = attachPoints.begin(); itValue != attachPoints.end(); itValue++)
-			for (UInt32 i = 0; i < attachPoints.size(); i++)
-			{
-				for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = objectMods.begin(); itMod != objectMods.end(); itMod++)
-				{
-					if (*itMod)
-					{
-						if ((*itMod)->unkC0 == attachPoints[i])
-						{
-							qualified.push_back(*itMod);
-							AttachParentArray* apArray = (AttachParentArray*)&(*itMod)->unk98;
-							for (UInt32 i2 = 0; i2 < apArray->kewordValueArray.count; i2++)
-							{
-								attachPoints.push_back(apArray->kewordValueArray[i2]);
-								//BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, baseAP->kewordValueArray[i]);
-								//if (kw)
-								//	_MESSAGE("apkw: %s", kw->GetEditorID());
-							}
-							*itMod = nullptr;
-						}
-					}
-				}
-				if (qualified.size() == objectMods.size())
-					break;
-			}
-			_MESSAGE("ap: %i", attachPoints.size());
-			_MESSAGE("qualified: %i", qualified.size());
-			_MESSAGE("all: %i", objectMods.size());
-			for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = objectMods.begin(); itMod != objectMods.end(); itMod++)
-			{
-				if (*itMod)
-				{
-					bool ret = 0;
-					CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
-					ModifyModDataFunctor modFunctor(*itMod, 0, false, &ret);
-					UInt32 unk = 0x00200000;
-					AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
-					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
-					{
-						ExtraDataList* newList = stack->extraData;
-						ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-						TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-						BGSObjectInstance idStruct;
-						idStruct.baseForm = baseWeap;
-						idStruct.instanceData = newInstanceData;
-						EquipItemInternal(g_ActorEquipManager, owner, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
-						//owner->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
-						//UpdateMiddleProcess(owner->middleProcess, owner, idStruct, newInstanceData->equipSlot);
-						//owner->middleProcess->unk08->unk290[1] = owner->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
-						//volatile long long* lockcnt = (volatile long long*)&owner->equipData->unk00;
-						//InterlockedIncrement64(lockcnt);
-						//UpdateEquipData(owner->equipData, idStruct, nullptr);
-						//InterlockedDecrement64(lockcnt);
-						//UpdateEnchantments(owner, idStruct, newList);
-						//UInt8 unk1 = 1;
-						//ActorStruct actorStruct;
-						//actorStruct.actor = owner;
-						//actorStruct.unk08 = &unk1;
-						//UpdateAVModifiers(actorStruct, newInstanceData->modifiers);
-						//float reloadSpeed = *g_reloadSpeedMultiplier * newInstanceData->reloadSpeed;
-						//UpdateAnimValueFloat(&owner->animGraphHolder, g_reloadSpeedAnimValueHolder, reloadSpeed);
-						//if (newInstanceData->firingData)
-						//	UpdateAnimValueFloat(&owner->animGraphHolder, g_sightedTransitionAnimValueHolder, newInstanceData->firingData->sightedTransition);
-						////UpdateAnimGraph(actor, false);
-						bool bEquipped = false;
-						for (BGSInventoryItem::Stack* stacks = item->stack; stacks; stacks = stacks->next)
-						{
-							if (stacks->flags & 1)
-							{
-								if (bEquipped)
-								{
-									volatile short* equipFlagPtr = (volatile short*)&stacks->flags;
-									InterlockedExchange16(equipFlagPtr, 0);
-								}
-								bEquipped = true;
-							}
-						}
-						EquipWeaponData* newEqData = (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
-						TESAmmo* newAmmoType = newEqData->ammo;
-						UInt64 ammoCount = Utilities::GetInventoryItemCount(owner->inventoryList, newAmmoType);
-						if (ammoCount < newInstanceData->ammoCapacity)
-							newEqData->loadedAmmoCount = ammoCount;
-						else
-							newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
-					}
-				}
-			}
-		}
 		return true;
 	}
 

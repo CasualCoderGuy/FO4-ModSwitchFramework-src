@@ -20,9 +20,9 @@ EventResult	BGSOnPlayerUseWorkBenchEventSink::ReceiveEvent(BGSOnPlayerUseWorkBen
 
 EventResult	BGSOnPlayerModArmorWeaponEventSink::ReceiveEvent(BGSOnPlayerModArmorWeaponEvent * evn, void * dispatcher)
 {
-	TESObjectWEAP* moddedWeap = DYNAMIC_CAST(evn->object, TESBoundObject, TESObjectWEAP);
-	if (moddedWeap)
-		delayTask delay(100, true, &MSF_Base::ReevalModdedWeapon, moddedWeap);
+	//TESObjectWEAP* moddedWeap = DYNAMIC_CAST(evn->object, TESBoundObject, TESObjectWEAP);
+	//if (moddedWeap)
+	//	delayTask delay(100, true, &MSF_Base::ReevalModdedWeapon, moddedWeap);
 	return kEvent_Continue;
 }
 
@@ -36,7 +36,7 @@ EventResult	TESCellFullyLoadedEventSink::ReceiveEvent(TESCellFullyLoadedEvent * 
 EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatcher)
 {
 	//instance midprocess ammo count!
-	_MESSAGE("combat started");
+	//_MESSAGE("combat started");
 	return kEvent_Continue;
 }
 
@@ -83,9 +83,9 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 		return kEvent_Continue;
 	switch (evn->type)
 	{
-	case BGSInventoryListEventData::kAddStack: {}; //_MESSAGE("kAddStack"); }; //
-	case BGSInventoryListEventData::kChangedStack: {}; //_MESSAGE("kChangedStack"); };
-	case BGSInventoryListEventData::kAddNewItem: {}; //_MESSAGE("kAddNewItem"); };
+	case BGSInventoryListEventData::kAddStack: {} break; //_MESSAGE("kAddStack"); }; //
+	case BGSInventoryListEventData::kChangedStack: {} break; //_MESSAGE("kChangedStack"); };
+	case BGSInventoryListEventData::kAddNewItem: {} break; //_MESSAGE("kAddNewItem"); };
 	case BGSInventoryListEventData::kRemoveItem: {
 		//_MESSAGE("kRemoveItem"); 
 		//_MESSAGE("obj: %p", evn->objAffected);
@@ -101,7 +101,8 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 		//ref = nullptr;
 		//ret = GetSmartPointer(evn->owner, ref);
 		//_MESSAGE("ownHandle2Ref: %02X, %p", ret, ref);
-	};
+	}
+	break;
 	}
 	return kEvent_Continue;
 }
@@ -203,9 +204,64 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 
 	ModifyModDataFunctor* modWriteFunctor = (ModifyModDataFunctor*)modFunctor;
+	UInt32 stackID = IDfunctor->stackID;
+	UInt32 unk = *unk_rsp20;
+	UInt8 slotIndex = modWriteFunctor->slotIndex;
+	_MESSAGE("unk: %08X, slot index: %02X", unk, slotIndex);
+	
+	if (!invItem)
+		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+	for (BGSInventoryItem::Stack* stack = invItem->stack; stack; stack = stack->next)
+		_MESSAGE("stack: %p, %i", stack, stack->count);
 
-	_MESSAGE("CALL from Gameplay");
-	return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+	bool result = AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+
+	for (BGSInventoryItem::Stack* stack = invItem->stack; stack; stack = stack->next)
+		_MESSAGE("stack: %p, %i", stack, stack->count);
+
+	if (invItem && modWriteFunctor && modWriteFunctor->mod)
+	{
+		BGSMod::Attachment::Mod* attachedMod = modWriteFunctor->mod;
+		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+			return result;
+		TESObjectWEAP* weapon = DYNAMIC_CAST(invItem->form, TESForm, TESObjectWEAP);
+		if (!weapon)
+			return result;
+		BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
+		if (!stack)
+			return result;
+		ExtraDataList* extraList = stack->extraData;
+		if (!extraList)
+			return result;
+		BGSObjectInstanceExtra* moddata = DYNAMIC_CAST(extraList->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+		if (!moddata)
+			return result;
+
+		std::vector<BGSMod::Attachment::Mod*> invalidMods;
+		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
+		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+		{
+			BGSMod::Attachment::Mod* invalidMod = *itMods;
+			_MESSAGE("invalid mod: %08X", invalidMod->formID);
+			UInt32 newunk = unk;
+			bool success = false;
+			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidMod, slotIndex, false, &success);
+			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
+		}
+
+		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
+		if (invalidAmmoMod)
+		{
+			_MESSAGE("invalid ammomod: %08X", invalidAmmoMod->formID);
+			UInt32 newunk = unk;
+			bool success = false;
+			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidAmmoMod, slotIndex, false, &success);
+			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
+		}
+	}
+	return result;
 }
 
 bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20)
@@ -213,8 +269,9 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu"))
 		return AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
 
-	CheckStackIDFunctor newIDfunctor = CheckStackIDFunctor(IDfunctor->stackID);
-	CheckStackIDFunctor newIDfunctor2 = CheckStackIDFunctor(IDfunctor->stackID);
+	UInt32 stackID = IDfunctor->stackID;
+	UInt32 unk = *unk_rsp20;
+
 	bool result = AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
 
 	ApplyChangesFunctor* applyChangesFunctor = (ApplyChangesFunctor*)changesFunctor;
@@ -225,40 +282,29 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 			return result;
 		TESObjectWEAP* weapon = DYNAMIC_CAST(applyChangesFunctor->foundObject, TESBoundObject, TESObjectWEAP);
 		BGSObjectInstanceExtra* moddata = applyChangesFunctor->moddata;
-		_MESSAGE("moddata: %p", moddata);
-		_MESSAGE("has: %02X", Utilities::HasObjectMod(moddata, MSF_MainData::APbaseMod));
-		
-		UInt32 unk = 0;
-		ApplyChangesFunctor newChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, MSF_MainData::APbaseMod, applyChangesFunctor->ignoreWeapon, applyChangesFunctor->remove, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
-		MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-		AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &newIDfunctor, &newChangesFunctor, unk_r9d, &unk);
 
-		_MESSAGE("has: %02X", Utilities::HasObjectMod(moddata, MSF_MainData::APbaseMod));
-
-
-		_MESSAGE("size: %08X, params: %02X, %02X, %02X, %02X, %04X, %02X", moddata->data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form), applyChangesFunctor->shouldSplitStacks, applyChangesFunctor->transferEquippedToSplitStack, applyChangesFunctor->ignoreWeapon, applyChangesFunctor->remove, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
 		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
-		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon); //remove!
-		_MESSAGE("invalid: %08X", invalidMods.size());
+		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+		{
+			BGSMod::Attachment::Mod* invalidMod = *itMods;
+			_MESSAGE("invalid mod UI: %08X", invalidMod->formID);
+			UInt32 newunk = unk;
+			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
+		}
+
+		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
 		if (invalidAmmoMod)
 		{
-			_MESSAGE("ammomod: %s", invalidAmmoMod->GetFullName());
+			_MESSAGE("invalid ammomod UI: %08X", invalidAmmoMod->formID);
+			UInt32 newunk = unk;
+			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidAmmoMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-			UInt32 unk = 0;
-			ApplyChangesFunctor removeChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidAmmoMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
-			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &newIDfunctor2, &removeChangesFunctor, unk_r9d, &unk);
-		}
-
-		for (UInt32 i = 0; i < moddata->data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
-		{
-			_MESSAGE("form: %08X", moddata->data->forms[i].formId);
+			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
 		}
 	}
-	//reevaluate
-//ApplyChangesFunctor newChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, applyChangesFunctor->mod, applyChangesFunctor->unk28, applyChangesFunctor->unk29, applyChangesFunctor->unk2A, applyChangesFunctor->unk2B);
-
 	return result;
 }
 
@@ -269,6 +315,13 @@ bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, Extra
 	else
 		return DeleteExtraData_CallFromWorkbenchUI_Copied(extraDataHead, type);
 	return false;
+}
+
+ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack) //futureParentStack only valid if owner is inventory item (check vtbl!); must return newExtraRank
+{
+	_MESSAGE("loaded ExtraRank: %08X", rank);
+	//rank is valid
+	return newExtraRank;
 }
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03

@@ -89,12 +89,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::DumpExtraDataInfo();
 				//MSF_Test::CallAttachModToInvItem();
 				//MSF_Test::NPCtest();
-				_MESSAGE("has: %02X", Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player), MSF_MainData::APbaseMod));
 				
 				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
 				//Utilities::PlayIdle(*g_player, sw);
 
-				//MSF_Test::ExtraDataTest();
+				MSF_Test::ExtraDataTest();
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
 				_MESSAGE("test1");
 			}
@@ -111,7 +110,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallPlayAction();
 				//MSF_Test::MenuFlagTest();
 				//MSF_Test::CallAttachModToInvItem();
-				Utilities::ReloadWeapon(*g_player);
+				//Utilities::ReloadWeapon(*g_player);
 				_MESSAGE("test2");
 			}
 		}
@@ -125,8 +124,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CallRemoveModFromInvItem();
 				//MSF_Test::DamageEquippedWeapon(*g_player);
-				//MSF_Test::ListExtraData();
-				Utilities::FireWeapon(*g_player, 1);
+				MSF_Test::ListExtraData();
+				//Utilities::FireWeapon(*g_player, 1);
 				_MESSAGE("test3");
 			}
 		}
@@ -336,7 +335,7 @@ namespace MSF_Scaleform
 			{
 				ModData::Mod* modAdd = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[0].data.u32);
 				ModData::Mod* modRem = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[1].data.u32);
-				MSF_Base::SwitchToSelectedMod(modAdd, modRem, false);// args->args[2].data.boolean);
+				MSF_Base::SwitchToSelectedMod(modAdd, modRem);// args->args[2].data.boolean);
 			}
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			args->result->SetBool(true);

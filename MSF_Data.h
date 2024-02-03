@@ -519,7 +519,7 @@ namespace MSF_Data
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
-	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);

@@ -1573,7 +1573,7 @@ namespace MSF_Data
 		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
 			return false;
 
-		return QueueModsToSwitch(modToAttach, modToRemove, modData->flags & ModData::bRequireAPmod);
+		return QueueModsToSwitch(modToAttach, modToRemove);
 	}
 
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData)
@@ -1641,7 +1641,7 @@ namespace MSF_Data
 		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
 			return false;
 
-		return QueueModsToSwitch(modToAttach, modToRemove, modData->flags & ModData::bRequireAPmod);
+		return QueueModsToSwitch(modToAttach, modToRemove);
 	}
 
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove)
@@ -1649,7 +1649,7 @@ namespace MSF_Data
 		return true;
 	}
 
-	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit)
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove)
 	{
 		if (modToAttach == modToRemove)
 			return false; //no change
@@ -1859,37 +1859,10 @@ namespace MSF_Data
 
 				}
 
-				//AmmoData* itAmmoData = itAD->second;
-				//chance += itAmmoData->baseAmmoData.spawnChance;
-				//UInt32 _chance = 0;
-				//for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				//{
-				//	_chance += itAmmoMod->spawnChance;
-				//}
-				//if (_chance == 0)
-				//	return false;
-				//chance += _chance - 1;
-				//UInt32 picked = MSF_MainData::rng.RandomInt(0, chance - 1);
-				//_chance = itAmmoData->baseAmmoData.spawnChance - 1;
-				//if (picked <= _chance)
-				//	return false;
-				//for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
-				//{
-				//	_chance += itAmmoMod->spawnChance;
-				//	if (picked <= _chance)
-				//	{
-				//		mods->push_back(itAmmoMod->mod);
-				//		*ammo = itAmmoMod->ammo;
-				//		*count = MSF_MainData::rng.RandomInt(6, 48);
-				//		break;
-				//	}
-				//}
 				return true;
 			}
 		}
 		// mod association
-
-
 
 		return false;
 	}
