@@ -460,7 +460,7 @@ namespace MSF_Base
 					BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
 					if (!mod)
 						continue;
-					TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+					TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(objectModData, baseWeapon);
 					bool found = false;
 					if (!baseAmmo)
 						continue;
@@ -560,6 +560,7 @@ namespace MSF_Base
 			return false;
 		BGSObjectInstanceExtra * objectModData = DYNAMIC_CAST(stack->extraData->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 		ExtraInstanceData* extraInstance = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		TESObjectWEAP* baseForm = DYNAMIC_CAST(extraInstance->baseForm, TESForm, TESObjectWEAP);
 		if (!extraInstance)
 			return false;
 		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstance->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
@@ -570,7 +571,7 @@ namespace MSF_Base
 			BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(objectModData, MSF_MainData::hasSwitchedAmmoKW);
 			if (!mod)
 				return false;
-			TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+			TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(objectModData, baseForm);
 			bool found = false;
 			if (!baseAmmo)
 				return false;
@@ -804,6 +805,65 @@ namespace MSF_Base
 			}
 		}
 		return true;
+	}
+
+	bool GetInvalidMods(std::vector<BGSMod::Attachment::Mod*>* invalidList, BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod* lastmod)
+	{
+		if (!invalidList || !mods || !baseWeap)
+			return false;
+		auto data = mods->data;
+		if (!data || !data->forms)
+			return false;
+		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (objectMod && MSF_MainData::instantiationRequirements.count(objectMod) > 0)
+			{
+				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
+				bool bRemove = false;
+				std::vector<BGSMod::Attachment::Mod*> parentMods;
+				Utilities::GetParentMods(mods, objectMod, &parentMods);
+				for (auto it = range.first; it != range.second; ++it)
+				{
+					bRemove = true;
+					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
+					{
+						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
+						if (instantiationData->GetItemIndex(it->second) >= 0)
+						{
+							bRemove = false;
+							break;
+						}
+					}
+					if (bRemove == false)
+						break;
+				}
+				if (bRemove)
+					invalidList->push_back(objectMod);
+			}
+		}
+		return true;
+	}
+
+	BGSMod::Attachment::Mod* GetAmmoModIfInvalid(BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap)
+	{
+		BGSMod::Attachment::Mod* ammoMod = Utilities::GetModAtAttachPoint(mods, MSF_MainData::ammoAP);
+		if (!ammoMod)
+			return nullptr;
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(mods, baseWeap);
+		if (!baseAmmo)
+			return nullptr;
+		auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+		if (itAD != MSF_MainData::ammoDataMap.end())
+		{
+			auto ammoData = (*itAD).second;
+			auto itMod = std::find_if(ammoData->ammoMods.begin(), ammoData->ammoMods.end(), [ammoMod](AmmoData::AmmoMod& data) {
+				return data.mod == ammoMod;
+				});
+			if (itMod != ammoData->ammoMods.end())
+				return nullptr;
+		}
+		return ammoMod;
 	}
 
 	void SpawnRandomMods(TESObjectCELL* cell)

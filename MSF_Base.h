@@ -20,6 +20,8 @@ namespace MSF_Base
 	bool ReevalModdedWeapon(TESObjectWEAP* weapon);
 	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod);
 	bool ReevalAttachedMods(Actor* owner, BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
+	bool GetInvalidMods(std::vector<BGSMod::Attachment::Mod*>* invalidList, BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod* lastmod);
+	BGSMod::Attachment::Mod* GetAmmoModIfInvalid(BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap);
 	void SpawnRandomMods(TESObjectCELL* cell);
 
 	bool ReloadWeapon();

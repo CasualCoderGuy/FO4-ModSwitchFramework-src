@@ -138,9 +138,9 @@ class CheckStackIDFunctor
 {
 private:
 	void* vtbl;		//00
-	UInt32 stackID;	//08
 public:
 	CheckStackIDFunctor(UInt32 ID);
+	UInt32 stackID;	//08
 };
 
 class StackDataWriteFunctor
@@ -168,20 +168,23 @@ public:
 STATIC_ASSERT(sizeof(ModifyModDataFunctor) == 0x30);
 STATIC_ASSERT(offsetof(ModifyModDataFunctor, mod) == 0x10);
 
+
 class ApplyChangesFunctor : public StackDataWriteFunctor
 {
 public:
-	ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, UInt8 unk28, UInt16 unk29, UInt8 unk2B);
+	ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, bool ignoreWeapon, bool remove, bool equipLocked, UInt8 setExtraData);
 
 	BGSObjectInstanceExtra* moddata;		// 10
 	TESBoundObject* foundObject;			// 18
 	BGSMod::Attachment::Mod* mod;			// 20
-	UInt8 unk28;							// 28
-	UInt16 unk29;							// 29
-	UInt8 unk2B;							// 2B
+	bool ignoreWeapon;						// 28 true
+	bool remove;							// 29 
+	bool equipLocked;						// 2A false
+	UInt8 setExtraData;						// 2B FE (ignored when FE)
+
 };
 STATIC_ASSERT(sizeof(ApplyChangesFunctor) == 0x30);
-STATIC_ASSERT(offsetof(ApplyChangesFunctor, mod) == 0x20);
+STATIC_ASSERT(offsetof(ApplyChangesFunctor, remove) == 0x29);
 
 struct unkTBOStruct
 {
@@ -384,6 +387,7 @@ namespace Utilities
 	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex);
+	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor);
 	UInt64 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
 	EquippedWeaponData* GetEquippedWeaponData(Actor* owner);
@@ -513,6 +517,7 @@ typedef void*(*_UpdateAnimGraph)(Actor* actor, bool rdx);
 typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInstance, ExtraDataList* extraDataList);
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
+typedef bool(*_DeleteExtraData)(BSExtraData** extraDataHead, ExtraDataType type);
 
 typedef void(*_UpdateEquippedWeaponData)(EquippedWeaponData* data);
 typedef bool(*_MainEquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);

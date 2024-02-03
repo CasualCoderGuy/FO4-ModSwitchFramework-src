@@ -5,6 +5,7 @@ HUDShowAmmoCounter HUDShowAmmoCounter_Copied;
 _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 _AttachModToStack AttachModToStack_CallFromGameplay_Copied;
 _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
+_DeleteExtraData DeleteExtraData_CallFromWorkbenchUI_Copied;
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
@@ -212,20 +213,62 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu"))
 		return AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
 
-	ApplyChangesFunctor* applyChangesFunctor = (ApplyChangesFunctor*)changesFunctor;
-	if (applyChangesFunctor)
-	{
-		TESBoundObject* item = applyChangesFunctor->foundObject;
-		BGSMod::Attachment::Mod* mod = applyChangesFunctor->mod;
-		_MESSAGE("APPLY CHANGES:");
-		if (item)
-			_MESSAGE("weap: %s", item->GetFullName());
-		if (mod)
-			_MESSAGE("mod: %s", mod->GetFullName());
-		_MESSAGE("split, transfer, 28, 29, 2B::: %02X, %02X, %02X, %04X, %02X", applyChangesFunctor->shouldSplitStacks, applyChangesFunctor->transferEquippedToSplitStack, applyChangesFunctor->unk28, applyChangesFunctor->unk29, applyChangesFunctor->unk2B);
-	}
+	CheckStackIDFunctor newIDfunctor = CheckStackIDFunctor(IDfunctor->stackID);
+	CheckStackIDFunctor newIDfunctor2 = CheckStackIDFunctor(IDfunctor->stackID);
+	bool result = AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
 
-	return AttachModToStack_CallFromWorkbenchUI_Copied(invItem, IDfunctor, changesFunctor, unk_r9d, unk_rsp20);
+	ApplyChangesFunctor* applyChangesFunctor = (ApplyChangesFunctor*)changesFunctor;
+	if (applyChangesFunctor && applyChangesFunctor->mod && applyChangesFunctor->foundObject && applyChangesFunctor->moddata)
+	{
+		BGSMod::Attachment::Mod* attachedMod = applyChangesFunctor->mod;
+		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+			return result;
+		TESObjectWEAP* weapon = DYNAMIC_CAST(applyChangesFunctor->foundObject, TESBoundObject, TESObjectWEAP);
+		BGSObjectInstanceExtra* moddata = applyChangesFunctor->moddata;
+		_MESSAGE("moddata: %p", moddata);
+		_MESSAGE("has: %02X", Utilities::HasObjectMod(moddata, MSF_MainData::APbaseMod));
+		
+		UInt32 unk = 0;
+		ApplyChangesFunctor newChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, MSF_MainData::APbaseMod, applyChangesFunctor->ignoreWeapon, applyChangesFunctor->remove, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+		MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+		AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &newIDfunctor, &newChangesFunctor, unk_r9d, &unk);
+
+		_MESSAGE("has: %02X", Utilities::HasObjectMod(moddata, MSF_MainData::APbaseMod));
+
+
+		_MESSAGE("size: %08X, params: %02X, %02X, %02X, %02X, %04X, %02X", moddata->data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form), applyChangesFunctor->shouldSplitStacks, applyChangesFunctor->transferEquippedToSplitStack, applyChangesFunctor->ignoreWeapon, applyChangesFunctor->remove, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+		std::vector<BGSMod::Attachment::Mod*> invalidMods;
+		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
+		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon); //remove!
+		_MESSAGE("invalid: %08X", invalidMods.size());
+		if (invalidAmmoMod)
+		{
+			_MESSAGE("ammomod: %s", invalidAmmoMod->GetFullName());
+			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			UInt32 unk = 0;
+			ApplyChangesFunctor removeChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidAmmoMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &newIDfunctor2, &removeChangesFunctor, unk_r9d, &unk);
+		}
+
+		for (UInt32 i = 0; i < moddata->data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			_MESSAGE("form: %08X", moddata->data->forms[i].formId);
+		}
+	}
+	//reevaluate
+//ApplyChangesFunctor newChangesFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, applyChangesFunctor->mod, applyChangesFunctor->unk28, applyChangesFunctor->unk29, applyChangesFunctor->unk2A, applyChangesFunctor->unk2B);
+
+	return result;
+}
+
+bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, ExtraDataType type)
+{
+	if (MSF_MainData::modSwitchManager.GetIgnoreDeleteExtraData())
+		MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(false);
+	else
+		return DeleteExtraData_CallFromWorkbenchUI_Copied(extraDataHead, type);
+	return false;
 }
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03

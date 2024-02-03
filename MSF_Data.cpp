@@ -931,6 +931,8 @@ namespace MSF_Data
 									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
+									if (mod->unkC0 != MSF_MainData::ammoAP)
+									{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									float spawnChance = ammoType["spawnChance"].asFloat();
 
@@ -985,6 +987,8 @@ namespace MSF_Data
 									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
+									if (mod->unkC0 != MSF_MainData::ammoAP) 
+									{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									float spawnChance = ammoType["spawnChance"].asFloat();
 
@@ -1479,8 +1483,9 @@ namespace MSF_Data
 	{
 		if (num < 0)
 			return nullptr;
-		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
-		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
+		TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 		if (!baseAmmo)
 			return nullptr;
 		auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
@@ -1770,14 +1775,8 @@ namespace MSF_Data
 		return false;
 	}
 
-	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack)
+	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase)
 	{
-		if (!stack)
-			return nullptr;
-		BGSObjectInstanceExtra* objectModData = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP* weapBase = (TESObjectWEAP*)extraInstanceData->baseForm;
-
 		if (!objectModData || !weapBase)
 			return nullptr;
 

@@ -264,6 +264,7 @@ class ModSwitchManager
 {
 private:
 	volatile UInt16 ignoreAnimGraphUpdate;
+	volatile UInt16 ignoreDeleteExtraData;
 	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
@@ -282,6 +283,7 @@ public:
 		displayedModChoices.reserve(20);
 		InterlockedExchange16((volatile short*)&switchState, 0);
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
+		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
@@ -295,6 +297,8 @@ public:
 	void SetState(UInt16 state) { InterlockedExchange16((volatile short*)&switchState, state); };
 	void SetIgnoreAnimGraph(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, bIgnore); };
 	bool GetIgnoreAnimGraph() { return ignoreAnimGraphUpdate; };
+	void SetIgnoreDeleteExtraData(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, bIgnore); };
+	bool GetIgnoreDeleteExtraData() { return ignoreDeleteExtraData; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -403,8 +407,9 @@ public:
 
 	void Reset()
 	{
-		ClearQueue();
+		ClearQueue(); 
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
+		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		ClearDisplayChioces();
@@ -515,7 +520,7 @@ namespace MSF_Data
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, bool bNeedInit);
-	TESAmmo* GetBaseCaliber(BGSInventoryItem::Stack* stack);
+	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);

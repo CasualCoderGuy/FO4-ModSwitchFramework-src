@@ -22,13 +22,14 @@ ModifyModDataFunctor::ModifyModDataFunctor(BGSMod::Attachment::Mod* mod, UInt8 s
 		*success = true;
 	}
 }
-ApplyChangesFunctor::ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, UInt8 unk28, UInt16 unk29, UInt8 unk2B) :
+ApplyChangesFunctor::ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectInstanceExtra* moddata, BGSMod::Attachment::Mod* mod, bool ignoreWeapon, bool remove, bool equipLocked, UInt8 setExtraData) :
 	moddata(moddata),
 	foundObject(foundObject),
 	mod(mod),
-	unk28(unk28),
-	unk29(unk29),
-	unk2B(unk2B)
+	ignoreWeapon(ignoreWeapon),
+	remove(remove),
+	equipLocked(equipLocked),
+	setExtraData(setExtraData)
 {
 	vtbl = g_ApplyChangesFunctor;
 }
@@ -245,6 +246,21 @@ namespace Utilities
 				return nullptr;
 			BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
 			return DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
+		}
+		return nullptr;
+	}
+
+	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor)
+	{
+		if (ownerActor)
+		{
+			ActorEquipData * equipData = ownerActor->equipData;
+			if (!equipData)
+				return nullptr;
+			auto item = equipData->slots[41].item;
+			if (!item)
+				return nullptr;
+			return DYNAMIC_CAST(item, TESForm, TESObjectWEAP);
 		}
 		return nullptr;
 	}

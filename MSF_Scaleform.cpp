@@ -87,8 +87,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::DumpUnknownData((*g_player));
 				//MSF_Test::DumpActorValue();
 				//MSF_Test::DumpExtraDataInfo();
-				MSF_Test::CallAttachModToInvItem();
+				//MSF_Test::CallAttachModToInvItem();
 				//MSF_Test::NPCtest();
+				_MESSAGE("has: %02X", Utilities::HasObjectMod(Utilities::GetEquippedModData(*g_player), MSF_MainData::APbaseMod));
 				
 				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
 				//Utilities::PlayIdle(*g_player, sw);
@@ -564,8 +565,9 @@ namespace MSF_Scaleform
 	{
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bAmmoRequireWeaponToBeDrawn) && !(*g_player)->actorState.IsWeaponDrawn())
 			return false;
-		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
-		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
+		TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 		menuRoot->CreateArray(dst);
 		if (baseAmmo)
 		{
@@ -746,8 +748,9 @@ namespace MSF_Scaleform
 	//	GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
 	//	if (!menuRoot)
 	//		return false;
-	//	BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(*g_player, 41);
-	//	TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(stack);
+	//  BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
+	//  TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+	//  TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 	//	GFxValue ammoData;
 	//	menuRoot->CreateArray(&ammoData);
 	//	if (baseAmmo)
