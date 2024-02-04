@@ -16,7 +16,6 @@ namespace MSF_Scaleform
 	void ReceiveKeyEvents();
 	bool RegisterScaleformCallback(GFxMovieView* view, GFxValue* f4se_root);
 	bool RegisterScaleformTest(GFxMovieView * view, GFxValue * f4se_root);
-	bool RegisterMCMCallback();
 	void RegisterMSFScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot);
 	bool StartWidgetHideCountdown(UInt32 delayTime);
 	bool UpdateWidgetData();

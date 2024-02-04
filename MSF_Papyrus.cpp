@@ -1,47 +1,8 @@
 #include "MSF_Papyrus.h"
+#include "MSF_Data.h"
 
 namespace MSF_Papyrus
 {
-
-	bool UpdateEquipment(StaticFunctionTag*, Actor * actor)
-	{
-		if (!actor)
-			return false;
-		//actor->middleProcess->unk08->lock.Release();
-		CALL_MEMBER_FN(actor, UpdateEquipment)();
-		//CALL_MEMBER_FN(actor->middleProcess, UpdateEquipment)(actor, actor->flags); //flags?
-		//actor->middleProcess->unk08->lock.Lock(3);
-		return true;
-	}
-
-	bool UpdateEquippedInstanceData(StaticFunctionTag*, Actor* actor, UInt32 newLoadedAmmoNum = -1)
-	{
-		if (!actor)
-			return false;
-		if (newLoadedAmmoNum == -1)
-			newLoadedAmmoNum = (UInt32)actor->middleProcess->unk08->equipData->equippedData->unk18;
-		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(actor, 41);
-		if (!eqStack)
-			return false;
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(eqStack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		if (!extraInstanceData)
-			return false;
-		actor->middleProcess->unk08->equipData->instanceData = extraInstanceData->instanceData;
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!instanceData)
-			return false;
-		actor->middleProcess->unk08->equipData->equippedData->ammo = instanceData->ammo;
-		if (newLoadedAmmoNum == -2)
-		{
-			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(actor, 41);
-			if (instanceData)
-			{
-				newLoadedAmmoNum = (UInt32)instanceData->ammoCapacity;
-			}
-		}
-		actor->middleProcess->unk08->equipData->equippedData->unk18 = (UInt64)newLoadedAmmoNum;
-		return true;
-	}
 
 	//============InstanceData===========
 	TESAmmo * GetEquippedAmmo(StaticFunctionTag*, Actor* owner, UInt32 slotID = 41)
@@ -56,11 +17,11 @@ namespace MSF_Papyrus
 		return nullptr;
 	}
 
-	bool SetEquippedAmmo(StaticFunctionTag*, Actor* owner, TESAmmo* newAmmo, UInt32 slotID = 41) //instant
+	bool SetEquippedAmmo(StaticFunctionTag*, Actor* owner, TESAmmo* newAmmo)
 	{
 		if (!owner)
 			return false;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
 			if (instanceData->ammo != newAmmo && owner->middleProcess->unk08->equipData->equippedData) 
@@ -74,11 +35,11 @@ namespace MSF_Papyrus
 		return false;
 	}
 
-	UInt32 GetEquippedAmmoCapacity(StaticFunctionTag*, Actor* owner, UInt32 slotID = 41)
+	UInt32 GetEquippedAmmoCapacity(StaticFunctionTag*, Actor* owner)
 	{
 		if (!owner)
 			return 0;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
 			return instanceData->ammoCapacity;
@@ -86,11 +47,11 @@ namespace MSF_Papyrus
 		return 0;
 	}
 
-	bool SetEquippedAmmoCapacity(StaticFunctionTag*, Actor* owner, UInt32 newCap, UInt32 slotID = 41)
+	bool SetEquippedAmmoCapacity(StaticFunctionTag*, Actor* owner, UInt32 newCap)
 	{
 		if (!owner || newCap < 0)
 			return 0;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
 			if (instanceData->ammoCapacity != newCap) 
@@ -102,11 +63,11 @@ namespace MSF_Papyrus
 		return false;
 	}
 
-	BGSProjectile * GetEquippedProjectile(StaticFunctionTag*, Actor* owner, UInt32 slotID = 41)
+	BGSProjectile * GetEquippedProjectile(StaticFunctionTag*, Actor* owner)
 	{
 		if (!owner)
 			return nullptr;
-		TESObjectWEAP::InstanceData * instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData * instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
 			if (instanceData->firingData) 
@@ -117,11 +78,11 @@ namespace MSF_Papyrus
 		return nullptr;
 	}
 
-	bool SetEquippedProjectile(StaticFunctionTag*, Actor * owner, BGSProjectile* newProjectile, UInt32 slotID = 41)
+	bool SetEquippedProjectile(StaticFunctionTag*, Actor * owner, BGSProjectile* newProjectile)
 	{
 		if (!owner)
 			return false;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
 			if (instanceData->firingData) 
@@ -156,11 +117,11 @@ namespace MSF_Papyrus
 		return false;
 	}
 
-	TESForm* GetEquippedZoomData(StaticFunctionTag*, Actor* owner, UInt32 slotID = 41)
+	TESForm* GetEquippedZoomData(StaticFunctionTag*, Actor* owner)
 	{
 		if (!owner)
 			return nullptr;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData)
 		{
 			if (instanceData->zoomData)
@@ -169,11 +130,11 @@ namespace MSF_Papyrus
 		return nullptr;
 	}
 
-	bool SetEquippedZoomData(StaticFunctionTag*, Actor* owner, TESForm* zoomData, UInt32 slotID = 41)
+	bool SetEquippedZoomData(StaticFunctionTag*, Actor* owner, TESForm* zoomData)
 	{
 		if (!owner || !zoomData)
 			return nullptr;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, slotID);
+		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		BGSZoomData* zoom = (BGSZoomData*)zoomData;
 		if (instanceData && zoom)
 		{
@@ -186,7 +147,7 @@ namespace MSF_Papyrus
 		return false;
 	}
 
-	bool ToggleAutomaticWeapon(StaticFunctionTag*, Actor* owner) //soundmapping!
+	bool ToggleAutomaticWeapon(StaticFunctionTag*, Actor* owner)
 	{
 
 		if (!owner)
@@ -200,16 +161,12 @@ namespace MSF_Papyrus
 				Utilities::AddRemKeyword(instanceData->keywords, soundKeyword, false);
 			else
 				Utilities::AddRemKeyword(instanceData->keywords, soundKeyword, true);
-			//if (instanceData->flags & 0x0008000)
-			//	instanceData->flags &= ~0x0008000;
-			//else
-			//	instanceData->flags |= 0x0008000;
 			return true;
 		}
 		return false;
 	}
 
-	bool SetAutomaticWeapon(StaticFunctionTag*, Actor* owner, bool bAuto) //soundmapping!
+	bool SetAutomaticWeapon(StaticFunctionTag*, Actor* owner, bool bAuto)
 	{
 		if (!owner)
 			return false;
@@ -327,47 +284,13 @@ namespace MSF_Papyrus
 		return false;
 	}
 
-	TESAmmo* GetEquippedBaseCaliber(StaticFunctionTag*, Actor * owner, UInt32 slotID = 41)
+	TESAmmo* GetEquippedBaseCaliber(StaticFunctionTag*, Actor * owner)
 	{
-		BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(owner, slotID);
-		if (!stack)
-			return nullptr;
-		BGSObjectInstanceExtra* objectModData = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		TESObjectWEAP* weapBase = (TESObjectWEAP*)extraInstanceData->baseForm;
-
-		if (!instanceData || !objectModData || !weapBase)
-			return nullptr;
-
-		auto data = objectModData->data;
-		if (!data || !data->forms)
-			return nullptr;
-		//TESAmmo* ammo = nullptr;
-		TESAmmo* ammoConverted = nullptr;
-		//TESAmmo* switchedAmmo = nullptr;
-		//TESAmmo* UBAmmo = nullptr;
-		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
-		{
-			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
-			for (UInt32 i4 = 0; i4 < objectMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
-			{
-				BGSMod::Container::Data * data = &objectMod->modContainer.data[i4];
-				if (data->target == 61 && data->value.form)
-				{
-					if (objectMod->priority < 123 || objectMod->priority > 127)
-						ammoConverted = (TESAmmo*)data->value.form;
-					//else if (objectMod->priority == 125)
-					//	switchedAmmo = (TESAmmo*)data->value.form;
-					//else if (objectMod->priority == 126)
-					//	UBAmmo = (TESAmmo*)data->value.form;
-				}
-			}
-		}
-		if (!ammoConverted)
-			ammoConverted = weapBase->weapData.ammo;
-		return ammoConverted;
+		TESObjectWEAP* weap = Utilities::GetEquippedWeapon(owner);
+		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(owner);
+		return MSF_Data::GetBaseCaliber(moddata, weap);
 	}
+
 
 	//=====Version=====
 	UInt32 GetVersion(StaticFunctionTag* base)
@@ -382,39 +305,33 @@ bool MSF_Papyrus::RegisterPapyrus(VirtualMachine* vm)
 	return true;
 }
 
-//AttachModToStack
-//AttachModToEquippedWeapon
-//ToggleAmmoMenu
 //GetAttachParentKeyword +WEAP
 //GetAttachPointKeywords +WEAP
 //GetModAtAttachPoint
 
+
 void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 {
 	vm->RegisterFunction(
-		new NativeFunction1 <StaticFunctionTag, bool, Actor*>("UpdateEquipment", SCRIPTNAME, UpdateEquipment, vm));
-	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, bool, Actor*, UInt32>("UpdateEquippedInstanceData", SCRIPTNAME, UpdateEquippedInstanceData, vm));
-	vm->RegisterFunction(
 		new NativeFunction2 <StaticFunctionTag, TESAmmo*, Actor*, UInt32>("GetEquippedAmmo", SCRIPTNAME, GetEquippedAmmo, vm));
 	vm->RegisterFunction(
-		new NativeFunction3 <StaticFunctionTag, bool, Actor*, TESAmmo*, UInt32>("SetEquippedAmmo", SCRIPTNAME, SetEquippedAmmo, vm));
+		new NativeFunction2 <StaticFunctionTag, bool, Actor*, TESAmmo*>("SetEquippedAmmo", SCRIPTNAME, SetEquippedAmmo, vm));
 	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, UInt32, Actor*, UInt32>("GetEquippedAmmoCapacity", SCRIPTNAME, GetEquippedAmmoCapacity, vm));
+		new NativeFunction1 <StaticFunctionTag, UInt32, Actor*>("GetEquippedAmmoCapacity", SCRIPTNAME, GetEquippedAmmoCapacity, vm));
 	vm->RegisterFunction(
-		new NativeFunction3 <StaticFunctionTag, bool, Actor*, UInt32, UInt32>("SetEquippedAmmoCapacity", SCRIPTNAME, SetEquippedAmmoCapacity, vm));
+		new NativeFunction2 <StaticFunctionTag, bool, Actor*, UInt32>("SetEquippedAmmoCapacity", SCRIPTNAME, SetEquippedAmmoCapacity, vm));
 	vm->RegisterFunction(
-		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSProjectile*, UInt32>("SetEquippedProjectile", SCRIPTNAME, SetEquippedProjectile, vm));
+		new NativeFunction2 <StaticFunctionTag, bool, Actor*, BGSProjectile*>("SetEquippedProjectile", SCRIPTNAME, SetEquippedProjectile, vm));
 	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, BGSProjectile*, Actor*, UInt32>("GetEquippedProjectile", SCRIPTNAME, GetEquippedProjectile, vm));
+		new NativeFunction1 <StaticFunctionTag, BGSProjectile*, Actor*>("GetEquippedProjectile", SCRIPTNAME, GetEquippedProjectile, vm));
 	vm->RegisterFunction(
 		new NativeFunction2 <StaticFunctionTag, bool, Actor*, UInt32>("SetLoadedAmmoCount", SCRIPTNAME, SetLoadedAmmoCount, vm));
 	vm->RegisterFunction(
 		new NativeFunction1 <StaticFunctionTag, UInt32, Actor*>("GetLoadedAmmoCount", SCRIPTNAME, GetLoadedAmmoCount, vm));
 	vm->RegisterFunction(
-		new NativeFunction3 <StaticFunctionTag, bool, Actor*, TESForm*, UInt32>("SetEquippedZoomData", SCRIPTNAME, SetEquippedZoomData, vm));
+		new NativeFunction2 <StaticFunctionTag, bool, Actor*, TESForm*>("SetEquippedZoomData", SCRIPTNAME, SetEquippedZoomData, vm));
 	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, TESForm*, Actor*, UInt32>("GetEquippedZoomData", SCRIPTNAME, GetEquippedZoomData, vm));
+		new NativeFunction1 <StaticFunctionTag, TESForm*, Actor*>("GetEquippedZoomData", SCRIPTNAME, GetEquippedZoomData, vm));
 	vm->RegisterFunction(
 		new NativeFunction1 <StaticFunctionTag, bool, Actor*>("ToggleAutomaticWeapon", SCRIPTNAME, ToggleAutomaticWeapon, vm));
 	vm->RegisterFunction(
@@ -426,7 +343,7 @@ void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 	vm->RegisterFunction(
 		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSMod::Attachment::Mod*, UInt32>("EquippedItemHasMod", SCRIPTNAME, EquippedItemHasMod, vm));
 	vm->RegisterFunction(
-		new NativeFunction2 <StaticFunctionTag, TESAmmo*, Actor*, UInt32>("GetEquippedBaseCaliber", SCRIPTNAME, GetEquippedBaseCaliber, vm));
+		new NativeFunction1 <StaticFunctionTag, TESAmmo*, Actor*>("GetEquippedBaseCaliber", SCRIPTNAME, GetEquippedBaseCaliber, vm));
 	vm->RegisterFunction(
 		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSKeyword*, UInt32>("EquippedItemHasKeyword", SCRIPTNAME, EquippedItemHasKeyword, vm));
 

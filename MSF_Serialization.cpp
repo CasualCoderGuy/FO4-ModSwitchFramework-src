@@ -2,7 +2,7 @@
 #include "f4se/PluginAPI.h"
 
 
-namespace Serialization
+namespace MSF_Serialization
 {
 	std::set<UInt32> readedNotes;
 
@@ -10,7 +10,7 @@ namespace Serialization
 	void RevertCallback(const F4SESerializationInterface * intfc)
 	{
 		_MESSAGE("Clearing MSF serialization data.");
-		readedNotes.clear();
+		MSF_MainData::weaponStateStore.Free();
 	}
 
 	void LoadCallback(const F4SESerializationInterface * intfc)
@@ -21,8 +21,8 @@ namespace Serialization
 		{
 			switch (type)
 			{
-			case 'MSF':
-				Serialization::Load(intfc, InternalEventVersion::kCurrentVersion);
+			case 'EXWS':
+				MSF_Serialization::Load(intfc, SERIALIZATION_VERSION);
 				break;
 			}
 		}
@@ -61,7 +61,7 @@ namespace Serialization
 	void SaveCallback(const F4SESerializationInterface * intfc)
 	{
 		_MESSAGE("Saving MSF serialization data.");
-		Serialization::Save(intfc, 'MSF', InternalEventVersion::kCurrentVersion);
+		MSF_Serialization::Save(intfc, 'EXWS', SERIALIZATION_VERSION);
 	}
 
 	bool Save(const F4SESerializationInterface * intfc, UInt32 type, UInt32 version)

@@ -5,7 +5,7 @@
 #include "MSF_WeaponState.h"
 #include <unordered_map>
 
-namespace Serialization
+namespace MSF_Serialization
 {
 	/*
 	class StoredExtraWeaponState
@@ -32,8 +32,8 @@ namespace Serialization
 			StoredModData(ModData::Mod* mod);
 			ModData::Mod* Recover();
 
-			KeywordValue attachParent;
-			KeywordValue instantiationFilter;
+			UInt32 attachParent;
+			UInt32 instantiationFilter;
 			UInt32 mod;
 			UInt8 mod_number;
 		};
@@ -62,7 +62,6 @@ namespace Serialization
 	};
 	*/
 
-	//void PtrScanForIDOnGameLoad();
 
 	void RevertCallback(const F4SESerializationInterface * intfc);
 	void LoadCallback(const F4SESerializationInterface * intfc);

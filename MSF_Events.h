@@ -205,6 +205,7 @@ extern _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
 extern _DeleteExtraData DeleteExtraData_CallFromWorkbenchUI_Copied;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_BranchCode;
+extern uintptr_t ExtraRankCompare_Copied;
 
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
@@ -214,6 +215,7 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
 bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, ExtraDataType type);
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack);
+bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

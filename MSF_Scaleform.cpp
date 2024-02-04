@@ -921,22 +921,6 @@ namespace MSF_Scaleform
 	//	return menu;
 	//}
 
-	void RegisterMCMScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot)
-	{
-		//RegisterFunction<OnMCMOpen>(codeObj, movieRoot, "OnMCMOpen");
-		RegisterFunction<OnMCMClosed>(codeObj, movieRoot, "OnMCMClose");
-
-		//RegisterFunction<SetModSettingInt>(codeObj, movieRoot, "SetModSettingInt");
-		//RegisterFunction<SetModSettingBool>(codeObj, movieRoot, "SetModSettingBool");
-		//RegisterFunction<SetModSettingFloat>(codeObj, movieRoot, "SetModSettingFloat");
-		//RegisterFunction<SetModSettingString>(codeObj, movieRoot, "SetModSettingString");
-
-		//RegisterFunction<SetKeybind>(codeObj, movieRoot, "SetKeybind");
-		//RegisterFunction<ClearKeybind>(codeObj, movieRoot, "ClearKeybind"); //clear keybinds
-		//RegisterFunction<RemapKeybind>(codeObj, movieRoot, "RemapKeybind");
-
-	}
-
 	void RegisterMSFScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot)
 	{
 		RegisterFunction<SendF4SEVersion>(codeObj, movieRoot, "GetF4SEVersion");
@@ -1072,37 +1056,6 @@ namespace MSF_Scaleform
 			GFxValue msf_loader; root.GetMember("msf_loader", &msf_loader);
 			GFxValue msfmsf; root.GetMember("msf", &msfmsf);
 			_MESSAGE("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
-		}
-
-		return true;
-	}
-
-	bool RegisterMCMCallback()
-	{
-		BSFixedString mainMenuStr("PauseMenu");
-		IMenu* menu = (*g_ui)->GetMenu(mainMenuStr);
-		GFxMovieRoot* movieRoot = menu->movie->movieRoot;
-		GFxValue currentSWFPath;
-		const char* currentSWFPathString = nullptr;
-
-		if (movieRoot->GetVariable(&currentSWFPath, "root.loaderInfo.url")) {
-			currentSWFPathString = currentSWFPath.GetString();
-		}
-		else {
-			_MESSAGE("WARNING: MCM callback registration failed.");
-		}
-
-		// Look for the menu that we want to inject into.
-		if (currentSWFPathString && strcmp(currentSWFPathString, "Interface/MainMenu.swf") == 0) {
-			GFxValue root; movieRoot->GetVariable(&root, "root");
-			GFxValue mcm;
-			root.GetMember("mcm", &mcm);
-			if (!mcm.data.obj)
-			{
-				_MESSAGE("WARNING: MCM callback registration failed.");
-				return false;
-			}
-			RegisterMCMScaleformFuncs(&mcm, movieRoot);
 		}
 
 		return true;

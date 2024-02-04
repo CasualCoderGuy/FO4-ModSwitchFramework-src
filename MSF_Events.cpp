@@ -326,6 +326,10 @@ ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03
 {
+	_MESSAGE("COMPARE");
+	if (!extra1 || !extra2)
+		return false;
+	_MESSAGE("%08X vs %08X", extra1->rank, extra2->rank);
 	ExtraWeaponState* state1 = MSF_MainData::weaponStateStore.Get(extra1->rank);
 	ExtraWeaponState* state2 = MSF_MainData::weaponStateStore.Get(extra2->rank);
 	if (state1 || state2)

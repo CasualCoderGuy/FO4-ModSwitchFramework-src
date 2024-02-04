@@ -16,20 +16,24 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Events.h"
 #include "MSF_Papyrus.h"
+#include "MSF_Serialization.h"
+#ifdef DEBUG
 #include "MSF_Test.h"
+#endif
 
 
-IDebugLog				gLog;
-PluginHandle			g_pluginHandle =	kPluginHandle_Invalid;
-F4SEPapyrusInterface	*g_papyrus   =		NULL;
-F4SEMessagingInterface	*g_messaging =		NULL;
-F4SEScaleformInterface	*g_scaleform =		NULL;
+IDebugLog					gLog;
+PluginHandle				g_pluginHandle	=	kPluginHandle_Invalid;
+F4SEPapyrusInterface*		g_papyrus		=	NULL;
+F4SEMessagingInterface*		g_messaging		=	NULL;
+F4SEScaleformInterface*		g_scaleform		=	NULL;
+F4SESerializationInterface* g_serialization =	NULL;
 
 bool RegisterAfterLoadEvents()
 {
-	auto eventDispatcher4 = GET_EVENT_DISPATCHER(PlayerAmmoCountEvent);
-	if (eventDispatcher4)
-		eventDispatcher4->AddEventSink(&playerAmmoCountEventSink);
+	auto eventDispatcher1 = GET_EVENT_DISPATCHER(PlayerAmmoCountEvent);
+	if (eventDispatcher1)
+		eventDispatcher1->AddEventSink(&playerAmmoCountEventSink);
 	else
 	{
 		_MESSAGE("MSF was unable to register for PlayerAmmoCountEvent");
@@ -139,15 +143,15 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 
 bool WriteHooks()
 {
-	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
-	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
-
 	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
 	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
 	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
 	AttachModToStack_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromWorkbenchUI_Hook);
 	DeleteExtraData_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &DeleteExtraData_CallFromWorkbenchUI_Hook);
 	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
+
+	if (!HUDShowAmmoCounter_Copied || !EquipHandler_UpdateAnimGraph_Copied || !AttachModToStack_CallFromGameplay_Copied || !AttachModToStack_CallFromWorkbenchUI_Copied || !DeleteExtraData_CallFromWorkbenchUI_Copied || !LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
+		return false;
 
 	if (LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
 	{
@@ -175,14 +179,13 @@ bool WriteHooks()
 		LoadExtraRank_InjectCode code(codeBuf);
 		g_localTrampoline.EndAlloc(code.getCurr());
 
-		_MESSAGE("codeBuf: %p", codeBuf);
-
 		LoadBuffer_ExtraDataList_ExtraRank_BranchCode = (uintptr_t)codeBuf;
 		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
 	}
-	//if (! copied address validity)
-	//	return false;
 
+	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
+	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
+	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromGameplay_Hook);
@@ -337,6 +340,13 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 		return false;
 	}
 
+	g_serialization = (F4SESerializationInterface*)f4se->QueryInterface(kInterface_Serialization);
+	if (!g_serialization)
+	{
+		_FATALERROR("Fatal Error - Serialization query failed");
+		return false;
+	}
+
 	return true;
 }
 
@@ -347,6 +357,14 @@ bool F4SEPlugin_Load(const F4SEInterface *f4se)
 		g_messaging->RegisterListener(g_pluginHandle, "F4SE", F4SEMessageHandler);
 		//g_messaging->RegisterListener(g_pluginHandle, NULL, MSFMessageHandler);
 	}
+	
+	if (g_serialization)
+	{
+		g_serialization->SetUniqueID(g_pluginHandle, 'MSF');
+		g_serialization->SetRevertCallback(g_pluginHandle, MSF_Serialization::RevertCallback);
+		g_serialization->SetLoadCallback(g_pluginHandle, MSF_Serialization::LoadCallback);
+		g_serialization->SetSaveCallback(g_pluginHandle, MSF_Serialization::SaveCallback);
+	}
 
 	if (g_papyrus) 
 	{
@@ -355,6 +373,7 @@ bool F4SEPlugin_Load(const F4SEInterface *f4se)
 		g_papyrus->Register(MSF_Test::RegisterPapyrus);
 #endif
 	}
+
 	
 	return InitPlugin(f4se->runtimeVersion);
 }
