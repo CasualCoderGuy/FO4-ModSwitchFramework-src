@@ -1,4 +1,5 @@
 #include "MSF_Base.h"
+#include "MSF_Events.h"
 
 namespace MSF_Base
 {
@@ -435,6 +436,8 @@ namespace MSF_Base
 			else
 				newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
 		}
+		//ExtraWeaponState* weaponState = ExtraWeaponState::Init(newList, newEqData);
+		//weaponState->HandleModChangeEvent(newList, equipData);
 
 		//if (MSF_MainData::activeBurstManager)
 		//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;

@@ -429,7 +429,7 @@ namespace Utilities
 	UInt32 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	BGSInventoryItem::Stack* GetStack(BGSInventoryItem* item, UInt32 stackID);
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
-	EquippedWeaponData* GetEquippedWeaponData(Actor* owner);
+	EquipWeaponData* GetEquippedWeaponData(Actor* owner);
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod);
 	BGSMod::Attachment::Mod* FindModByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
 	std::vector<BGSMod::Attachment::Mod*> FindModsByUniqueKeyword(BGSObjectInstanceExtra* modData, BGSKeyword* keyword);
@@ -591,23 +591,6 @@ typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt3
 typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
-//typedef bool(*_UnEquipItem)(void* unkPtr, Actor* target, unkWeapBaseStruct baseWeap, UInt32 unk_r9d, UInt64 unk_rsp20, SInt32 unk_rsp28, UInt8 unk_rsp30, UInt8 unk_rsp38, UInt8 unk_rsp40, UInt8 unk_rsp48, UInt64 unk_rsp50);
-// sub_140E1BEF0(qword_145A10618, v7, &v25, 1, v16, -1, 1, a5, 1, 0, 0i64);
-//SetSubGraphFloatVariable: 138B430
-//SetAnimationVariableInt: 140EC70
-//SetAnimationVariableFloat: 140EBD0
-//SetAnimationVariableBool: 140EB30
-//GetAnimationVariableBool: 1406570 
-//GetAnimationVariableInt: 1406620
-//GetAnimationVariableFloat: 14066D0
-//onitemremoved: struct:5ADCD98 access:sub_1427953F0
-
-//actorEquipManager->GetSingleton: 59D75C8
-//ActorEquipManager->EquipObject: E1BCD0
-//AddMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* a_newMod, std::uint8_t a_attachIndex, std::uint8_t a_rank, bool a_removeInvalidMods) 003BF70
-//std::uint32_t RemoveInvalidMods(BGSObjectInstanceExtra* modData, BGSAttachParentArray* a_baseObjectParents) 003C640
-//std::uint32_t RemoveMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* a_mod, std::uint8_t a_attachIndex) 003C3F0
-
 
 typedef UInt32(*_GetHandle)(TESObjectREFR** ref);
 extern RelocAddr <_GetHandle> GetHandle;
@@ -661,7 +644,6 @@ extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
 extern RelocPtr <void*> g_ModifyModDataFunctor;
 extern RelocPtr <void*> g_ApplyChangesFunctor;
-extern RelocPtr <void*> g_ActorEquipManager; 
 extern RelocPtr <tArray<BGSKeyword*>> g_AttachPointKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_InstantiationKeywordArray;
 extern RelocPtr <tArray<BGSKeyword*>> g_ModAssociationKeywordArray;
@@ -677,46 +659,6 @@ extern RelocPtr <BSReadWriteLock*> g_FormMapLock;
 extern RelocPtr  <DWORD> hkLifoAllocator_TLS;
 extern RelocPtr  <DWORD> unk1_TLS;
 extern RelocPtr  <void*> hkLifoAllocator_vtbl;
-
-//AddItem?shorter?: 0x143A0C0
-//RemItem?shorter?: 0x143AA60
-
-//sub_140E23A90 fire weapon?
-
-//allfunctions: sub_1413E6BC0
-//objRef_functions: sub_141410E40
-//debug_functions: sub_1413BA570
-//actor_functions: sub_14138C960
-//weapon_functions: sub_141446AA0 //fire?
-//scriptObj_functions: sub_1413DB070
-//Game_functions: sub_1413C22C0
-//Utility_functions: sub_141452C30
-//Message_functions: sub_1413AF660
-
-//modifyModDataFunctor:
-//sub_1409CE4E0
-//sub_1414038B0 //attachmodtoinvitem
-//sub_141403A70 //uniqueID
-
-
-/*
-0010010680000000: 4->6: drawn 0: holstered, A: sheathing
-
-0011810680000000: 18: aim, 08: weap behúzva, 1C: fire, 10: reloading
-enum {  };
-0010090680000000: 9: sneak, LAST 3 BYTE: 1:sprint; 6:slow walk, A: run
-0010090680000000: after 68: 2/4/6: bashing
-0014010080000000: 4: furniture enter, then 8, C when exit; 8: when in freeroam, 0 ehrn in furniture
-
-UInt32 unkA94; //stg to do w/ held object, increasing
-UInt64 v. UInt8 unkB18; //if holding object: 4, otherwise: F
-tArray<mouseSpringAction> unkB38;
-BSTValueEventSource<PlayerCommandTypeEvent> unkB20; //0:interact, 3: freeaim, 6: pick up
-UInt32 unkB5C; picked up objectREF formID
-UInt38 unkB60; float? when holding object, constant
-UInt64 v. UInt8 unkCE8; 1 when holding object
-
-*/
 
 class ModColData
 {

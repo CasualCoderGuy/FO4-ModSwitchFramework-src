@@ -132,6 +132,41 @@ extern _PlayerAnimationEvent PlayerAnimationEvent_Original;
 
 //BSTEventSource<InventoryInterface::CountChangedEvent>
 //BSTEventSource<ActorEquipManagerEvent::Event>
+//GetEventDispatcher<TESEquipEvent>()->AddEventSink(&_TESEquipEventSink);
+
+namespace ActorEquipManagerEvent
+{
+	struct EventData
+	{
+		TESBoundObject* equippedItem;
+		TBO_InstanceData* instancedata;
+		BGSEquipSlot* equipSlot; //weaponequipslot //maybe not
+		UInt64 unk18;								//maybe not
+		EquipWeaponData* equippedWeaponData;		//maybe not
+	};
+
+	struct Event
+	{
+		bool equip;
+		EventData* data;
+		Actor* targetActor;
+	};
+}
+
+class ActorEquipManager
+{
+public:
+	UInt64 singleton;
+	BSTEventDispatcher<ActorEquipManagerEvent::Event> equipUnequipEventSource;
+};
+extern RelocPtr <ActorEquipManager> g_ActorEquipManager;
+
+class ActorEquipManagerEventSink : public BSTEventSink<ActorEquipManagerEvent::Event>
+{
+public:
+	virtual	EventResult	ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher) override;
+};
+void HelperFn(ActorEquipManagerEvent::Event* evn);
 
 struct PlayerWeaponReloadEvent
 {

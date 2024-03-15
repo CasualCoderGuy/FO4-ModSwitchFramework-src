@@ -58,6 +58,13 @@ bool RegisterAfterLoadEvents()
 		return false;
 	}
 
+	if (!g_ActorEquipManager->equipUnequipEventSource.AddEventSink(&MSF_MainData::actorEquipManagerEventSink))
+	{
+		_MESSAGE("MSF was unable to register for ActorEquipManagerEvent");
+		return false;
+	}
+	_MESSAGE("sinkFnPtr: %p", &HelperFn);
+
 	return true;
 }
 

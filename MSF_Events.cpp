@@ -40,39 +40,87 @@ EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatch
 	return kEvent_Continue;
 }
 
+void HelperFn(ActorEquipManagerEvent::Event* evn)
+{
+	_MESSAGE("equipEvent");
+}
+
+EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher)
+{
+	//return kEvent_Continue;
+	if (!evn->data || (evn->targetActor != *g_player))
+		return kEvent_Continue;
+	_MESSAGE("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip);
+	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->equippedItem, TESBoundObject, TESObjectWEAP);
+	if (!eventWeapon)
+		return kEvent_Continue;
+	MSF_MainData::modSwitchManager.ClearQueue();
+	MSF_MainData::modSwitchManager.CloseOpenedMenu();
+	MSF_Scaleform::UpdateWidgetData();
+	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
+	if (!eventInstanceData || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
+		return kEvent_Continue;
+	//EquipWeaponData* equipData = evn->data->equippedWeaponData;
+	//if (!equipData)
+	//	return kEvent_Continue;
+	ExtraDataList* equippedExtraData = nullptr;
+	(*g_player)->GetEquippedExtraData(41, &equippedExtraData);
+	if (!equippedExtraData)
+		return kEvent_Continue;
+	//ExtraWeaponState* weaponState = ExtraWeaponState::Init(equippedExtraData, equipData);
+	//weaponState->HandleEquipEvent(equippedExtraData, equipData);
+
+	HelperFn(evn);
+
+	return kEvent_Continue;
+}
+
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
-	if (evn->weaponInstance != MSF_MainData::modSwitchManager.GetCurrentWeapon())
-	{
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
-		if (instanceData != MSF_MainData::modSwitchManager.GetCurrentWeapon())
-		{
-			MSF_MainData::modSwitchManager.SetCurrentWeapon(instanceData);
-			MSF_MainData::modSwitchManager.ClearQueue();
-			MSF_MainData::modSwitchManager.CloseOpenedMenu();
-			MSF_Scaleform::UpdateWidgetData();
-			//if (MSF_MainData::activeBurstManager)
-			//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;
-			//if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::FiringModBurstKW))
-			//{
-			//	BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
-			//	BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(modData, MSF_MainData::FiringModBurstKW);
-			//	if (mod)
-			//	{
-			//		auto it = MSF_MainData::burstModeData.find(mod);
-			//		if (it != MSF_MainData::burstModeData.end());
-			//		{
-			//			BurstModeData* burstMode = it->second;
+	_MESSAGE("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
+	//ExtraDataList* extralist = nullptr;
+	//(*g_player)->GetEquippedExtraData(41, &extralist);
+	//if (!extralist)
+	//	return kEvent_Continue;
+	//EquipWeaponData* equippedData = Utilities::GetEquippedWeaponData(*g_player);
+	//if (!equippedData)
+	//	return kEvent_Continue;
+	//ExtraWeaponState* weaponState = ExtraWeaponState::Init(extralist, equippedData);
+	//weaponState->HandleModChangeEvent(extralist, equippedData);
 
-			//			if (MSF_MainData::activeBurstManager)
-			//				delete MSF_MainData::activeBurstManager;
-			//			MSF_MainData::activeBurstManager = new BurstModeManager(burstMode, true);
-			//			//MSF_MainData::activeBurstManager->HandleEquipEvent(instanceData);
-			//		}
-			//	}
-			//}
-		}
-	}
+
+	//if (evn->weaponInstance != MSF_MainData::modSwitchManager.GetCurrentWeapon())
+	//{
+	//	TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player, 41);
+	//	if (instanceData != MSF_MainData::modSwitchManager.GetCurrentWeapon())
+	//	{
+	//		MSF_MainData::modSwitchManager.SetCurrentWeapon(instanceData);
+	//		MSF_MainData::modSwitchManager.ClearQueue();
+	//		MSF_MainData::modSwitchManager.CloseOpenedMenu();
+	//		MSF_Scaleform::UpdateWidgetData();
+	//		//if (MSF_MainData::activeBurstManager)
+	//		//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;
+	//		//if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::FiringModBurstKW))
+	//		//{
+	//		//	BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+	//		//	BGSMod::Attachment::Mod* mod = Utilities::FindModByUniqueKeyword(modData, MSF_MainData::FiringModBurstKW);
+	//		//	if (mod)
+	//		//	{
+	//		//		auto it = MSF_MainData::burstModeData.find(mod);
+	//		//		if (it != MSF_MainData::burstModeData.end());
+	//		//		{
+	//		//			BurstModeData* burstMode = it->second;
+
+	//		//			if (MSF_MainData::activeBurstManager)
+	//		//				delete MSF_MainData::activeBurstManager;
+	//		//			MSF_MainData::activeBurstManager = new BurstModeManager(burstMode, true);
+	//		//			//MSF_MainData::activeBurstManager->HandleEquipEvent(instanceData);
+	//		//		}
+	//		//	}
+	//		//}
+	//	}
+	//}
 
 	return kEvent_Continue;
 }
@@ -200,32 +248,24 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 
 bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20)
 {
-	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu"))
+	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu") || !invItem)
 		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 
 	ModifyModDataFunctor* modWriteFunctor = (ModifyModDataFunctor*)modFunctor;
 	UInt32 stackID = IDfunctor->stackID;
 	UInt32 unk = *unk_rsp20;
 	UInt8 slotIndex = modWriteFunctor->slotIndex;
-	_MESSAGE("unk: %08X, slot index: %02X", unk, slotIndex);
-	
-	if (!invItem)
-		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
-	for (BGSInventoryItem::Stack* stack = invItem->stack; stack; stack = stack->next)
-		_MESSAGE("stack: %p, %i", stack, stack->count);
+	//_MESSAGE("unk: %08X, slot index: %02X", unk, slotIndex);
 
 	bool result = AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 
-	for (BGSInventoryItem::Stack* stack = invItem->stack; stack; stack = stack->next)
-		_MESSAGE("stack: %p, %i", stack, stack->count);
-
-	if (invItem && modWriteFunctor && modWriteFunctor->mod)
+	if (modWriteFunctor && modWriteFunctor->mod)
 	{
-		BGSMod::Attachment::Mod* attachedMod = modWriteFunctor->mod;
-		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-			return result;
 		TESObjectWEAP* weapon = DYNAMIC_CAST(invItem->form, TESForm, TESObjectWEAP);
 		if (!weapon)
+			return result;
+		BGSMod::Attachment::Mod* attachedMod = modWriteFunctor->mod;
+		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 			return result;
 		BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
 		if (!stack)
@@ -246,7 +286,6 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 			UInt32 newunk = unk;
 			bool success = false;
 			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidMod, slotIndex, false, &success);
-			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
 			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
 		}
 
@@ -257,9 +296,11 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 			UInt32 newunk = unk;
 			bool success = false;
 			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidAmmoMod, slotIndex, false, &success);
-			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
 			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
 		}
+		//EquipWeaponData* equipData = Utilities::GetEquippedWeaponData(*g_player);
+		//ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, equipData);
+		//weaponState->HandleModChangeEvent(extraList, equipData);
 	}
 	return result;
 }
@@ -277,10 +318,12 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 	ApplyChangesFunctor* applyChangesFunctor = (ApplyChangesFunctor*)changesFunctor;
 	if (applyChangesFunctor && applyChangesFunctor->mod && applyChangesFunctor->foundObject && applyChangesFunctor->moddata)
 	{
+		TESObjectWEAP* weapon = DYNAMIC_CAST(applyChangesFunctor->foundObject, TESBoundObject, TESObjectWEAP);
+		if (!weapon)
+			return result;
 		BGSMod::Attachment::Mod* attachedMod = applyChangesFunctor->mod;
 		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 			return result;
-		TESObjectWEAP* weapon = DYNAMIC_CAST(applyChangesFunctor->foundObject, TESBoundObject, TESObjectWEAP);
 		BGSObjectInstanceExtra* moddata = applyChangesFunctor->moddata;
 
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
@@ -343,6 +386,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
 	{
+		_MESSAGE("reloadCOMP");
 		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
 			MSF_MainData::activeBurstManager->ResetShotsOnReload();
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
@@ -357,6 +401,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				//_MESSAGE("switchOK");
 			}
 		}
+
 	}
 	if (!_strcmpi("reloadEnd", name))
 	{
@@ -405,6 +450,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		//		MSF_Base::FireBurst(*g_player);
 		//}
 		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
+		_MESSAGE("Anim: fire");
 	}
 	else if (!_strcmpi("switchMod", name))
 	{

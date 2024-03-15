@@ -53,12 +53,15 @@ std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainDat
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
 PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
+ActorEquipManagerEventSink MSF_MainData::actorEquipManagerEventSink;
 WeaponStateStore MSF_MainData::weaponStateStore;
 KeywordValue MSF_MainData::ammoAP = 0;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
 UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
 std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
+std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDataMap;
+std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;

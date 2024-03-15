@@ -362,11 +362,11 @@ namespace Utilities
 		return count;
 	}
 
-	EquippedWeaponData* GetEquippedWeaponData(Actor* owner)
+	EquipWeaponData* GetEquippedWeaponData(Actor* owner)
 	{
 		if (!owner || !owner->middleProcess || !owner->middleProcess->unk08 || !owner->middleProcess->unk08->equipData)
 			return nullptr;
-		return owner->middleProcess->unk08->equipData->equippedData;
+		return (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
 	}
 
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod)

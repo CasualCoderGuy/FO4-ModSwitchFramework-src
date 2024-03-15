@@ -2,6 +2,7 @@
 #include "MSF_Shared.h"
 
 class PlayerInventoryListEventSink;
+class ActorEquipManagerEventSink;
 class WeaponStateStore;
 
 class AmmoData
@@ -63,6 +64,7 @@ public:
 		{
 			bStandaloneAttach = 0x0001,
 			bStandaloneRemove = 0x0002,
+			bHasSecondaryAmmo = 0x0004,
 			bRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
@@ -432,6 +434,7 @@ public:
 	static ModSwitchManager modSwitchManager;
 	static WeaponStateStore weaponStateStore;
 	static PlayerInventoryListEventSink playerInventoryEventSink;
+	static ActorEquipManagerEventSink actorEquipManagerEventSink;
 	static UInt64 cancelSwitchHotkey;
 	static UInt64 lowerWeaponHotkey;
 	static UInt64 DEBUGprintStoredDataHotkey;
@@ -451,6 +454,8 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> compatibilityEdits;
 	static std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> instantiationRequirements;
 	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeData;
+	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;
+	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;

@@ -93,7 +93,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
 				//Utilities::PlayIdle(*g_player, sw);
 
-				MSF_Test::ExtraDataTest();
+				//MSF_Test::ExtraDataTest();
+				MSF_Test::TestIdle(true);
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
 				_MESSAGE("test1");
 			}
@@ -111,6 +112,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::MenuFlagTest();
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
+				MSF_Test::TestIdle(false);
 				_MESSAGE("test2");
 			}
 		}

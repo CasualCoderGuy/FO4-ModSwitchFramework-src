@@ -27,6 +27,16 @@ public:
 	bool HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
 	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
+	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+
+	enum
+	{
+		kEventTypeUndefined,
+		kEventTypeEquip,
+		KEventTypeAmmoCount,
+		KEventTypeReload,
+		KEventTypeModded //WB vs switch?
+	};
 
 	class WeaponState
 	{
@@ -35,29 +45,26 @@ public:
 		enum
 		{
 			bHasLevel = 0x01,
-			bActive = 0x02
+			bActive = 0x02,
+			bHasTacticalReload = 0x10,
+			bHasBCR = 0x20
 		};
 		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
 		UInt16 chamberSize;
 		volatile short shotCount; 
 		volatile long long loadedAmmo;
-		AmmoData::AmmoMod* switchToAmmoAfterFire;
 		AmmoData::AmmoMod* currentSwitchedAmmo;
-		std::vector<ModData::Mod*> attachedMods; //maybe later
+		AmmoData::AmmoMod* switchToAmmoAfterFire;
+		//std::vector<ModData::Mod*> attachedMods; //maybe later
 	};
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	WeaponStateID ID;
-	ExtraRank* holder;
-	std::unordered_map<ModData::Mod*, WeaponState*> weaponStates;
+	ExtraRank* holder; //ExtraDataList
+	std::map<ModData::Mod*, WeaponState*> weaponStates;
 	WeaponState* currentState;
-	BurstModeManager* burstModeManager;
-	//std::pair<WeaponState, WeaponState> primaryState; //temporaryState, baseState
-	//std::pair<WeaponState, WeaponState> secondaryState;
-	//bool hasSecondaryAmmo;
-	//BGSMod::Attachment::Mod* baseMod;
-	//BGSMod::Attachment::Mod* functionMod;
+	//BurstModeManager* burstModeManager;
 };
 
 class WeaponStateStore
