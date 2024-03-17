@@ -19,12 +19,14 @@ class ExtraWeaponState
 public:
 	~ExtraWeaponState();
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	static bool HandleWeaponStateEvents(UInt8 eventType);
 	static ModData::Mod defaultStatePlaceholder;
 	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
 	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	//bool SetCurrentStateTemporary();
 	bool HandleEquipEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	bool HandleAmmoChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
 	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
 	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData);
@@ -34,6 +36,7 @@ public:
 		kEventTypeUndefined,
 		kEventTypeEquip,
 		KEventTypeAmmoCount,
+		KEventTypeFireWeapon,
 		KEventTypeReload,
 		KEventTypeModded //WB vs switch?
 	};
@@ -54,8 +57,10 @@ public:
 		UInt16 chamberSize;
 		volatile short shotCount; 
 		volatile long long loadedAmmo;
-		AmmoData::AmmoMod* currentSwitchedAmmo;
-		AmmoData::AmmoMod* switchToAmmoAfterFire;
+		TESAmmo* chamberedAmmo;
+		std::vector<TESAmmo*> BCRammo;
+		//AmmoData::AmmoMod* currentSwitchedAmmo;
+		//AmmoData::AmmoMod* switchToAmmoAfterFire;
 		//std::vector<ModData::Mod*> attachedMods; //maybe later
 	};
 private:

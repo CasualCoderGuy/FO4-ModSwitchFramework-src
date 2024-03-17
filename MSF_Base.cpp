@@ -426,7 +426,7 @@ namespace MSF_Base
 		EquipWeaponData* newEqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData->equippedData;
 		TESAmmo* newAmmoType = newEqData->ammo;
 
-		if (modLoadedAmmoCount == 0 || (modLoadedAmmoCount == 2 && newAmmoType == ammoType))
+		if (modLoadedAmmoCount == 0 || (modLoadedAmmoCount == 2 && newAmmoType == ammoType)) //BCR!!
 			newEqData->loadedAmmoCount = loadedAmmoCount;
 		else if (modLoadedAmmoCount == 1 || (modLoadedAmmoCount == 2 && newAmmoType != ammoType))
 		{

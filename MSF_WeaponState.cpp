@@ -140,15 +140,23 @@ ExtraWeaponState::WeaponState::WeaponState(ExtraDataList* extraDataList, EquipWe
 	//has BCR?
 	//has tactical reload?
 	//get chamber size
-	chamberSize = 1;
+	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-	if (!attachedMods)
+	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	if (!currInstanceData || !baseWeap)
 		return;
-	BGSMod::Attachment::Mod* ammoOmod = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::ammoAP);
-	if (!ammoOmod)
-		return;
-	auto itammomod = MSF_MainData::ammoModMap.find(ammoOmod);
-	currentSwitchedAmmo = itammomod->second;
+	BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
+	chamberSize = MSF_Data::GetChamberSize(baseWeap, receiver);
+	chamberedAmmo = equipData->ammo;
+	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+	//if (!attachedMods)
+	//	return;
+	//BGSMod::Attachment::Mod* ammoOmod = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::ammoAP);
+	//if (!ammoOmod)
+	//	return;
+	//auto itammomod = MSF_MainData::ammoModMap.find(ammoOmod);
+	//currentSwitchedAmmo = itammomod->second;
 }
 
 //create new ID and class instance
@@ -231,13 +239,28 @@ ExtraWeaponState::WeaponState::WeaponState(ExtraDataList* extraDataList, EquipWe
 //
 //}
 
-bool HandleWeaponStateEvents(UInt8 eventType)
+bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType) // wait for equip
 {
 	Actor* player = *g_player;
 	ExtraDataList* equippedWeapExtraData = nullptr;
 	player->GetEquippedExtraData(41, &equippedWeapExtraData);
 	EquipWeaponData* equippedData = Utilities::GetEquippedWeaponData(player);
 	ExtraWeaponState* weaponState = ExtraWeaponState::Init(equippedWeapExtraData, equippedData);
+	if (!weaponState)
+		return false;
+	bool ret = false;
+	_MESSAGE("eqSwitch");
+	switch (eventType)
+	{
+	case ExtraWeaponState::kEventTypeEquip: ret = weaponState->HandleEquipEvent(equippedWeapExtraData, equippedData); break;
+	case ExtraWeaponState::KEventTypeAmmoCount: ret = weaponState->HandleAmmoChangeEvent(equippedWeapExtraData, equippedData); break;
+	case ExtraWeaponState::KEventTypeFireWeapon: ret = weaponState->HandleFireEvent(equippedWeapExtraData, equippedData); break;
+	case ExtraWeaponState::KEventTypeReload: ret = weaponState->HandleReloadEvent(equippedWeapExtraData, equippedData, eventType); break;
+	case ExtraWeaponState::KEventTypeModded: ret = weaponState->HandleModChangeEvent(equippedWeapExtraData, equippedData); break;
+	default:
+		return false; break;
+	}
+	return ret;
 }
 
 bool ExtraWeaponState::UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData)
@@ -269,14 +292,18 @@ bool ExtraWeaponState::UpdateWeaponStates(ExtraDataList* extraDataList, EquipWea
 	if (itstate == this->weaponStates.end())
 	{
 		WeaponState* newState = new ExtraWeaponState::WeaponState(extraDataList, equipData);
-		this->weaponStates.at(currModData) = newState;
+		this->weaponStates[currModData] = newState;
+		this->currentState = newState;
 	}
-	this->currentState = itstate->second;
+	else
+		this->currentState = itstate->second;
+	return true;
 }
 
 
 bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
+	_MESSAGE("equipState");
 	if (!extraDataList || !equipData || !equipData->ammo)
 		return false;
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
@@ -286,52 +313,87 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		return false;
 	if (this->currentState)
 	{
+		_MESSAGE("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
 		equipData->loadedAmmoCount = this->currentState->loadedAmmo;
+		_MESSAGE("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
 		//if (!Utilities::HasObjectMod(attachedMods, this->currentState->currentSwitchedAmmo->mod))//validate
 		//{
 		//	//attach
 		//}
 	}
 	else
-	{
-
-	}
+		this->UpdateWeaponStates(extraDataList, equipData); //should not reach this
+	return true;
 }
 
 bool ExtraWeaponState::HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
-	if (this->currentState)
-	{
-		this->currentState->loadedAmmo = equipData->loadedAmmoCount;
-		this->currentState->shotCount++;
-		if (this->currentState->switchToAmmoAfterFire && (this->currentState->shotCount >= this->currentState->chamberSize))
-		{
-			//evaluate
-			if (MSF_Base::AttachModToEquippedWeapon(*g_player, this->currentState->switchToAmmoAfterFire->mod, true, 0, false))
-			{
-				this->currentState->currentSwitchedAmmo = this->currentState->switchToAmmoAfterFire;
-				this->currentState->switchToAmmoAfterFire = nullptr;
-				MSF_Scaleform::UpdateWidgetData();
-			}
-			//error handle
-		}
-	}
-	//add state?
+	if (!this->currentState)
+		this->UpdateWeaponStates(extraDataList, equipData);
+	_MESSAGE("fireWeaponState");
+	//if (this->currentState->switchToAmmoAfterFire)
+	//{
+	//	this->currentState->shotCount++;
+	//	if (this->currentState->shotCount >= this->currentState->chamberSize)
+	//	{
+	//		//evaluate
+	//		if (MSF_Base::AttachModToEquippedWeapon(*g_player, this->currentState->switchToAmmoAfterFire->mod, true, 0, false))
+	//		{
+	//			this->currentState->currentSwitchedAmmo = this->currentState->switchToAmmoAfterFire;
+	//			this->currentState->switchToAmmoAfterFire = nullptr;
+	//			this->currentState->shotCount = 0;
+	//			MSF_Scaleform::UpdateWidgetData();
+	//		}
+	//		//error handle
+	//	}
+	//}
+	return true;
+}
+
+bool ExtraWeaponState::HandleAmmoChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData)
+{
+	if (!this->currentState)
+		this->UpdateWeaponStates(extraDataList, equipData);
+	_MESSAGE("ammoChangeState");
+	this->currentState->loadedAmmo = equipData->loadedAmmoCount;
+	//if (equipData->loadedAmmoCount == 0 && this->currentState->switchToAmmoAfterFire)
+	//{
+	//	//evaluate
+	//	if (MSF_Base::AttachModToEquippedWeapon(*g_player, this->currentState->switchToAmmoAfterFire->mod, true, 0, false))
+	//	{
+	//		this->currentState->currentSwitchedAmmo = this->currentState->switchToAmmoAfterFire;
+	//		this->currentState->switchToAmmoAfterFire = nullptr;
+	//		this->currentState->shotCount = 0;
+	//		MSF_Scaleform::UpdateWidgetData();
+	//	}
+	//	//error handle
+	//}
+	return true;
 }
 
 bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType) //0:start,1:BCR,2:complete
 {
-	if (this->currentState)
-	{
-		equipData->loadedAmmoCount = this->currentState->ammoCapacity + this->currentState->chamberSize; //BCR!
-		this->currentState->loadedAmmo = equipData->loadedAmmoCount;
-	}
-	//add state?
+	_MESSAGE("reloadState");
+	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
+	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	if (!currInstanceData || !baseWeap)
+		return false;
+	if (!this->currentState)
+		this->UpdateWeaponStates(extraDataList, equipData);
+	//if (this->currentState->flags & ExtraWeaponState::WeaponState::bHasTacticalReload)
+	//{
+	//	equipData->loadedAmmoCount = currInstanceData->ammoCapacity + this->currentState->chamberSize; //if chamberedRounds < chamberSize ?
+	//	this->currentState->loadedAmmo = equipData->loadedAmmoCount;
+	//}
+
+	return true;
 }
 
 bool ExtraWeaponState::HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
-
+	return true;
 }
 
 //bool ExtraWeaponState::SetParentRef(ObjectRefHandle refHandle)

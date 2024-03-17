@@ -459,9 +459,13 @@ public:
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
+	static KeywordValue magAP;
+	static KeywordValue receiverAP;
+	static KeywordValue muzzleAP;
 	static BGSKeyword* baseModCompatibilityKW;
 	static BGSKeyword* hasSwitchedAmmoKW;
 	static BGSKeyword* hasUniqueStateKW;
+	static BGSKeyword* tacticalReloadKW;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
@@ -526,6 +530,7 @@ namespace MSF_Data
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
+	UInt16 GetChamberSize(TESObjectWEAP* baseWeapon, BGSMod::Attachment::Mod* receiverMod);
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);

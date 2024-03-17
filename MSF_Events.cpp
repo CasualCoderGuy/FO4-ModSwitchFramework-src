@@ -59,19 +59,19 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	MSF_Scaleform::UpdateWidgetData();
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
-	if (!eventInstanceData || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
+	if (!eventInstanceData)// || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
 		return kEvent_Continue;
 	//EquipWeaponData* equipData = evn->data->equippedWeaponData;
 	//if (!equipData)
 	//	return kEvent_Continue;
-	ExtraDataList* equippedExtraData = nullptr;
-	(*g_player)->GetEquippedExtraData(41, &equippedExtraData);
-	if (!equippedExtraData)
-		return kEvent_Continue;
-	//ExtraWeaponState* weaponState = ExtraWeaponState::Init(equippedExtraData, equipData);
-	//weaponState->HandleEquipEvent(equippedExtraData, equipData);
+	//ExtraDataList* equippedExtraData = nullptr;
+	//(*g_player)->GetEquippedExtraData(41, &equippedExtraData);
+	//if (!equippedExtraData)
+	//	return kEvent_Continue;
+	_MESSAGE("eqStart");
+	ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
 
-	HelperFn(evn);
+	//HelperFn(evn);
 
 	return kEvent_Continue;
 }
@@ -79,6 +79,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
 	_MESSAGE("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
+	ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeAmmoCount);
 	//ExtraDataList* extralist = nullptr;
 	//(*g_player)->GetEquippedExtraData(41, &extralist);
 	//if (!extralist)
@@ -387,8 +388,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	if (!_strcmpi("reloadComplete", name))
 	{
 		_MESSAGE("reloadCOMP");
-		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
-			MSF_MainData::activeBurstManager->ResetShotsOnReload();
+		//if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
+		//	MSF_MainData::activeBurstManager->ResetShotsOnReload();
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
@@ -401,6 +402,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				//_MESSAGE("switchOK");
 			}
 		}
+		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeReload); //BCR!!
 
 	}
 	if (!_strcmpi("reloadEnd", name))
@@ -441,15 +443,15 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	else if (!_strcmpi("weaponFire", name))
 	{
-		if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
-			MSF_MainData::activeBurstManager->HandleFireEvent();
-		
+		//if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
+		//	MSF_MainData::activeBurstManager->HandleFireEvent();
 		//if (MSF_MainData::tmr.IsRunning())
 		//{
 		//	if (MSF_MainData::tmr.stop() < 1000)
 		//		MSF_Base::FireBurst(*g_player);
 		//}
 		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
+		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeFireWeapon);
 		_MESSAGE("Anim: fire");
 	}
 	else if (!_strcmpi("switchMod", name))

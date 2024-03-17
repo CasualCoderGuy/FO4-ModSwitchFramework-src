@@ -22,6 +22,7 @@ std::vector<HUDMuzzleData> MSF_MainData::muzzleDisplayData;
 BGSKeyword* MSF_MainData::baseModCompatibilityKW;
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
 BGSKeyword* MSF_MainData::hasUniqueStateKW;
+BGSKeyword* MSF_MainData::tacticalReloadKW = nullptr;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
@@ -56,6 +57,9 @@ PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
 ActorEquipManagerEventSink MSF_MainData::actorEquipManagerEventSink;
 WeaponStateStore MSF_MainData::weaponStateStore;
 KeywordValue MSF_MainData::ammoAP = 0;
+KeywordValue MSF_MainData::magAP = 0;
+KeywordValue MSF_MainData::receiverAP = 0;
+KeywordValue MSF_MainData::muzzleAP = 0;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
 UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
@@ -87,23 +91,14 @@ namespace MSF_Data
 	bool InitData()
 	{
 		UInt32 formIDbase = 0;
-		UInt8 espModIndex = (*g_dataHandler)->GetLoadedModIndex(MODNAME);
-		//if (espModIndex == (UInt8)-1)
-		//	return false;
-		if (espModIndex != 0xFF)
+		UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(MODNAME);
+		if (eslModIndex != 0xFFFF)
 		{
-			formIDbase = ((UInt32)espModIndex) << 24;
+			formIDbase = 0xFE000000 | (UInt32(eslModIndex) << 12);
 		}
 		else
-		{
-			UInt16 eslModIndex = (*g_dataHandler)->GetLoadedLightModIndex(MODNAME);
-			if (eslModIndex != 0xFFFF)
-			{
-				formIDbase = 0xFE000000 | (UInt32(eslModIndex) << 12);
-			}
-			else
-				return false;
-		}
+			return false;
+
 		MSF_MainData::hasSwitchedAmmoKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x000002F);
 		MSF_MainData::APbaseMod = (BGSMod::Attachment::Mod*)LookupFormByID(formIDbase | (UInt32)0x0000065);
 		if (MSF_MainData::baseModCompatibilityKW)
@@ -114,6 +109,13 @@ namespace MSF_Data
 		}
 		BGSKeyword* ammoApkeyword = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x000000B);
 		MSF_MainData::ammoAP = Utilities::GetAttachValueForTypedKeyword(ammoApkeyword);
+		BGSKeyword* magAPkeyword = (BGSKeyword*)LookupFormByID((UInt32)0x005D4D7);
+		MSF_MainData::magAP = Utilities::GetAttachValueForTypedKeyword(magAPkeyword);
+		BGSKeyword* receiverAPkeyword = (BGSKeyword*)LookupFormByID((UInt32)0x0024004);
+		MSF_MainData::receiverAP = Utilities::GetAttachValueForTypedKeyword(receiverAPkeyword);
+		BGSKeyword* muzzleAPkeyword = (BGSKeyword*)LookupFormByID((UInt32)0x002249C);
+		MSF_MainData::muzzleAP = Utilities::GetAttachValueForTypedKeyword(muzzleAPkeyword);
+
 		MSF_MainData::NullMuzzleMod = (BGSMod::Attachment::Mod*)LookupFormByID((UInt32)0x004F21D);
 		MSF_MainData::CanHaveNullMuzzleKW = (BGSKeyword*)LookupFormByID((UInt32)0x01C9E78);
 		MSF_MainData::FiringModBurstKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000024);
@@ -129,7 +131,14 @@ namespace MSF_Data
 		MSF_MainData::ActionDraw = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x00132AF));
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
 		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
-		
+
+		UInt8 tacticalReloadModIndex = (*g_dataHandler)->GetLoadedModIndex("TacticalReload.esm");
+		if (tacticalReloadModIndex != 0xFF)
+		{
+			UInt32 TRformIDbase = ((UInt32)tacticalReloadModIndex) << 24;
+			MSF_MainData::tacticalReloadKW = (BGSKeyword*)LookupFormByID(TRformIDbase | (UInt32)0x0001734);
+		}
+
 		return InjectAttachPoints();
 	}
 
@@ -1823,6 +1832,12 @@ namespace MSF_Data
 		if (!ammoConverted)
 			return weapBase->weapData.ammo;
 		return ammoConverted;
+	}
+
+	UInt16 GetChamberSize(TESObjectWEAP* baseWeapon, BGSMod::Attachment::Mod* receiverMod)
+	{
+		//if !hasTacticalReload return 0
+		return 1;
 	}
 
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
