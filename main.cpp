@@ -16,6 +16,7 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Events.h"
 #include "MSF_Papyrus.h"
+#include "MSF_WeaponState.h"
 #include "MSF_Serialization.h"
 #ifdef DEBUG
 #include "MSF_Test.h"
@@ -92,7 +93,7 @@ public:
 			//MSFAmmoMenu::RegisterMenu();
 			//MSFModMenu::RegisterMenu();
 			MSFWidgetMenu::OpenMenu();
-			delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData);
+			delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
 
 			//BSScaleformTranslator * translator = (BSScaleformTranslator*)(*g_scaleformManager)->stateBag->GetStateAddRef(GFxState::kInterface_Translator);
 			//if (translator) {

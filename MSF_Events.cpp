@@ -56,9 +56,9 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 		return kEvent_Continue;
 	MSF_MainData::modSwitchManager.ClearQueue();
 	MSF_MainData::modSwitchManager.CloseOpenedMenu();
-	MSF_Scaleform::UpdateWidgetData();
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
+	MSF_Scaleform::UpdateWidgetData(eventInstanceData);
 	if (!eventInstanceData)// || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
 		return kEvent_Continue;
 	//EquipWeaponData* equipData = evn->data->equippedWeaponData;
@@ -69,8 +69,8 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//if (!equippedExtraData)
 	//	return kEvent_Continue;
 	_MESSAGE("eqStart");
-	ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
-
+	//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
+	MSF_MainData::modSwitchManager.SetEquipEvent(true);
 	//HelperFn(evn);
 
 	return kEvent_Continue;

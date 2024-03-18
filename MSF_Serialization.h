@@ -1,16 +1,15 @@
 #pragma once
 #include "f4se/PluginAPI.h"
 #include "f4se/PapyrusEvents.h"
-#include "MSF_Data.h"
 #include "MSF_WeaponState.h"
+#include "MSF_Data.h"
 #include <unordered_map>
 
-namespace MSF_Serialization
-{
-	/*
+	
 	class StoredExtraWeaponState
 	{
 	public:
+		/*
 		static StoredExtraWeaponState* ConvertForStorage(ExtraWeaponState* extraWeaponState);
 		bool Recover();
 
@@ -37,31 +36,34 @@ namespace MSF_Serialization
 			UInt32 mod;
 			UInt8 mod_number;
 		};
-
+		*/
 		class StoredWeaponState
 		{
 		public:
 			StoredWeaponState(ExtraWeaponState::WeaponState* weaponState);
-			ExtraWeaponState::WeaponState* Recover();
+			//ExtraWeaponState::WeaponState* Recover();
 
 			UInt16 flags; //state flags
 			UInt16 ammoCapacity;
 			UInt16 chamberSize;
 			volatile short shotCount;
 			volatile long long loadedAmmo;
-			StoredAmmoMod switchToAmmoAfterFire;
-			StoredAmmoMod currentSwitchedAmmo;
+			UInt32 chamberedAmmo;
+			std::vector<UInt32> BCRammo;
+			//StoredAmmoMod switchToAmmoAfterFire;
+			//StoredAmmoMod currentSwitchedAmmo;
 			//std::vector<ModData::Mod*> attachedMods; //maybe later
 		};
 	private:
 		StoredExtraWeaponState(ExtraWeaponState* extraWeaponState);
 		WeaponStateID ID;
-		StoredWeaponState currentState;
+		UInt32 currentState;
 		//BurstModeManager* burstModeManager;
-		std::vector<StoredModData, StoredWeaponState> weaponStates;
+		std::map<UInt32, StoredWeaponState> weaponStates;
 	};
-	*/
-
+	
+namespace MSF_Serialization
+{
 
 	void RevertCallback(const F4SESerializationInterface * intfc);
 	void LoadCallback(const F4SESerializationInterface * intfc);

@@ -41,7 +41,7 @@ BGSAction* MSF_MainData::ActionRightRelease;
 bool MSF_MainData::GameIsLoading = true;
 bool MSF_MainData::IsInitialized = false;
 int MSF_MainData::iCheckDelayMS = 10;
-UInt16 MSF_MainData::MCMSettingFlags = 0x000;
+UInt32 MSF_MainData::MCMSettingFlags = 0;
 UInt16 MSF_MainData::iMinRandomAmmo = 5;
 UInt16 MSF_MainData::iMaxRandomAmmo = 50;
 UInt16 MSF_MainData::iAutolowerTimeSec = 0;
@@ -167,6 +167,41 @@ namespace MSF_Data
 			}
 			for (std::vector<KeywordValue>::iterator itValue = itComp->second->addedAPslots.begin(); itValue != itComp->second->addedAPslots.end(); itValue++)
 				attachParentArray->kewordValueArray.Push(*itValue);
+		}
+		return true;
+	}
+
+	bool FillQuickAccessData()
+	{
+		for (std::unordered_map<TESAmmo*, AmmoData*>::iterator it = MSF_MainData::ammoDataMap.begin(); it != MSF_MainData::ammoDataMap.end(); it++)
+		{
+			AmmoData* itAmmoData = it->second;
+			if (!itAmmoData)
+				continue;
+			BGSMod::Attachment::Mod* baseMod = itAmmoData->baseAmmoData.mod;
+			if (baseMod)
+				MSF_MainData::ammoModMap[baseMod] = &itAmmoData->baseAmmoData;
+			for (std::vector<AmmoData::AmmoMod>::iterator itAmmo = itAmmoData->ammoMods.begin(); itAmmo != itAmmoData->ammoMods.end(); itAmmo++)
+				MSF_MainData::ammoModMap[itAmmo->mod] = itAmmo._Ptr;
+		}
+		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
+		{
+			KeybindData* itKb = it->second;
+			if (!itKb)
+				continue;
+			if (!itKb->modData)
+				continue;
+			BGSKeyword* kw = nullptr;
+			for (std::unordered_map<KeywordValue, ModData::ModCycle*>::iterator itCycles = itKb->modData->modCycleMap.begin(); itCycles != itKb->modData->modCycleMap.end(); itCycles++)
+			{
+				ModData::ModCycle* cycle = itCycles->second;
+				for (std::vector<ModData::Mod*>::iterator itData = cycle->mods.begin(); itData != cycle->mods.end(); itData++)
+				{
+					ModData::Mod* mod = *itData;
+					if (mod->mod)
+						MSF_MainData::modDataMap[mod->mod] = mod;
+				}
+			}
 		}
 		return true;
 	}
@@ -545,7 +580,7 @@ namespace MSF_Data
 			//	MSF_MainData::MCMSettingFlags &= ~(1 << flagType);
 			//return true;
 			bool flagValue = settingValue != "0";
-			UInt16 flag = 0;
+			UInt32 flag = 0;
 			if (settingName == "bWidgetAlwaysVisible")
 				flag = MSF_MainData::bWidgetAlwaysVisible;
 			else if (settingName == "bShowAmmoIcon")
@@ -576,6 +611,16 @@ namespace MSF_Data
 				flag = MSF_MainData::bSpawnRandomAmmo;
 			else if (settingName == "bSpawnRandomMods")
 				flag = MSF_MainData::bSpawnRandomMods;
+			else if (settingName == "bEnableMetadataSaving")
+				flag = MSF_MainData::bEnableMetadataSaving;
+			else if (settingName == "bEnableAmmoSaving")
+				flag = MSF_MainData::bEnableAmmoSaving;
+			else if (settingName == "bEnableTacticalReloadAll")
+				flag = MSF_MainData::bEnableTacticalReloadAll;
+			else if (settingName == "bEnableTacticalReloadAnim")
+				flag = MSF_MainData::bEnableTacticalReloadAnim;
+			else if (settingName == "bEnableBCRSupport")
+				flag = MSF_MainData::bEnableBCRSupport;
 			else
 				return false;
 
@@ -638,6 +683,9 @@ namespace MSF_Data
 			if (!ReadDataFromJSON(modName, jsonLocation))
 				_ERROR("Cannot read data from %s", modSettingFiles[i].cFileName);
 		}
+
+		FillQuickAccessData();
+
 		return true;
 	}
 

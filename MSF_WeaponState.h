@@ -1,6 +1,7 @@
 #pragma once
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
+//#include "MSF_Serialization.h"
 
 
 typedef UInt32 WeaponStateID;
@@ -63,11 +64,12 @@ public:
 		//AmmoData::AmmoMod* switchToAmmoAfterFire;
 		//std::vector<ModData::Mod*> attachedMods; //maybe later
 	};
+	friend class StoredExtraWeaponState;
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	WeaponStateID ID;
 	ExtraRank* holder; //ExtraDataList
-	std::map<ModData::Mod*, WeaponState*> weaponStates;
+	std::map<BGSMod::Attachment::Mod*, WeaponState*> weaponStates;
 	WeaponState* currentState;
 	//BurstModeManager* burstModeManager;
 };

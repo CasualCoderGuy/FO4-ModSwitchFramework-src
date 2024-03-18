@@ -98,9 +98,18 @@ ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData
 	//parent.extraList = extraDataList;
 	//parent.formID = extraInstanceData->baseForm->formID;
 	this->ID = MSF_MainData::weaponStateStore.Add(this);
-	ExtraRank* holder = ExtraRank::Create(ID);
-	this->holder = holder;
-	extraDataList->Add(ExtraDataType::kExtraData_Rank, holder);
+	if (extraDataList->HasType(kExtraData_Rank))
+	{
+		ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank); 
+		holder->rank = this->ID;
+		this->holder = holder;
+	}
+	else
+	{
+		ExtraRank* holder = ExtraRank::Create(ID);
+		this->holder = holder;
+		extraDataList->Add(ExtraDataType::kExtraData_Rank, holder);
+	}
 	this->UpdateWeaponStates(extraDataList, equipData);
 	//setweaponstate: init(noSwitch?),loadSave,beforeSwitchAmmo,afterSwitchAmmo,beforeSwitchMod,afterSwitchMod,fireWeaponAfterAmmoSwitch,fireWeaponAfterReload;;validate mod-weapstate pairs
 }
@@ -119,17 +128,25 @@ ExtraWeaponState::~ExtraWeaponState()
 
 ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
+	_MESSAGE("WS_init");
 	if (!extraDataList || !equipData || !equipData->ammo)
 		return nullptr;
+	_MESSAGE("WS_inputok");
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	if (!attachedMods || !currInstanceData || !extraInstanceData->baseForm)
 		return nullptr;
+	_MESSAGE("WS_instanceok");
 	if (extraDataList->HasType(ExtraDataType::kExtraData_Rank))
 	{
 		ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
-		return MSF_MainData::weaponStateStore.Get(holder->rank);
+		ExtraWeaponState* storedState = MSF_MainData::weaponStateStore.Get(holder->rank);
+		_MESSAGE("WS rank: %i, state: %p", holder->rank, storedState);
+		if (storedState)
+			return MSF_MainData::weaponStateStore.Get(holder->rank);
+		else
+			return new ExtraWeaponState(extraDataList, equipData);
 	}
 	return new ExtraWeaponState(extraDataList, equipData);
 }
@@ -239,7 +256,7 @@ ExtraWeaponState::WeaponState::WeaponState(ExtraDataList* extraDataList, EquipWe
 //
 //}
 
-bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType) // wait for equip
+bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType)
 {
 	Actor* player = *g_player;
 	ExtraDataList* equippedWeapExtraData = nullptr;
@@ -253,7 +270,17 @@ bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType) // wait for equi
 	switch (eventType)
 	{
 	case ExtraWeaponState::kEventTypeEquip: ret = weaponState->HandleEquipEvent(equippedWeapExtraData, equippedData); break;
-	case ExtraWeaponState::KEventTypeAmmoCount: ret = weaponState->HandleAmmoChangeEvent(equippedWeapExtraData, equippedData); break;
+	case ExtraWeaponState::KEventTypeAmmoCount: 
+	{
+		if (MSF_MainData::modSwitchManager.GetEquipEvent())
+		{
+			ret = weaponState->HandleEquipEvent(equippedWeapExtraData, equippedData);
+			MSF_MainData::modSwitchManager.SetEquipEvent(false);
+		}
+		else
+			ret = weaponState->HandleAmmoChangeEvent(equippedWeapExtraData, equippedData);
+	}
+		break;
 	case ExtraWeaponState::KEventTypeFireWeapon: ret = weaponState->HandleFireEvent(equippedWeapExtraData, equippedData); break;
 	case ExtraWeaponState::KEventTypeReload: ret = weaponState->HandleReloadEvent(equippedWeapExtraData, equippedData, eventType); break;
 	case ExtraWeaponState::KEventTypeModded: ret = weaponState->HandleModChangeEvent(equippedWeapExtraData, equippedData); break;
@@ -272,7 +299,7 @@ bool ExtraWeaponState::UpdateWeaponStates(ExtraDataList* extraDataList, EquipWea
 	if (!data || !data->forms)
 		return false;
 	UInt64 priority = 0;
-	ModData::Mod* currModData = nullptr;
+	BGSMod::Attachment::Mod* currModData = nullptr;
 	for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 	{
 		BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
@@ -285,7 +312,7 @@ bool ExtraWeaponState::UpdateWeaponStates(ExtraDataList* extraDataList, EquipWea
 		ModData::Mod* moddata = itmoddata->second;
 		if (!(moddata->flags & ModData::Mod::bHasSecondaryAmmo))
 			continue;
-		currModData = moddata;
+		currModData = objectMod;
 		priority = currPriority;
 	}
 	auto itstate = this->weaponStates.find(currModData); //might not work

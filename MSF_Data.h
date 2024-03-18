@@ -267,6 +267,7 @@ class ModSwitchManager
 private:
 	volatile UInt16 ignoreAnimGraphUpdate;
 	volatile UInt16 ignoreDeleteExtraData;
+	volatile UInt16 equipEvent;
 	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
@@ -286,6 +287,7 @@ public:
 		InterlockedExchange16((volatile short*)&switchState, 0);
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
+		InterlockedExchange16((volatile short*)&equipEvent, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
@@ -301,6 +303,8 @@ public:
 	bool GetIgnoreAnimGraph() { return ignoreAnimGraphUpdate; };
 	void SetIgnoreDeleteExtraData(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, bIgnore); };
 	bool GetIgnoreDeleteExtraData() { return ignoreDeleteExtraData; };
+	void SetEquipEvent(bool bEquip) { InterlockedExchange16((volatile short*)&equipEvent, bEquip); };
+	bool GetEquipEvent() { return equipEvent; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -412,6 +416,7 @@ public:
 		ClearQueue(); 
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
+		InterlockedExchange16((volatile short*)&equipEvent, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		ClearDisplayChioces();
@@ -485,23 +490,28 @@ public:
 	//MCM data (read on init and on update)
 	enum
 	{
-		bReloadEnabled = 0x0100,
-		bDrawEnabled = 0x0200,
-		bCustomAnimEnabled = 0x0400,
-		bAmmoRequireWeaponToBeDrawn = 0x0800,
-		bRequireAmmoToSwitch = 0x1000,
-		bSpawnRandomAmmo = 0x2000,
-		bSpawnRandomMods = 0x4000,
-		bWidgetAlwaysVisible = 0x0001,
-		bShowAmmoIcon = 0x0002,
-		bShowMuzzleIcon = 0x0004,
-		bShowAmmoName = 0x0008,
-		bShowMuzzleName = 0x0010,
-		bShowFiringMode = 0x0020,
-		bShowScopeData = 0x0040,
-		bShowUnavailableMods = 0x0080
+		bReloadEnabled = 0x00000100,
+		bDrawEnabled = 0x00000200,
+		bCustomAnimEnabled = 0x00000400,
+		bAmmoRequireWeaponToBeDrawn = 0x00000800,
+		bRequireAmmoToSwitch = 0x00001000,
+		bSpawnRandomAmmo = 0x00002000,
+		bSpawnRandomMods = 0x00004000,
+		bWidgetAlwaysVisible = 0x00000001,
+		bShowAmmoIcon = 0x00000002,
+		bShowMuzzleIcon = 0x00000004,
+		bShowAmmoName = 0x00000008,
+		bShowMuzzleName = 0x00000010,
+		bShowFiringMode = 0x00000020,
+		bShowScopeData = 0x00000040,
+		bShowUnavailableMods = 0x00000080,
+		bEnableMetadataSaving = 0x00010000,
+		bEnableAmmoSaving = 0x00020000,
+		bEnableTacticalReloadAll = 0x00040000,
+		bEnableTacticalReloadAnim = 0x00080000,
+		bEnableBCRSupport = 0x00100000
 	};
-	static UInt16 MCMSettingFlags;
+	static UInt32 MCMSettingFlags;
 	static UInt16 iMinRandomAmmo;
 	static UInt16 iMaxRandomAmmo;
 	static UInt16 iAutolowerTimeSec;
@@ -511,6 +521,7 @@ public:
 namespace MSF_Data
 {
 	bool InitData();
+	bool FillQuickAccessData();
 	bool InitCompatibility();
 	bool InitMCMSettings();
 	void ClearInternalKeybinds();

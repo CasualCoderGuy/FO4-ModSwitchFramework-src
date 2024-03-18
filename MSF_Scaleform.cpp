@@ -501,10 +501,11 @@ namespace MSF_Scaleform
 		return true;
 	}
 
-	bool UpdateWidgetData()
+	bool UpdateWidgetData(TESObjectWEAP::InstanceData* instanceData)
 	{
 		Actor* playerActor = *g_player;
-		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(playerActor, 41);
+		if (!instanceData)
+			instanceData = Utilities::GetEquippedInstanceData(playerActor, 41);
 		static BSFixedString menuName("MSFwidget");
 		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
 		if (!widgetMenu)

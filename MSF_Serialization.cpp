@@ -83,3 +83,37 @@ namespace MSF_Serialization
 	}
 
 }
+
+	StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::WeaponState* weaponState)
+	{
+		this->flags = weaponState->flags;
+		this->ammoCapacity = weaponState->ammoCapacity;
+		this->chamberSize = weaponState->chamberSize;
+		this->shotCount = weaponState->shotCount;
+		this->loadedAmmo = weaponState->loadedAmmo;
+		this->chamberedAmmo = weaponState->chamberedAmmo->formID;
+		for (auto itAmmo = weaponState->BCRammo.begin(); itAmmo != weaponState->BCRammo.end(); itAmmo++)
+			this->BCRammo.push_back((*itAmmo)->formID);
+	}
+
+	StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
+	{
+		this->ID = extraWeaponState->ID;
+		this->currentState = 0;
+		UInt32 idx = 1;
+		for (auto itState = extraWeaponState->weaponStates.begin(); itState != extraWeaponState->weaponStates.end(); itState++)
+		{
+			ExtraWeaponState::WeaponState* weaponState = itState->second;
+			if (weaponState == extraWeaponState->currentState)
+				this->currentState = idx;
+			if (itState->first)
+			{
+				this->weaponStates.insert({ itState->first->formID, StoredWeaponState(weaponState) });
+			}
+			else
+			{
+				this->weaponStates.insert({ 0, StoredWeaponState(weaponState) });
+			}
+			idx++;
+		}
+	}

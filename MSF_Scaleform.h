@@ -18,7 +18,7 @@ namespace MSF_Scaleform
 	bool RegisterScaleformTest(GFxMovieView * view, GFxValue * f4se_root);
 	void RegisterMSFScaleformFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot);
 	bool StartWidgetHideCountdown(UInt32 delayTime);
-	bool UpdateWidgetData();
+	bool UpdateWidgetData(TESObjectWEAP::InstanceData* instanceData = nullptr);
 	bool UpdateWidgetSettings();
 	UInt32 GetInterfaceVersion(); 
 	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);
