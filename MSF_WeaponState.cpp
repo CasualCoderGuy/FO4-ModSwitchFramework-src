@@ -100,18 +100,25 @@ ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData
 	this->ID = MSF_MainData::weaponStateStore.Add(this);
 	if (extraDataList->HasType(kExtraData_Rank))
 	{
-		ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank); 
-		holder->rank = this->ID;
-		this->holder = holder;
+		ExtraRank* extraHolder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
+		extraHolder->rank = this->ID;
+		this->holder = extraHolder;
 	}
 	else
 	{
-		ExtraRank* holder = ExtraRank::Create(ID);
-		this->holder = holder;
-		extraDataList->Add(ExtraDataType::kExtraData_Rank, holder);
+		ExtraRank* extraHolder = ExtraRank::Create(ID);
+		this->holder = extraHolder;
+		extraDataList->Add(ExtraDataType::kExtraData_Rank, extraHolder);
 	}
 	this->UpdateWeaponStates(extraDataList, equipData);
 	//setweaponstate: init(noSwitch?),loadSave,beforeSwitchAmmo,afterSwitchAmmo,beforeSwitchMod,afterSwitchMod,fireWeaponAfterAmmoSwitch,fireWeaponAfterReload;;validate mod-weapstate pairs
+}
+
+ExtraWeaponState::ExtraWeaponState(ExtraRank* extraHolder)
+{
+	this->ID = MSF_MainData::weaponStateStore.Add(this);
+	extraHolder->rank = this->ID;
+	this->holder = extraHolder;
 }
 
 ExtraWeaponState::~ExtraWeaponState()

@@ -67,6 +67,7 @@ public:
 	friend class StoredExtraWeaponState;
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	ExtraWeaponState(ExtraRank* holder);
 	WeaponStateID ID;
 	ExtraRank* holder; //ExtraDataList
 	std::map<BGSMod::Attachment::Mod*, WeaponState*> weaponStates;
@@ -107,5 +108,5 @@ public:
 	};
 private:
 	std::unordered_map<WeaponStateID, ExtraWeaponState*> mapstorage;
-	std::vector<ExtraWeaponState*> vectorstorage;
+	std::vector<ExtraWeaponState*> vectorstorage; 
 };

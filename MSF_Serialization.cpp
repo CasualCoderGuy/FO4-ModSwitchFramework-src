@@ -84,36 +84,70 @@ namespace MSF_Serialization
 
 }
 
-	StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::WeaponState* weaponState)
-	{
-		this->flags = weaponState->flags;
-		this->ammoCapacity = weaponState->ammoCapacity;
-		this->chamberSize = weaponState->chamberSize;
-		this->shotCount = weaponState->shotCount;
-		this->loadedAmmo = weaponState->loadedAmmo;
-		this->chamberedAmmo = weaponState->chamberedAmmo->formID;
-		for (auto itAmmo = weaponState->BCRammo.begin(); itAmmo != weaponState->BCRammo.end(); itAmmo++)
-			this->BCRammo.push_back((*itAmmo)->formID);
-	}
+StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::WeaponState* weaponState)
+{
+	this->flags = weaponState->flags;
+	this->ammoCapacity = weaponState->ammoCapacity;
+	this->chamberSize = weaponState->chamberSize;
+	this->shotCount = weaponState->shotCount;
+	this->loadedAmmo = weaponState->loadedAmmo;
+	this->chamberedAmmo = weaponState->chamberedAmmo->formID;
+	for (auto itAmmo = weaponState->BCRammo.begin(); itAmmo != weaponState->BCRammo.end(); itAmmo++)
+		this->BCRammo.push_back((*itAmmo)->formID);
+}
 
-	StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
+StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
+{
+	this->ID = extraWeaponState->ID;
+	this->currentState = 0;
+	UInt32 idx = 1;
+	for (auto itState = extraWeaponState->weaponStates.begin(); itState != extraWeaponState->weaponStates.end(); itState++)
 	{
-		this->ID = extraWeaponState->ID;
-		this->currentState = 0;
-		UInt32 idx = 1;
-		for (auto itState = extraWeaponState->weaponStates.begin(); itState != extraWeaponState->weaponStates.end(); itState++)
+		ExtraWeaponState::WeaponState* weaponState = itState->second;
+		if (weaponState == extraWeaponState->currentState)
+			this->currentState = idx;
+		if (itState->first)
 		{
-			ExtraWeaponState::WeaponState* weaponState = itState->second;
-			if (weaponState == extraWeaponState->currentState)
-				this->currentState = idx;
-			if (itState->first)
-			{
-				this->weaponStates.insert({ itState->first->formID, StoredWeaponState(weaponState) });
-			}
-			else
-			{
-				this->weaponStates.insert({ 0, StoredWeaponState(weaponState) });
-			}
-			idx++;
+			this->weaponStates.insert({ itState->first->formID, StoredWeaponState(weaponState) });
 		}
+		else
+		{
+			this->weaponStates.insert({ 0, StoredWeaponState(weaponState) });
+		}
+		idx++;
 	}
+}
+
+bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	intfc->WriteRecordData(&this->flags, sizeof(this->flags));
+	intfc->WriteRecordData(&this->ammoCapacity, sizeof(this->ammoCapacity));
+	intfc->WriteRecordData(&this->chamberSize, sizeof(this->chamberSize));
+	intfc->WriteRecordData(&this->shotCount, sizeof(this->shotCount));
+	intfc->WriteRecordData(&this->loadedAmmo, sizeof(this->loadedAmmo));
+	intfc->WriteRecordData(&this->chamberedAmmo, sizeof(this->chamberedAmmo));
+	UInt32 size = this->BCRammo.size();
+	intfc->WriteRecordData(&size, sizeof(size));
+	for (auto itAmmo = this->BCRammo.begin(); itAmmo != this->BCRammo.end(); itAmmo++)
+	{
+		UInt32 formId = *itAmmo;
+		intfc->WriteRecordData(&formId, sizeof(formId));
+	}
+	return true;
+}
+
+bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	intfc->OpenRecord(this->dataType, version);
+
+	intfc->WriteRecordData(&this->ID, sizeof(this->ID));
+	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
+	UInt32 size = this->weaponStates.size();
+	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
+	for (auto itState = this->weaponStates.begin(); itState != this->weaponStates.end(); itState++)
+	{
+		intfc->WriteRecordData(&itState->first, sizeof(itState->first));
+		itState->second.SaveState(intfc, version);
+	}
+	return true;
+}
