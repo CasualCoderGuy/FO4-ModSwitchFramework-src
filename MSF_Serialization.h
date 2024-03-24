@@ -9,10 +9,11 @@
 class StoredExtraWeaponState
 {
 public:
-	const UInt32 dataType = 'EXWS';
+	static const UInt32 dataType = 'EXWS';
 	StoredExtraWeaponState(ExtraWeaponState* extraWeaponState);
+	StoredExtraWeaponState(const F4SESerializationInterface* intfc, UInt32 version);
 	bool SaveExtra(const F4SESerializationInterface* intfc, UInt32 version);
-	bool RecoverExtra(const F4SESerializationInterface* intfc, UInt32 version);
+	bool Recover(const F4SESerializationInterface* intfc, UInt32 version);
 
 	/*
 	static StoredExtraWeaponState* ConvertForStorage(ExtraWeaponState* extraWeaponState);
@@ -46,9 +47,10 @@ public:
 	{
 	public:
 		StoredWeaponState(ExtraWeaponState::WeaponState* weaponState);
+		StoredWeaponState(const F4SESerializationInterface* intfc, UInt32 version);
 		bool SaveState(const F4SESerializationInterface* intfc, UInt32 version);
-		//ExtraWeaponState::WeaponState* Recover();
-		
+		ExtraWeaponState::WeaponState* Recover(const F4SESerializationInterface* intfc, UInt32 version);
+
 		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
 		UInt16 chamberSize;
@@ -70,10 +72,10 @@ private:
 namespace MSF_Serialization
 {
 
-	void RevertCallback(const F4SESerializationInterface * intfc);
-	void LoadCallback(const F4SESerializationInterface * intfc);
-	void SaveCallback(const F4SESerializationInterface * intfc);
+	void RevertCallback(const F4SESerializationInterface* intfc);
+	void LoadCallback(const F4SESerializationInterface* intfc);
+	void SaveCallback(const F4SESerializationInterface* intfc);
 
-	bool Load(const F4SESerializationInterface * intfc, UInt32 version);
-	bool Save(const F4SESerializationInterface * intfc, UInt32 type, UInt32 version);
+	bool Load(const F4SESerializationInterface* intfc, UInt32 version);
+	bool Save(const F4SESerializationInterface* intfc, UInt32 version, ExtraWeaponState* extraState);
 }

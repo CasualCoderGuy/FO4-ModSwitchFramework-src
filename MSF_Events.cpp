@@ -363,8 +363,8 @@ bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, Extra
 
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack) //futureParentStack only valid if owner is inventory item (check vtbl!); must return newExtraRank
 {
-	_MESSAGE("loaded ExtraRank: %08X", rank);
-	//rank is valid
+	_MESSAGE("loaded ExtraRank: %08X, %08X", rank, newExtraRank->rank);
+	MSF_MainData::weaponStateStore.StoreForLoad(rank, newExtraRank);
 	return newExtraRank;
 }
 

@@ -19,6 +19,7 @@ class ExtraWeaponState
 {
 public:
 	~ExtraWeaponState();
+	ExtraWeaponState(ExtraRank* holder);
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	static bool HandleWeaponStateEvents(UInt8 eventType);
 	static ModData::Mod defaultStatePlaceholder;
@@ -46,6 +47,7 @@ public:
 	{
 	public:
 		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo);
 		enum
 		{
 			bHasLevel = 0x01,
@@ -67,7 +69,6 @@ public:
 	friend class StoredExtraWeaponState;
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	ExtraWeaponState(ExtraRank* holder);
 	WeaponStateID ID;
 	ExtraRank* holder; //ExtraDataList
 	std::map<BGSMod::Attachment::Mod*, WeaponState*> weaponStates;
@@ -83,7 +84,13 @@ public:
 		mapstorage.reserve(100);
 		vectorstorage.reserve(100);
 	};
-	void Free() {};
+	void Free()
+	{
+		for (auto& state : vectorstorage)
+			delete state;
+		vectorstorage.clear();
+		mapstorage.clear();
+	};
 	WeaponStateID Add(ExtraWeaponState* state)
 	{
 		//nocheck
@@ -106,7 +113,33 @@ public:
 			return state;
 		return nullptr;
 	};
+	bool StoreForLoad(WeaponStateID id, ExtraRank* holder)
+	{
+		if (!holder || id == 0)
+			return false;
+		mapstorage[id] = holder;
+		return true;
+	};
+	ExtraRank* GetForLoad(WeaponStateID id)
+	{
+		ExtraRank* holder = mapstorage[id];
+		if (holder && holder->rank != id)
+			holder = nullptr;
+		return holder;
+	};
+	UInt32 GetCount()
+	{
+		return vectorstorage.size();
+	};
+	void SaveWeaponStates(std::function<bool(const F4SESerializationInterface*, UInt32, ExtraWeaponState*)> f_callback, const F4SESerializationInterface* intfc, UInt32 version)
+	{
+		for (const auto& state : vectorstorage)
+		{
+			if (state)
+				f_callback(intfc, version, state);
+		}
+	};
 private:
-	std::unordered_map<WeaponStateID, ExtraWeaponState*> mapstorage;
-	std::vector<ExtraWeaponState*> vectorstorage; 
+	std::unordered_map<WeaponStateID, ExtraRank*> mapstorage; //used only for the loading of f4se serialized data, WeaponStateID is invalid afterwards
+	std::vector<ExtraWeaponState*> vectorstorage; // used for quick access of WeaponState with ExtraRank->rank (WeaponStateID) being the vector index +1
 };

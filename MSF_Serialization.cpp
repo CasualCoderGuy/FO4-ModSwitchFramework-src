@@ -4,8 +4,6 @@
 
 namespace MSF_Serialization
 {
-	std::set<UInt32> readedNotes;
-
 
 	void RevertCallback(const F4SESerializationInterface * intfc)
 	{
@@ -31,29 +29,12 @@ namespace MSF_Serialization
 
 	bool Load(const F4SESerializationInterface * intfc, UInt32 version)
 	{
-		UInt32 TSCount = 0;
-		if (!Serialization::ReadData(intfc, &TSCount))
+		UInt32 dataCount = 0;
+		Serialization::ReadData(intfc, &dataCount);
+		for (UInt32 idx = 0; idx < dataCount; idx++)
 		{
-			_MESSAGE("Error loading readed notes count");
-			return false;
-		}
-		_MESSAGE("readed notes count loaded: %i", TSCount);
-		for (UInt32 i = 0; i < TSCount; i++)
-		{
-			UInt32 oldformId = 0;
-			UInt32 newformId = 0;
-
-			if (!Serialization::ReadData(intfc, &oldformId))
-			{
-				_MESSAGE("Error loading formId parameter");
-				return false;
-			}
-
-			// Skip if handle is no longer valid.
-			if (!intfc->ResolveFormId(oldformId, &newformId))
-				continue;
-
-			readedNotes.insert(newformId);
+			StoredExtraWeaponState loadedExtraState(intfc, version);
+			loadedExtraState.Recover(intfc, version);
 		}
 		return true;
 	}
@@ -61,24 +42,16 @@ namespace MSF_Serialization
 	void SaveCallback(const F4SESerializationInterface * intfc)
 	{
 		_MESSAGE("Saving MSF serialization data.");
-		MSF_Serialization::Save(intfc, 'EXWS', SERIALIZATION_VERSION);
+		intfc->OpenRecord(StoredExtraWeaponState::dataType, SERIALIZATION_VERSION);
+		UInt32 dataCount = MSF_MainData::weaponStateStore.GetCount();
+		intfc->WriteRecordData(&dataCount, sizeof(dataCount));
+		MSF_MainData::weaponStateStore.SaveWeaponStates(MSF_Serialization::Save, intfc, SERIALIZATION_VERSION);
 	}
 
-	bool Save(const F4SESerializationInterface * intfc, UInt32 type, UInt32 version)
+	bool Save(const F4SESerializationInterface * intfc, UInt32 version, ExtraWeaponState* extraState)
 	{
-		intfc->OpenRecord(type, version);
-
-		UInt32 size = readedNotes.size();
-		_MESSAGE("readed notes count to save: %i", size);
-		if (!intfc->WriteRecordData(&size, sizeof(size)))
-			return false;
-
-		for (auto & form : readedNotes)
-		{
-			UInt32 formId = form;
-			if (!intfc->WriteRecordData(&formId, sizeof(formId)))
-				return false;
-		}
+		StoredExtraWeaponState storedExtraState(extraState);
+		storedExtraState.SaveExtra(intfc, version);
 		return true;
 	}
 
@@ -118,6 +91,24 @@ StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponStat
 	}
 }
 
+StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	Serialization::ReadData(intfc, &this->flags);
+	Serialization::ReadData(intfc, &this->ammoCapacity);
+	Serialization::ReadData(intfc, &this->chamberSize);
+	Serialization::ReadData(intfc, &this->shotCount);
+	Serialization::ReadData(intfc, &this->loadedAmmo);
+	Serialization::ReadData(intfc, &this->chamberedAmmo);
+	UInt32 size = 0;
+	Serialization::ReadData(intfc, &size);
+	for (UInt32 dataidx = 0; dataidx < size; dataidx++)
+	{
+		UInt32 ammoFormID = 0;
+		Serialization::ReadData(intfc, &ammoFormID);
+		this->BCRammo.push_back(ammoFormID);
+	}
+}
+
 bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializationInterface* intfc, UInt32 version)
 {
 	intfc->WriteRecordData(&this->flags, sizeof(this->flags));
@@ -136,6 +127,26 @@ bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializatio
 	return true;
 }
 
+ExtraWeaponState::WeaponState* StoredExtraWeaponState::StoredWeaponState::Recover(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	UInt32 newFormID = 0;
+	TESAmmo* recoveredAmmo = nullptr;
+	if (intfc->ResolveFormId(this->chamberedAmmo, &newFormID))
+		recoveredAmmo = (TESAmmo*)LookupFormByID(newFormID);
+	std::vector<TESAmmo*> recoveredBCRammoVector;
+	for (auto itAmmo = this->BCRammo.begin(); itAmmo != this->BCRammo.end(); itAmmo++)
+	{
+		UInt32 newBCRFormID = 0;
+		if (!intfc->ResolveFormId(*itAmmo, &newBCRFormID))
+			continue;
+		TESAmmo* recoveredBCRAmmo = (TESAmmo*)LookupFormByID(newBCRFormID);
+		if (!recoveredBCRAmmo)
+			continue;
+		recoveredBCRammoVector.push_back(recoveredBCRAmmo);
+	}
+	return new ExtraWeaponState::WeaponState(this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, recoveredAmmo, &recoveredBCRammoVector);
+}
+
 bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, UInt32 version)
 {
 	intfc->OpenRecord(this->dataType, version);
@@ -143,11 +154,62 @@ bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, 
 	intfc->WriteRecordData(&this->ID, sizeof(this->ID));
 	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
 	UInt32 size = this->weaponStates.size();
-	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
+	intfc->WriteRecordData(&size, sizeof(size));
 	for (auto itState = this->weaponStates.begin(); itState != this->weaponStates.end(); itState++)
 	{
 		intfc->WriteRecordData(&itState->first, sizeof(itState->first));
 		itState->second.SaveState(intfc, version);
+	}
+	return true;
+}
+
+StoredExtraWeaponState::StoredExtraWeaponState(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	Serialization::ReadData(intfc, &this->ID);
+	Serialization::ReadData(intfc, &this->currentState);
+	UInt32 size = 0;
+	Serialization::ReadData(intfc, &size);
+	for (UInt32 dataidx = 0; dataidx < size; dataidx++)
+	{
+		UInt32 modFormID = 0;
+		Serialization::ReadData(intfc, &modFormID);
+		this->weaponStates.insert({ modFormID, StoredWeaponState(intfc, version) });
+	}
+}
+
+bool StoredExtraWeaponState::Recover(const F4SESerializationInterface* intfc, UInt32 version)
+{
+	ExtraRank* holder = MSF_MainData::weaponStateStore.GetForLoad(this->ID);
+	if (!holder)
+		return false;
+	ExtraWeaponState* recoveredExtraWeaponState = new ExtraWeaponState(holder);
+	UInt32 idx = 0;
+	for (auto itStates = this->weaponStates.begin(); itStates != this->weaponStates.end(); itStates++)
+	{
+		idx++;
+		ExtraWeaponState::WeaponState* recoveredWeaponState = nullptr;
+		if (itStates->first != 0)
+		{
+			UInt32 newFormID = 0;
+			if (!intfc->ResolveFormId(itStates->first, &newFormID))
+				continue;
+			BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)LookupFormByID(newFormID);
+			if (!mod)
+				continue;
+			recoveredWeaponState = itStates->second.Recover(intfc, version);
+			if (!recoveredWeaponState)
+				continue;
+			recoveredExtraWeaponState->weaponStates[mod] = recoveredWeaponState;
+		}
+		else
+		{
+			recoveredWeaponState = itStates->second.Recover(intfc, version);
+			if (!recoveredWeaponState)
+				continue;
+			recoveredExtraWeaponState->weaponStates[nullptr] = recoveredWeaponState;
+		}
+		if (this->currentState == idx)
+			recoveredExtraWeaponState->currentState = recoveredWeaponState;
 	}
 	return true;
 }

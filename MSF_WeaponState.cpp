@@ -119,6 +119,19 @@ ExtraWeaponState::ExtraWeaponState(ExtraRank* extraHolder)
 	this->ID = MSF_MainData::weaponStateStore.Add(this);
 	extraHolder->rank = this->ID;
 	this->holder = extraHolder;
+	this->currentState = nullptr;
+}
+
+ExtraWeaponState::WeaponState::WeaponState(UInt16 newflags, UInt16 newammoCapacity, UInt16 newchamberSize, UInt16 newshotCount, UInt64 newloadedAmmo, TESAmmo* newchamberedAmmo, std::vector<TESAmmo*>* newBCRammo)
+{
+	this->flags = newflags;
+	this->ammoCapacity = newammoCapacity;
+	this->chamberSize = newchamberSize;
+	this->shotCount = newshotCount;
+	this->loadedAmmo = newloadedAmmo;
+	this->chamberedAmmo = newchamberedAmmo;
+	if (newBCRammo)
+		this->BCRammo = *newBCRammo;
 }
 
 ExtraWeaponState::~ExtraWeaponState()
