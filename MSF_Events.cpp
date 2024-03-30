@@ -29,20 +29,20 @@ EventResult	BGSOnPlayerModArmorWeaponEventSink::ReceiveEvent(BGSOnPlayerModArmor
 EventResult	TESCellFullyLoadedEventSink::ReceiveEvent(TESCellFullyLoadedEvent * evn, void * dispatcher)
 {
 	MSF_Base::SpawnRandomMods(evn->cell);
-	//_MESSAGE("Cell evn");
+	//_DEBUG("Cell evn");
 	return kEvent_Continue;
 }
 
 EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatcher)
 {
 	//instance midprocess ammo count!
-	//_MESSAGE("combat started");
+	//_DEBUG("combat started");
 	return kEvent_Continue;
 }
 
 void HelperFn(ActorEquipManagerEvent::Event* evn)
 {
-	_MESSAGE("equipEvent");
+	_DEBUG("equipEvent");
 }
 
 EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher)
@@ -50,7 +50,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//return kEvent_Continue;
 	if (!evn->data || (evn->targetActor != *g_player))
 		return kEvent_Continue;
-	_MESSAGE("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip);
+	_DEBUG("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip);
 	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->equippedItem, TESBoundObject, TESObjectWEAP);
 	if (!eventWeapon)
 		return kEvent_Continue;
@@ -68,7 +68,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//(*g_player)->GetEquippedExtraData(41, &equippedExtraData);
 	//if (!equippedExtraData)
 	//	return kEvent_Continue;
-	_MESSAGE("eqStart");
+	_DEBUG("eqStart");
 	//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
 	MSF_MainData::modSwitchManager.SetEquipEvent(true);
 	//HelperFn(evn);
@@ -78,7 +78,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
-	_MESSAGE("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
+	_DEBUG("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
 	ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeAmmoCount);
 	//ExtraDataList* extralist = nullptr;
 	//(*g_player)->GetEquippedExtraData(41, &extralist);
@@ -132,24 +132,24 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 		return kEvent_Continue;
 	switch (evn->type)
 	{
-	case BGSInventoryListEventData::kAddStack: {} break; //_MESSAGE("kAddStack"); }; //
-	case BGSInventoryListEventData::kChangedStack: {} break; //_MESSAGE("kChangedStack"); };
-	case BGSInventoryListEventData::kAddNewItem: {} break; //_MESSAGE("kAddNewItem"); };
+	case BGSInventoryListEventData::kAddStack: {} break; //_DEBUG("kAddStack"); }; //
+	case BGSInventoryListEventData::kChangedStack: {} break; //_DEBUG("kChangedStack"); };
+	case BGSInventoryListEventData::kAddNewItem: {} break; //_DEBUG("kAddNewItem"); };
 	case BGSInventoryListEventData::kRemoveItem: {
-		//_MESSAGE("kRemoveItem"); 
-		//_MESSAGE("obj: %p", evn->objAffected);
-		//_MESSAGE("own: %p", evn->owner);
+		//_DEBUG("kRemoveItem"); 
+		//_DEBUG("obj: %p", evn->objAffected);
+		//_DEBUG("own: %p", evn->owner);
 		//Actor* player = *g_player;
-		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
-		//_MESSAGE("ownRef2Handle: %p", GetHandle((TESObjectREFR**)&player));
-		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//_DEBUG("ownRef2Handle: %p", GetHandle((TESObjectREFR**)&player));
+		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
 		//TESObjectREFR* ref = nullptr;
 		//bool ret = GetNiSmartPointer(evn->owner, ref);
-		//_MESSAGE("ownHandle2RefNi: %02X, %p", ret, ref);
-		//_MESSAGE("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+		//_DEBUG("ownHandle2RefNi: %02X, %p", ret, ref);
+		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
 		//ref = nullptr;
 		//ret = GetSmartPointer(evn->owner, ref);
-		//_MESSAGE("ownHandle2Ref: %02X, %p", ret, ref);
+		//_DEBUG("ownHandle2Ref: %02X, %p", ret, ref);
 	}
 	break;
 	}
@@ -185,7 +185,7 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		}
 		if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
-			//_MESSAGE("CloseMSFMenu");
+			//_DEBUG("CloseMSFMenu");
 			MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			MSFMenu::CloseMenu();
 			MSFWidgetMenu::CloseMenu();
@@ -193,7 +193,7 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		}
 		else
 		{
-			//_MESSAGE("OpenMSFMenu from MenuOpenCloseHandler");
+			//_DEBUG("OpenMSFMenu from MenuOpenCloseHandler");
 			MSFMenu::OpenMenu();
 			MSFWidgetMenu::OpenMenu();
 		}
@@ -223,7 +223,7 @@ bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryLis
 
 void* AttackBlockHandler_Hook(void* handler)
 {
-	_MESSAGE("Attack");
+	_DEBUG("Attack");
 	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
 		return nullptr;
 	return AttackBlockHandler_Original(handler);
@@ -256,7 +256,7 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 	UInt32 stackID = IDfunctor->stackID;
 	UInt32 unk = *unk_rsp20;
 	UInt8 slotIndex = modWriteFunctor->slotIndex;
-	//_MESSAGE("unk: %08X, slot index: %02X", unk, slotIndex);
+	//_DEBUG("unk: %08X, slot index: %02X", unk, slotIndex);
 
 	bool result = AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 
@@ -283,7 +283,7 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
 		{
 			BGSMod::Attachment::Mod* invalidMod = *itMods;
-			_MESSAGE("invalid mod: %08X", invalidMod->formID);
+			_DEBUG("invalid mod: %08X", invalidMod->formID);
 			UInt32 newunk = unk;
 			bool success = false;
 			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidMod, slotIndex, false, &success);
@@ -293,7 +293,7 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
 		if (invalidAmmoMod)
 		{
-			_MESSAGE("invalid ammomod: %08X", invalidAmmoMod->formID);
+			_DEBUG("invalid ammomod: %08X", invalidAmmoMod->formID);
 			UInt32 newunk = unk;
 			bool success = false;
 			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidAmmoMod, slotIndex, false, &success);
@@ -332,7 +332,7 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
 		{
 			BGSMod::Attachment::Mod* invalidMod = *itMods;
-			_MESSAGE("invalid mod UI: %08X", invalidMod->formID);
+			_DEBUG("invalid mod UI: %08X", invalidMod->formID);
 			UInt32 newunk = unk;
 			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
@@ -342,7 +342,7 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
 		if (invalidAmmoMod)
 		{
-			_MESSAGE("invalid ammomod UI: %08X", invalidAmmoMod->formID);
+			_DEBUG("invalid ammomod UI: %08X", invalidAmmoMod->formID);
 			UInt32 newunk = unk;
 			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidAmmoMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
@@ -363,22 +363,22 @@ bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, Extra
 
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack) //futureParentStack only valid if owner is inventory item (check vtbl!); must return newExtraRank
 {
-	_MESSAGE("loaded ExtraRank: %08X, %08X", rank, newExtraRank->rank);
+	_DEBUG("loaded ExtraRank: %08X, %p", rank, newExtraRank);
 	MSF_MainData::weaponStateStore.StoreForLoad(rank, newExtraRank);
 	return newExtraRank;
 }
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03
 {
-	_MESSAGE("COMPARE");
+	_DEBUG("COMPARE");
 	if (!extra1 || !extra2)
 		return false;
-	_MESSAGE("%08X vs %08X", extra1->rank, extra2->rank);
-	ExtraWeaponState* state1 = MSF_MainData::weaponStateStore.Get(extra1->rank);
-	ExtraWeaponState* state2 = MSF_MainData::weaponStateStore.Get(extra2->rank);
-	if (state1 || state2)
-		return false;
-	else
+	_DEBUG("%08X vs %08X", extra1->rank, extra2->rank);
+	//ExtraWeaponState* state1 = MSF_MainData::weaponStateStore.Get(extra1->rank);
+	//ExtraWeaponState* state2 = MSF_MainData::weaponStateStore.Get(extra2->rank);
+	//if (state1 || state2)
+	//	return false;
+	//else
 		return extra1->rank != extra2->rank;
 }
 
@@ -387,19 +387,19 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	const char* name = arg2->eventName.c_str();
 	if (!_strcmpi("reloadComplete", name))
 	{
-		_MESSAGE("reloadCOMP");
+		_DEBUG("reloadCOMP");
 		//if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
 		//	MSF_MainData::activeBurstManager->ResetShotsOnReload();
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
-			//_MESSAGE("reloadCOMP %02X", switchData->SwitchFlags);
+			//_DEBUG("reloadCOMP %02X", switchData->SwitchFlags);
 			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
 				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
 				MSF_Base::SwitchMod(switchData, true);
-				//_MESSAGE("switchOK");
+				//_DEBUG("switchOK");
 			}
 		}
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeReload); //BCR!!
@@ -407,7 +407,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	}
 	if (!_strcmpi("reloadEnd", name))
 	{
-		//_MESSAGE("reloadEnd");
+		//_DEBUG("reloadEnd");
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
@@ -419,13 +419,13 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
-			//_MESSAGE("drawFlags: %08X", switchData->SwitchFlags);
+			//_DEBUG("drawFlags: %08X", switchData->SwitchFlags);
 			if (switchData->SwitchFlags & SwitchData::bDrawInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bDrawInProgress;
 				if ((switchData->SwitchFlags & SwitchData::bReloadNeeded))
 				{
-					//_MESSAGE("reloading");
+					//_DEBUG("reloading");
 					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
 					delayTask delayReload(400, true, &MSF_Base::ReloadWeapon);
 					//if (!MSF_Base::ReloadWeapon())
@@ -450,9 +450,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		//	if (MSF_MainData::tmr.stop() < 1000)
 		//		MSF_Base::FireBurst(*g_player);
 		//}
-		//_MESSAGE("Anim: fire %i", MSF_MainData::tmr.stop());
+		//_DEBUG("Anim: fire %i", MSF_MainData::tmr.stop());
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeFireWeapon);
-		_MESSAGE("Anim: fire");
+		_DEBUG("Anim: fire");
 	}
 	else if (!_strcmpi("switchMod", name))
 	{
@@ -476,6 +476,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		}
 	}
 	else if (!_strcmpi("toggleMenu", name))
+	{
+	}
+	else if (!_strcmpi("switchMag", name))
 	{
 	}
 	return PlayerAnimationEvent_Original(arg1, arg2, arg3);

@@ -349,7 +349,7 @@ public:
 		if (it != switchDataQueue.end())
 			switchDataQueue.erase(it);
 		queueLock.Release();
-		_MESSAGE("data: %p", data);
+		_DEBUG("data: %p", data);
 		delete data;
 		return true;
 	};
@@ -373,7 +373,7 @@ public:
 		}
 		switchDataQueue.clear();
 		InterlockedExchange16((volatile short*)&switchState, 0);
-		//_MESSAGE("unlock");
+		//_DEBUG("unlock");
 		queueLock.Release();
 		return true;
 	};
@@ -509,7 +509,8 @@ public:
 		bEnableAmmoSaving = 0x00020000,
 		bEnableTacticalReloadAll = 0x00040000,
 		bEnableTacticalReloadAnim = 0x00080000,
-		bEnableBCRSupport = 0x00100000
+		bEnableBCRSupport = 0x00100000,
+		mMakeExtraRankMask = bEnableAmmoSaving | bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt32 MCMSettingFlags;
 	static UInt16 iMinRandomAmmo;

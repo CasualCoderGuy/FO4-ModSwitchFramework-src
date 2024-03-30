@@ -55,3 +55,19 @@ public:
 	UInt32 f4seVersion;
 	UInt32 msfVersion;
 };
+
+#ifdef DEBUG
+inline void _DEBUG(const char* fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	gLog.Log(IDebugLog::kLevel_Message, fmt, args);
+	va_end(args);
+}
+#else
+inline void _DEBUG(const char* fmt, ...)
+{
+
+}
+#endif

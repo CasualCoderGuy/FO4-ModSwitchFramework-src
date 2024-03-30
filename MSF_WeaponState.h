@@ -117,14 +117,19 @@ public:
 	{
 		if (!holder || id == 0)
 			return false;
-		mapstorage[id] = holder;
+		ExtraRank* occupied = mapstorage[id];
+		if (!occupied)
+			mapstorage[id] = holder;
 		return true;
 	};
 	ExtraRank* GetForLoad(WeaponStateID id)
 	{
 		ExtraRank* holder = mapstorage[id];
 		if (holder && holder->rank != id)
+		{
+			_DEBUG("IDerror");
 			holder = nullptr;
+		}
 		return holder;
 	};
 	UInt32 GetCount()

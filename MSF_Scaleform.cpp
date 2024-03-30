@@ -12,7 +12,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 	UInt32	deviceType = inputEvent->deviceType;
 	UInt32	keyMask = inputEvent->keyMask;
 
-	//_MESSAGE("mask: %08X", keyMask);
+	//_DEBUG("mask: %08X", keyMask);
 	// Mouse
 	if (deviceType == InputEvent::kDeviceType_Mouse)
 		keyCode = InputMap::kMacro_MouseButtonOffset + keyMask;
@@ -20,7 +20,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 	else if (deviceType == InputEvent::kDeviceType_Gamepad)
 	{
 		keyCode = InputMap::GamepadMaskToKeycode(keyMask);
-		//_MESSAGE("gamepad: %08X", keyCode);
+		//_DEBUG("gamepad: %08X", keyCode);
 	}
 	// Keyboard
 	else
@@ -54,7 +54,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			{
 				//MSF_Base::FireBurst(*g_player);
 				//MSF_MainData::tmr.start();
-				//_MESSAGE("fire input");
+				//_DEBUG("fire input");
 			}
 		}
 			break;
@@ -96,7 +96,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::ExtraDataTest();
 				MSF_Test::TestIdle(true);
 				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
-				_MESSAGE("test1");
+				_DEBUG("test1");
 			}
 		}
 		break;
@@ -113,7 +113,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
 				MSF_Test::TestIdle(false);
-				_MESSAGE("test2");
+				_DEBUG("test2");
 			}
 		}
 		break;
@@ -126,9 +126,10 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::AttachModInternalTest(true, 2);
 				//MSF_Test::CallRemoveModFromInvItem();
 				//MSF_Test::DamageEquippedWeapon(*g_player);
-				MSF_Test::ListExtraData();
+				//MSF_Test::ListExtraData();
+				MSF_Test::SplitStackTest(13, false);
 				//Utilities::FireWeapon(*g_player, 1);
-				_MESSAGE("test3");
+				_DEBUG("test3");
 			}
 		}
 		break;
@@ -151,7 +152,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
 				if (!keyFn)
 					break;
-				_MESSAGE("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
+				_DEBUG("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
 				if (keyFn->type & KeybindData::bHUDselection)
 					MSF_Scaleform::ToggleSelectionMenu(keyFn->selectMenu, keyFn->modData);
 				else if (keyFn->type & KeybindData::bIsAmmo)
@@ -212,7 +213,7 @@ namespace MSF_Scaleform
 	public:
 		virtual void Invoke(Args* args) {
 			// OnMCMClosed
-			_MESSAGE("mcm closed");
+			_DEBUG("mcm closed");
 		}
 	};
 
@@ -283,10 +284,10 @@ namespace MSF_Scaleform
 	//public:
 	//	virtual void Invoke(Args* args) {
 	//		args->result->SetBool(false);
-	//		_MESSAGE("ammo scaleform callback");
+	//		_DEBUG("ammo scaleform callback");
 	//		if (args->numArgs != 1) return;
 	//		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-	//		_MESSAGE("val: %i, %p", args->args[0].type, args->args[0].data.obj);
+	//		_DEBUG("val: %i, %p", args->args[0].type, args->args[0].data.obj);
 	//		//if (args->args[0].data.obj) //args->args[0].type == GFxValue::kType_Object && 
 	//		//	MSF_Base::SwitchToSelectedAmmo(args->args[0].data.obj);
 
@@ -298,14 +299,14 @@ namespace MSF_Scaleform
 	public:
 		virtual void Invoke(Args* args) {
 			args->result->SetBool(false);
-			_MESSAGE("ammo scaleform callback idx");
+			_DEBUG("ammo scaleform callback idx");
 			if (args->numArgs != 1) return;
 			MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
-			_MESSAGE("val: %i, %i", args->args[0].type, args->args[0].data.u32);
+			_DEBUG("val: %i, %i", args->args[0].type, args->args[0].data.u32);
 			if (args->args[0].type == GFxValue::kType_UInt)
 			{
 				AmmoData::AmmoMod* ammo = MSF_MainData::modSwitchManager.GetDisplayedAmmoByIndex(args->args[0].data.u32);
-				_MESSAGE("ptr: %p", ammo);
+				_DEBUG("ptr: %p", ammo);
 				MSF_Base::SwitchToSelectedAmmo(ammo);
 			}
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
@@ -355,7 +356,7 @@ namespace MSF_Scaleform
 			UInt32 version = args->args[2].data.u32;
 			if (!cmname)
 				cmname = "";
-			_MESSAGE("scaleform prop: %s, %02X, %08X", cmname, type, version);
+			_DEBUG("scaleform prop: %s, %02X, %08X", cmname, type, version);
 			if (type == ModSelectionMenu::kType_Widget && version >= MIN_SUPPORTED_SWF_WIDGET_VERSION)
 				MSF_MainData::widgetMenu = nullptr; // = find args->args[0].data.string in array of Keybind; MSF_MainData::widgetMenu->type = type; MSF_MainData::widgetMenu->version = version;
 			else if ((type == ModSelectionMenu::kType_AmmoMenu && version >= MIN_SUPPORTED_SWF_AMMO_VERSION) || ((type & ModSelectionMenu::kType_ModMenu) && version >= MIN_SUPPORTED_SWF_MOD_VERSION))
@@ -452,16 +453,16 @@ namespace MSF_Scaleform
 		//		//arrArgs[1].SetUInt(dt);
 		//		//UInt32 a = arrArgs[0].GetUInt();
 		//		//UInt32 b = arrArgs[1].GetUInt();
-		//		_MESSAGE("calling");
+		//		_DEBUG("calling");
 
 		//		GFxValue vis, ver, verfn;
 		//		movieRoot->GetVariable(&vis, "root.msf_loader.content.visible");
 		//		movieRoot->GetVariable(&ver, "root.msf_loader.content.InterfaceVersion");
 		//		movieRoot->Invoke("root.msf_loader.content.SendInterfaceVersion", &verfn, nullptr, 0);
-		//		_MESSAGE("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
+		//		_DEBUG("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
 
-		//		//_MESSAGE("res type: %08X", GFxGlobaltest.GetType());
-		//		//_MESSAGE("res: %08X", GFxGlobaltest.GetInt());
+		//		//_DEBUG("res type: %08X", GFxGlobaltest.GetType());
+		//		//_DEBUG("res: %08X", GFxGlobaltest.GetInt());
 		//		//return GFxGlobaltest.GetInt();
 		//	}
 		//}
@@ -529,7 +530,7 @@ namespace MSF_Scaleform
 		arrArgs[2].SetString(muzzleName);
 		arrArgs[3].SetString(scopeName);
 		arrArgs[4].SetUInt(shapeID);
-		//_MESSAGE("ammo: %s, fm: %s, muzzle: %s, sc: %s", ammoName, firingMode, muzzleName, scopeName);
+		//_DEBUG("ammo: %s, fm: %s, muzzle: %s, sc: %s", ammoName, firingMode, muzzleName, scopeName);
 		movieRoot->Invoke("root.UpdateWidgetData", nullptr, arrArgs, 5);
 		return true;
 		//out of ammo, full (+1?)
@@ -589,7 +590,7 @@ namespace MSF_Scaleform
 					RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
 					RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
 					dst->PushBack(&BammoArg);
-					_MESSAGE("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
+					_DEBUG("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
 				}
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
@@ -603,7 +604,7 @@ namespace MSF_Scaleform
 						RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo); //weapState!
 						RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
 						dst->PushBack(&ammoArg);
-						_MESSAGE("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);
+						_DEBUG("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);
 					}
 				}
 				MSF_MainData::modSwitchManager.menuLock.Release();
@@ -773,7 +774,7 @@ namespace MSF_Scaleform
 	//				RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
 	//				RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
 	//				ammoData.PushBack(&BammoArg);
-	//				_MESSAGE("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
+	//				_DEBUG("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
 	//			}
 	//			for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 	//			{
@@ -787,7 +788,7 @@ namespace MSF_Scaleform
 	//					RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo); //weapState!
 	//					RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
 	//					ammoData.PushBack(&ammoArg);
-	//					_MESSAGE("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);
+	//					_DEBUG("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);
 	//				}
 	//			}
 	//			MSF_MainData::modSwitchManager.menuLock.Release();
@@ -1004,14 +1005,14 @@ namespace MSF_Scaleform
 
 			/*GFxValue msf_loader; root.GetMember("msf_loader", &msf_loader);
 			GFxValue msfmsf; root.GetMember("msf", &msfmsf);
-			_MESSAGE("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
+			_DEBUG("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
 			GFxValue vis, ver, verfn;
 			movieRoot->GetVariable(&vis, "root.msf_loader.content.visible");
 			movieRoot->GetVariable(&ver, "root.msf_loader.content.InterfaceVersion");
 			movieRoot->Invoke("root.msf_loader.content.SendInterfaceVersion", &verfn, nullptr, 0);
-			_MESSAGE("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
+			_DEBUG("vis type: %08X, ver type: %08X, verfn type: %08X", vis.GetType(), ver.GetType(), verfn.GetType());
 			//GFxValue msf_loader_content; msf_loader.GetMember("content", &msf_loader_content);
-			//_MESSAGE("UpdateWidgetData: %02X, InterfaceVersion: %02X, MSFwidget: %02X", msf_loader_content.HasMember("UpdateWidgetData"), msf_loader_content.HasMember("InterfaceVersion"), msf_loader_content.HasMember("MSFwidget"));
+			//_DEBUG("UpdateWidgetData: %02X, InterfaceVersion: %02X, MSFwidget: %02X", msf_loader_content.HasMember("UpdateWidgetData"), msf_loader_content.HasMember("InterfaceVersion"), msf_loader_content.HasMember("MSFwidget"));
 			*/
 		}
 
@@ -1058,7 +1059,7 @@ namespace MSF_Scaleform
 
 			GFxValue msf_loader; root.GetMember("msf_loader", &msf_loader);
 			GFxValue msfmsf; root.GetMember("msf", &msfmsf);
-			_MESSAGE("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
+			_DEBUG("msf: %02X, msf_loader: %02X, content: %02X", root.HasMember("msf"), root.HasMember("msf_loader"), msf_loader.HasMember("content"));
 		}
 
 		return true;

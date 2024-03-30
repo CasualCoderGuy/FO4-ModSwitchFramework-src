@@ -168,6 +168,18 @@ public:
 STATIC_ASSERT(sizeof(ModifyModDataFunctor) == 0x30);
 STATIC_ASSERT(offsetof(ModifyModDataFunctor, mod) == 0x10);
 
+class SplitStackFunctor
+{
+public:
+	SplitStackFunctor(bool transferEquipped, UInt32 newCount, BGSInventoryItem::Stack* oldStack);
+	virtual bool Apply(TESBoundObject* item, BGSInventoryItem::Stack* newStack);
+
+	bool shouldSplitStacks{ true };              // 08
+	bool transferEquippedToSplitStack{ false };  // 09
+	bool preventUnequip{ false };
+	UInt32 stackCount;
+	BGSInventoryItem::Stack* stack;
+};
 
 class ApplyChangesFunctor : public StackDataWriteFunctor
 {
@@ -550,6 +562,7 @@ public:
 typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod, bool unkbool);
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
+typedef bool(*_ModifyStackData)(BGSInventoryItem* invItem, BGSInventoryItem::Stack** stack, StackDataWriteFunctor* modFuntor);
 typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
 typedef void(*_UpdateEquipData)(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
 typedef void*(*_UpdateAnimGraph)(Actor* actor, bool rdx);
@@ -626,6 +639,7 @@ extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;
 extern RelocAddr <_AttachModToInventoryItem> AttachModToInventoryItem_Internal;
 extern RelocAddr <_AttachModToStack> AttachRemoveModStack;
+extern RelocAddr <_ModifyStackData> ModifyStackData;
 extern RelocAddr <_UpdMidProc> UpdateMiddleProcess;
 extern RelocAddr <_UpdateEquipData> UpdateEquipData;
 extern RelocAddr <_UpdateAnimGraph> UpdateAnimGraph;

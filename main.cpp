@@ -64,7 +64,7 @@ bool RegisterAfterLoadEvents()
 		_MESSAGE("MSF was unable to register for ActorEquipManagerEvent");
 		return false;
 	}
-	_MESSAGE("sinkFnPtr: %p", &HelperFn);
+	_DEBUG("sinkFnPtr: %p", &HelperFn);
 
 	return true;
 }
@@ -241,9 +241,9 @@ bool InitializeOffsets()
 
 bool InitPlugin(UInt32 runtimeVersion = 0) {
 	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
-	_MESSAGE("runtime version: %08X", runtimeVersion);
+	_MESSAGE("Runtime version: %08X", runtimeVersion);
 #ifdef DEBUG
-	_MESSAGE("DevMode enabled!");
+	_MESSAGE("DebugMode enabled!");
 #endif
 
 	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
@@ -324,7 +324,7 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 
 	if (f4se->runtimeVersion > SUPPORTED_RUNTIME_VERSION) 
 	{
-		_FATALERROR("INFO: Newer game version (%08X) than target (%08X).", f4se->runtimeVersion, SUPPORTED_RUNTIME_VERSION);
+		_FATALERROR("Error: Newer game version (%08X) than target (%08X).", f4se->runtimeVersion, SUPPORTED_RUNTIME_VERSION);
 	}
 
 	g_messaging = (F4SEMessagingInterface *)f4se->QueryInterface(kInterface_Messaging);

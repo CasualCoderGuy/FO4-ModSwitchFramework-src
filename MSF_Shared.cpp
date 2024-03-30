@@ -35,6 +35,30 @@ ApplyChangesFunctor::ApplyChangesFunctor(TESBoundObject* foundObject, BGSObjectI
 }
 
 
+SplitStackFunctor::SplitStackFunctor(bool transferEquipped, UInt32 newCount, BGSInventoryItem::Stack* oldStack)
+{
+	transferEquippedToSplitStack = transferEquipped;
+	stackCount = newCount;
+	stack = oldStack;
+}
+
+bool SplitStackFunctor::Apply(TESBoundObject* item, BGSInventoryItem::Stack* newStack)
+{
+	if (!item || !newStack || this->stackCount == 0)
+		return false;
+	if (this->stack)
+		this->stack->count -= this->stackCount + newStack->count;
+	newStack->count = this->stackCount;
+	if (this->preventUnequip)
+	{
+		if (this->transferEquippedToSplitStack && this->stack)
+			this->stack->flags |= 0x0;
+		else
+			newStack->flags |= 0x0;
+	}
+}
+
+
 UInt32 roundp(float a)
 {
 	int result = (int)a;
@@ -578,19 +602,19 @@ namespace Utilities
 			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
 			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
 			{
-				//_MESSAGE("api: %i", i);
+				//_DEBUG("api: %i", i);
 				KeywordValue value = attachPoints->kewordValueArray[i];
 				if (value == parentValue)
 				{
 					KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&objectMod->unkB0);
-					//_MESSAGE("if count: %i", instantiationData->count);
+					//_DEBUG("if count: %i", instantiationData->count);
 					for (UInt32 i = 0; i < instantiationData->count; i++)
 						instantiationValues->push_back((*instantiationData)[i]);
 					break;
 				}
 			}
 		}
-		//_MESSAGE("if counts: %i", instantiationValues->size());
+		//_DEBUG("if counts: %i", instantiationValues->size());
 		return true;
 	}
 

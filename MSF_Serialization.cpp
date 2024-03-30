@@ -13,6 +13,11 @@ namespace MSF_Serialization
 
 	void LoadCallback(const F4SESerializationInterface * intfc)
 	{
+		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
+		{
+			_MESSAGE("MSF serialization data loading disabled.");
+			return;
+		}
 		_MESSAGE("Loading MSF serialization data.");
 		UInt32 type, version, length;
 		while (intfc->GetNextRecordInfo(&type, &version, &length))
@@ -20,8 +25,11 @@ namespace MSF_Serialization
 			switch (type)
 			{
 			case 'EXWS':
+			{
+				_DEBUG("Load info: %08X %08X %08X", type, version, length);
 				MSF_Serialization::Load(intfc, SERIALIZATION_VERSION);
-				break;
+			}
+			break;
 			}
 		}
 
@@ -29,22 +37,25 @@ namespace MSF_Serialization
 
 	bool Load(const F4SESerializationInterface * intfc, UInt32 version)
 	{
-		UInt32 dataCount = 0;
-		Serialization::ReadData(intfc, &dataCount);
-		for (UInt32 idx = 0; idx < dataCount; idx++)
-		{
-			StoredExtraWeaponState loadedExtraState(intfc, version);
-			loadedExtraState.Recover(intfc, version);
-		}
+		//UInt32 dataCount = 0;
+		//Serialization::ReadData(intfc, &dataCount);
+		//for (UInt32 idx = 0; idx < dataCount; idx++)
+		StoredExtraWeaponState loadedExtraState(intfc, version);
+		loadedExtraState.Recover(intfc, version);
 		return true;
 	}
 
 	void SaveCallback(const F4SESerializationInterface * intfc)
 	{
+		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
+		{
+			_MESSAGE("MSF serialization data saving disabled.");
+			return;
+		}
 		_MESSAGE("Saving MSF serialization data.");
-		intfc->OpenRecord(StoredExtraWeaponState::dataType, SERIALIZATION_VERSION);
-		UInt32 dataCount = MSF_MainData::weaponStateStore.GetCount();
-		intfc->WriteRecordData(&dataCount, sizeof(dataCount));
+		//intfc->OpenRecord(StoredExtraWeaponState::dataType, SERIALIZATION_VERSION);
+		//UInt32 dataCount = MSF_MainData::weaponStateStore.GetCount();
+		//intfc->WriteRecordData(&dataCount, sizeof(dataCount));
 		MSF_MainData::weaponStateStore.SaveWeaponStates(MSF_Serialization::Save, intfc, SERIALIZATION_VERSION);
 	}
 
@@ -71,6 +82,7 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::W
 
 StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
 {
+	_DEBUG("Saving WeaponState %08X", extraWeaponState->ID);
 	this->ID = extraWeaponState->ID;
 	this->currentState = 0;
 	UInt32 idx = 1;
@@ -101,6 +113,7 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &this->chamberedAmmo);
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
+	_DEBUG("Loaded data: %04X %04X %04X %04X %016X %08X %08X", this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, size);
 	for (UInt32 dataidx = 0; dataidx < size; dataidx++)
 	{
 		UInt32 ammoFormID = 0;
@@ -119,6 +132,7 @@ bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializatio
 	intfc->WriteRecordData(&this->chamberedAmmo, sizeof(this->chamberedAmmo));
 	UInt32 size = this->BCRammo.size();
 	intfc->WriteRecordData(&size, sizeof(size));
+	_DEBUG("Saved data: %04X %04X %04X %04X %016X %08X %08X", this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, size);
 	for (auto itAmmo = this->BCRammo.begin(); itAmmo != this->BCRammo.end(); itAmmo++)
 	{
 		UInt32 formId = *itAmmo;
@@ -155,8 +169,10 @@ bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, 
 	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
 	UInt32 size = this->weaponStates.size();
 	intfc->WriteRecordData(&size, sizeof(size));
+	_DEBUG("Saved data: %08X, %08X, %08X", this->ID, this->currentState, size);
 	for (auto itState = this->weaponStates.begin(); itState != this->weaponStates.end(); itState++)
 	{
+		_DEBUG("Saved data: %08X", itState->first);
 		intfc->WriteRecordData(&itState->first, sizeof(itState->first));
 		itState->second.SaveState(intfc, version);
 	}
@@ -169,10 +185,12 @@ StoredExtraWeaponState::StoredExtraWeaponState(const F4SESerializationInterface*
 	Serialization::ReadData(intfc, &this->currentState);
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
+	_DEBUG("Loaded data %08X ", this->ID, this->currentState, size);
 	for (UInt32 dataidx = 0; dataidx < size; dataidx++)
 	{
 		UInt32 modFormID = 0;
 		Serialization::ReadData(intfc, &modFormID);
+		_DEBUG("Loaded data: %08X", modFormID);
 		this->weaponStates.insert({ modFormID, StoredWeaponState(intfc, version) });
 	}
 }
@@ -183,6 +201,7 @@ bool StoredExtraWeaponState::Recover(const F4SESerializationInterface* intfc, UI
 	if (!holder)
 		return false;
 	ExtraWeaponState* recoveredExtraWeaponState = new ExtraWeaponState(holder);
+	_DEBUG("Loading ExtraRank %p, %08X", holder, holder->rank);
 	UInt32 idx = 0;
 	for (auto itStates = this->weaponStates.begin(); itStates != this->weaponStates.end(); itStates++)
 	{

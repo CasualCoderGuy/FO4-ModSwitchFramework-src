@@ -539,7 +539,7 @@ namespace MSF_Data
 				len <<= 1;
 				lpReturnedString = new TCHAR[len];
 				sizeWritten = GetPrivateProfileSection(sections[j].c_str(), lpReturnedString, len, iniLocation.c_str());
-				//_MESSAGE("Expanded buffer to %d bytes.", len);
+				//_DEBUG("Expanded buffer to %d bytes.", len);
 			}
 			
 			for (LPTSTR p = lpReturnedString; *p; p++) {
@@ -573,7 +573,7 @@ namespace MSF_Data
 			//if (flagType == 0)
 			//	return false;
 			//bool flagValue = settingValue != "0";
-			//_MESSAGE("Setting read: %04X, %02X", flagType, flagValue);
+			//_DEBUG("Setting read: %04X, %02X", flagType, flagValue);
 			//if (flagValue)
 			//	MSF_MainData::MCMSettingFlags |= (1 << flagType);
 			//else
@@ -991,8 +991,9 @@ namespace MSF_Data
 									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
-									if (mod->unkC0 != MSF_MainData::ammoAP)
-									{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
+									mod->unkC0 = MSF_MainData::ammoAP;
+									//if (mod->unkC0 != MSF_MainData::ammoAP)
+									//{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									float spawnChance = ammoType["spawnChance"].asFloat();
 
@@ -1047,8 +1048,9 @@ namespace MSF_Data
 									{ _MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
 									if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 									{ _MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), type.c_str()); continue; }
-									if (mod->unkC0 != MSF_MainData::ammoAP) 
-									{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
+									mod->unkC0 = MSF_MainData::ammoAP;
+									//if (mod->unkC0 != MSF_MainData::ammoAP) 
+									//{ _MESSAGE("Data error in %s: attach point of ammo mod '%s' is not MSF_ap_AmmoType", fileName.c_str(), type.c_str()); continue; }
 									UInt16 ammoID = ammoType["ammoID"].asInt();
 									float spawnChance = ammoType["spawnChance"].asFloat();
 
@@ -1650,17 +1652,17 @@ namespace MSF_Data
 		if (!attachedMods || !instanceData)
 			return false;
 
-		_MESSAGE("check OK");
+		_DEBUG("check OK");
 		std::vector<KeywordValue> instantiationValues;
 		if (!Utilities::GetParentInstantiationValues(attachedMods, modData->attachParentValue, &instantiationValues))
 			return false;
-		_MESSAGE("if counts: %i / %i", instantiationValues.size(), instantiationValues.capacity());
+		_DEBUG("if counts: %i / %i", instantiationValues.size(), instantiationValues.capacity());
 
 		ModData::ModCycle* modCycle = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
-			_MESSAGE("it: %i", value);
+			_DEBUG("it: %i", value);
 			auto itCycle = modData->modCycleMap.find(value);
 			if (itCycle != modData->modCycleMap.end())
 			{

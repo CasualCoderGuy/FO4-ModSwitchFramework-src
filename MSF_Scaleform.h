@@ -70,7 +70,7 @@ public:
 	{
 		GFxMovieRoot * root = movie->movieRoot;
 		GFxValue ValueToSet;
-		//_MESSAGE("message proc!!");
+		//_DEBUG("message proc!!");
 		return this->GameMenuBase::ProcessMessage(msg);
 	};
 
@@ -155,13 +155,13 @@ public:
 	{
 		GFxMovieRoot * root = movie->movieRoot;
 		GFxValue ValueToSet;
-		//_MESSAGE("message proc!!");
+		//_DEBUG("message proc!!");
 		/*
 		switch (msg->type)
 		{
 		case kMessage_UpdateModSettings:
 		{
-			//_MESSAGE("UpdateModSettings");
+			//_DEBUG("UpdateModSettings");
 			if (isHMO)
 			{
 				GFxValue arr;
@@ -183,7 +183,7 @@ public:
 		}
 		case kMessage_UpdateValues:
 		{
-			//_MESSAGE("UpdateValues");
+			//_DEBUG("UpdateValues");
 
 			ValueToSet.SetInt(iFoodPool);
 			root->SetVariable("root.Menu_mc.iFoodPool", &ValueToSet);
@@ -212,7 +212,7 @@ public:
 		}
 		case kMessage_UpdateAmounts:
 		{
-			//_MESSAGE("UpdateAmounts");
+			//_DEBUG("UpdateAmounts");
 
 			ValueToSet.SetInt(iSleepPoolIncapacitatedAmount);
 			root->SetVariable("root.Menu_mc.iSleepPoolIncapacitatedAmount", &ValueToSet);
@@ -240,7 +240,7 @@ public:
 	static void OpenMenu()
 	{
 		static BSFixedString menuName("MSFMenu");
-		//_MESSAGE("opening menu");
+		//_DEBUG("opening menu");
 		CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
 	}
 
@@ -257,7 +257,7 @@ public:
 		{
 			(*g_ui)->Register("MSFMenu", CreateMSFMenu);
 		}
-		_MESSAGE("RegisterMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
+		_MESSAGE("MSFMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 	}
 };
 
