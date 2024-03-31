@@ -48,6 +48,8 @@ public:
 	public:
 		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo);
+		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+		bool RecoverState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		enum
 		{
 			bHasLevel = 0x01,

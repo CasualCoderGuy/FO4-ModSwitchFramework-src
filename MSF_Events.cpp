@@ -6,6 +6,7 @@ _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 _AttachModToStack AttachModToStack_CallFromGameplay_Copied;
 _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
 _DeleteExtraData DeleteExtraData_CallFromWorkbenchUI_Copied;
+_UpdateEquipData UpdateEquipData_Copied;
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
@@ -70,7 +71,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//	return kEvent_Continue;
 	_DEBUG("eqStart");
 	//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
-	MSF_MainData::modSwitchManager.SetEquipEvent(true);
+	//MSF_MainData::modSwitchManager.SetEquipEvent(true);
 	//HelperFn(evn);
 
 	return kEvent_Continue;
@@ -229,6 +230,36 @@ void* AttackBlockHandler_Hook(void* handler)
 	return AttackBlockHandler_Original(handler);
 }
 
+//bool UpdMidProc_Hook(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot)
+//{
+//	_DEBUG("UpdMidProc_Hook");
+//	UpdMidProc_Copied(midProc, actor, weaponBaseStruct, equipSlot);
+//}
+
+void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d)
+{
+	_DEBUG("UpdateEquipData_Hook1");
+	UpdateEquipData_Copied(equipData, instance, r8d);
+	//EquipWeaponData* eqdata = Utilities::GetEquippedWeaponData(*g_player);
+	//if (eqdata)
+	//{
+	//	_DEBUG("eq: %i", eqdata->loadedAmmoCount);
+	//}
+	if (equipData == (*g_player)->equipData)
+		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
+	else
+	{
+		MSF_MainData::modSwitchManager.SetModChangeEvent(false);
+		//weaponState->HandleModChangeEvent(equippedWeapExtraData, equippedData);
+	}
+}
+
+//void UpdateEquippedWeaponData_Hook(EquippedWeaponData* data)
+//{
+//	_DEBUG("UpdateEquippedWeaponData_Hook");
+//	UpdateEquippedWeaponData_Copied(data);
+//}
+
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime)
 {
 	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
@@ -249,6 +280,7 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 
 bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20)
 {
+	
 	if (MSF_MainData::GameIsLoading || (*g_ui)->IsMenuOpen("LoadingMenu") || !invItem)
 		return AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 
@@ -259,6 +291,13 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 	//_DEBUG("unk: %08X, slot index: %02X", unk, slotIndex);
 
 	bool result = AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
+	BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
+	if (!stack)
+		return result;
+	if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
+		MSF_MainData::modSwitchManager.SetModChangeEvent(true);
+	//else
+	//   recover state
 
 	if (modWriteFunctor && modWriteFunctor->mod)
 	{
@@ -267,9 +306,6 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 			return result;
 		BGSMod::Attachment::Mod* attachedMod = modWriteFunctor->mod;
 		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-			return result;
-		BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
-		if (!stack)
 			return result;
 		ExtraDataList* extraList = stack->extraData;
 		if (!extraList)

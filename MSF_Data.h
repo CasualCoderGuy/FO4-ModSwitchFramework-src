@@ -267,7 +267,7 @@ class ModSwitchManager
 private:
 	volatile UInt16 ignoreAnimGraphUpdate;
 	volatile UInt16 ignoreDeleteExtraData;
-	volatile UInt16 equipEvent;
+	volatile UInt16 modChangeEvent;
 	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
@@ -287,7 +287,7 @@ public:
 		InterlockedExchange16((volatile short*)&switchState, 0);
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
-		InterlockedExchange16((volatile short*)&equipEvent, 0);
+		InterlockedExchange16((volatile short*)&modChangeEvent, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
@@ -303,8 +303,8 @@ public:
 	bool GetIgnoreAnimGraph() { return ignoreAnimGraphUpdate; };
 	void SetIgnoreDeleteExtraData(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, bIgnore); };
 	bool GetIgnoreDeleteExtraData() { return ignoreDeleteExtraData; };
-	void SetEquipEvent(bool bEquip) { InterlockedExchange16((volatile short*)&equipEvent, bEquip); };
-	bool GetEquipEvent() { return equipEvent; };
+	void SetModChangeEvent(bool bEquip) { InterlockedExchange16((volatile short*)&modChangeEvent, bEquip); };
+	bool GetModChangeEvent() { return modChangeEvent; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -416,7 +416,7 @@ public:
 		ClearQueue(); 
 		InterlockedExchange16((volatile short*)&ignoreAnimGraphUpdate, 0);
 		InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, 0);
-		InterlockedExchange16((volatile short*)&equipEvent, 0);
+		InterlockedExchange16((volatile short*)&modChangeEvent, 0);
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		ClearDisplayChioces();
