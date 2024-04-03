@@ -21,7 +21,7 @@ public:
 	~ExtraWeaponState();
 	ExtraWeaponState(ExtraRank* holder);
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	static bool HandleWeaponStateEvents(UInt8 eventType);
+	static bool HandleWeaponStateEvents(UInt8 eventType, Actor* actor = nullptr);
 	static ModData::Mod defaultStatePlaceholder;
 	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
 	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
@@ -32,6 +32,7 @@ public:
 	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
 	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
 	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	bool UpdateWeaponStatesUnequipped(BGSInventoryItem* item, UInt32 stackID);
 
 	enum
 	{
@@ -49,7 +50,6 @@ public:
 		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo);
 		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-		bool RecoverState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		enum
 		{
 			bHasLevel = 0x01,

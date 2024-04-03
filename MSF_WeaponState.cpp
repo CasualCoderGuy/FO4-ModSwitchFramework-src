@@ -1,6 +1,6 @@
 #include "MSF_WeaponState.h"
 #include "MSF_Base.h"
-
+#include "MSF_Events.h"
 
 ModData::Mod ExtraWeaponState::defaultStatePlaceholder;
 
@@ -151,13 +151,13 @@ ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeap
 	//if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::mMakeExtraRankMask))
 	//	return nullptr;
 	_DEBUG("WS_init");
-	if (!extraDataList || !equipData || !equipData->ammo)
+	if (!extraDataList) // || !equipData || !equipData->ammo
 		return nullptr;
 	_DEBUG("WS_inputok");
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-	if (!attachedMods || !currInstanceData || !extraInstanceData->baseForm)
+	if (!attachedMods || !currInstanceData || !extraInstanceData->baseForm || !currInstanceData->ammo)
 		return nullptr;
 	_DEBUG("WS_instanceok");
 	if (extraDataList->HasType(ExtraDataType::kExtraData_Rank))
@@ -180,7 +180,10 @@ ExtraWeaponState::WeaponState::WeaponState(ExtraDataList* extraDataList, EquipWe
 
 bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData)
 {
-	this->loadedAmmo = equipData->loadedAmmoCount;
+	if (equipData)
+		this->loadedAmmo = equipData->loadedAmmoCount;
+	else
+		this->loadedAmmo = 0;
 	this->chamberSize = 0;
 	this->chamberedAmmo = nullptr;
 	this->ammoCapacity = 0;
@@ -197,8 +200,10 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 		return false;
 	BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
 	this->chamberSize = MSF_Data::GetChamberSize(baseWeap, receiver);
-	this->chamberedAmmo = equipData->ammo;
+	this->chamberedAmmo = currInstanceData->ammo;
 	this->ammoCapacity = currInstanceData->ammoCapacity;
+	if (!equipData)
+		this->loadedAmmo = this->ammoCapacity;
 	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	//if (!attachedMods)
 	//	return;
@@ -210,51 +215,116 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 	return true;
 }
 
-bool ExtraWeaponState::WeaponState::RecoverState(ExtraDataList* extraDataList, EquipWeaponData* equipData)
+bool ExtraWeaponState::UpdateWeaponStatesUnequipped(BGSInventoryItem* item, UInt32 stackID)
 {
+	BGSInventoryItem::Stack* stack = Utilities::GetStack(item, stackID);
+	if (!stack || stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
+		return false;
+	ExtraDataList* extraDataList = stack->extraData;
+	if (!extraDataList)
+		return false;
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	if (!extraInstanceData)
+		return false;
 	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-	if (!currInstanceData || !baseWeap)
+	if (!attachedMods || !currInstanceData || !baseWeap || !currInstanceData->ammo)
 		return false;
 
-	if (equipData->ammo != this->chamberedAmmo)
+	auto data = attachedMods->data;
+	if (!data || !data->forms)
+		return false;
+	UInt64 priority = 0;
+	BGSMod::Attachment::Mod* currModData = nullptr;
+	for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 	{
-		this->chamberedAmmo = equipData->ammo;
+		BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+		UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
+		if (currPriority < priority)
+			continue;
+		auto itmoddata = MSF_MainData::modDataMap.find(objectMod);
+		if (itmoddata == MSF_MainData::modDataMap.end())
+			continue;
+		ModData::Mod* moddata = itmoddata->second;
+		if (!(moddata->flags & ModData::Mod::bHasSecondaryAmmo))
+			continue;
+		currModData = objectMod;
+		priority = currPriority;
 	}
-
-	if (this->ammoCapacity == currInstanceData->ammoCapacity)
+	auto itstate = this->weaponStates.find(currModData); //might not work
+	if (itstate == this->weaponStates.end())
 	{
-		UInt32 inventoryAmmo = Utilities::GetInventoryItemCount((*g_player)->inventoryList, equipData->ammo);
-		if (inventoryAmmo < this->loadedAmmo)
+		WeaponState* newState = new ExtraWeaponState::WeaponState(extraDataList, nullptr);
+		this->weaponStates[currModData] = newState;
+		this->currentState = newState;
+	}
+	else if (this->currentState != itstate->second)
+	{
+		this->currentState = itstate->second;
+
+		if (currInstanceData->ammo != this->currentState->chamberedAmmo)
 		{
-			this->loadedAmmo = inventoryAmmo;
-			equipData->loadedAmmoCount = inventoryAmmo;
+			auto itAmmo = MSF_MainData::ammoDataMap.find(this->currentState->chamberedAmmo);
+			if (itAmmo == MSF_MainData::ammoDataMap.end())
+				return false;
+			auto ammoData = itAmmo->second->ammoMods;
+			BGSMod::Attachment::Mod* mod = nullptr;
+			for (auto itAmmoData = ammoData.begin(); itAmmoData != ammoData.end(); itAmmoData++)
+			{
+				if (itAmmoData->ammo == this->currentState->chamberedAmmo)
+				{
+					mod = itAmmoData->mod;
+					break;
+				}
+			}
+			if (!mod)
+				return false;
+
+			bool ret = false;
+			CheckStackIDFunctor IDfunctor(Utilities::GetStackID(item, stack));
+			ModifyModDataFunctor modFunctor(mod, 0, bAttach, &ret);
+
+			UInt32 unk = 0x00200000;
+			AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
+
+			ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			if (!newExtraInstanceData)
+				return false;
+			//TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
+			//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+			TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			if (!newInstanceData)
+				return false;
+			this->currentState->chamberedAmmo = newInstanceData->ammo;
+			this->currentState->loadedAmmo = newInstanceData->ammoCapacity;
 		}
-		else
-			equipData->loadedAmmoCount = this->loadedAmmo;
+
+		//this->chamberSize = 0;
+		//this->chamberedAmmo = nullptr;
+		//this->flags = 0;
+		//this->shotCount = 0;
+		//has BCR?
+		//has tactical reload?
+		//get chamber size
+		//BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
+		//if (this->chamberSize == MSF_Data::GetChamberSize(baseWeap, receiver))
 	}
 	else
-		this->loadedAmmo = equipData->loadedAmmoCount;
-	//this->chamberSize = 0;
-	//this->chamberedAmmo = nullptr;
-	//this->flags = 0;
-	this->shotCount = 0;
-	//has BCR?
-	//has tactical reload?
-	//get chamber size
-	BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
-	if (this->chamberSize == MSF_Data::GetChamberSize(baseWeap, receiver))
+	{
+		this->currentState->chamberedAmmo = currInstanceData->ammo;
+		//this->chamberSize = 0;
+		//this->chamberedAmmo = nullptr;
+		//this->flags = 0;
+		//this->shotCount = 0;
+		//has BCR?
+		//has tactical reload?
+		//get chamber size
+		//BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
+		//if (this->chamberSize == MSF_Data::GetChamberSize(baseWeap, receiver))
+	}
 
-	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-	//if (!attachedMods)
-	//	return;
-	//BGSMod::Attachment::Mod* ammoOmod = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::ammoAP);
-	//if (!ammoOmod)
-	//	return;
-	//auto itammomod = MSF_MainData::ammoModMap.find(ammoOmod);
-	//currentSwitchedAmmo = itammomod->second;
+
 	return true;
 }
 
@@ -338,14 +408,15 @@ bool ExtraWeaponState::WeaponState::RecoverState(ExtraDataList* extraDataList, E
 //
 //}
 
-bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType)
+bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType, Actor* actor)
 {
 	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::mMakeExtraRankMask))
 		return true;
-	Actor* player = *g_player;
+	if (!actor)
+		actor = *g_player;
 	ExtraDataList* equippedWeapExtraData = nullptr;
-	player->GetEquippedExtraData(41, &equippedWeapExtraData);
-	EquipWeaponData* equippedData = Utilities::GetEquippedWeaponData(player);
+	actor->GetEquippedExtraData(41, &equippedWeapExtraData);
+	EquipWeaponData* equippedData = Utilities::GetEquippedWeaponData(actor);
 	ExtraWeaponState* weaponState = ExtraWeaponState::Init(equippedWeapExtraData, equippedData);
 	if (!weaponState)
 		return false;

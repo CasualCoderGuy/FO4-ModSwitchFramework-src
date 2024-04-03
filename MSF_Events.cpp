@@ -249,8 +249,16 @@ void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance,
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
 	else
 	{
-		MSF_MainData::modSwitchManager.SetModChangeEvent(false);
-		//weaponState->HandleModChangeEvent(equippedWeapExtraData, equippedData);
+		//MSF_MainData::modSwitchManager.SetModChangeEvent(false);
+		BipedAnim* data = reinterpret_cast<BipedAnim*>(equipData);
+		TESObjectREFR* objref = nullptr;
+		GetNiSmartPointer(data->actorRef, &objref);
+		if (objref)
+		{
+			Actor* owner = DYNAMIC_CAST(objref, TESObjectREFR, Actor);
+			if (owner)
+				ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip, owner);
+		}
 	}
 }
 
@@ -336,8 +344,12 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
 		}
 		//EquipWeaponData* equipData = Utilities::GetEquippedWeaponData(*g_player);
-		//ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, equipData);
-		//weaponState->HandleModChangeEvent(extraList, equipData);
+		if (!(stack->flags & BGSInventoryItem::Stack::kFlagEquipped))
+		{
+			ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, nullptr);
+			if (weaponState)
+				weaponState->UpdateWeaponStatesUnequipped(invItem, stackID);
+		}
 	}
 	return result;
 }

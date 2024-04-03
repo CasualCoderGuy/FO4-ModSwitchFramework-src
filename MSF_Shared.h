@@ -26,7 +26,7 @@ BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* 
 ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 
 typedef unsigned short KeywordValue;
-typedef unsigned long ObjectRefHandle;
+typedef UInt32* ObjectRefHandle;
 
 class TESIdleForm : public TESForm
 {
@@ -605,11 +605,11 @@ typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 
-typedef UInt32(*_GetHandle)(TESObjectREFR** ref);
+typedef ObjectRefHandle(*_GetHandle)(TESObjectREFR** ref);
 extern RelocAddr <_GetHandle> GetHandle;
-typedef bool(*_GetNiSmartPointer)(const UInt32& a_handle, TESObjectREFR*& a_smartPointerOut);
+typedef bool(*_GetNiSmartPointer)(ObjectRefHandle a_handle, TESObjectREFR** a_smartPointerOut);
 extern RelocAddr <_GetNiSmartPointer> GetNiSmartPointer;
-typedef bool(*_GetSmartPointer)(const UInt32& a_handle, TESObjectREFR*& a_smartPointerOut);
+typedef bool(*_GetSmartPointer)(ObjectRefHandle a_handle, TESObjectREFR** a_smartPointerOut);
 extern RelocAddr <_GetSmartPointer> GetSmartPointer;
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl;
@@ -794,6 +794,18 @@ T* GetOffsetPtr(const void * baseObject, int offset)
 {
 	return reinterpret_cast<T*>((uintptr_t)baseObject + offset);
 }
+
+class BipedAnim :
+	public BSIntrusiveRefCounted  // 0000
+{
+public:
+	// members
+	NiNode* root;                                                         // 0008
+	ActorEquipData::SlotData slots[ActorEquipData::kMaxSlots];            // 0010
+	ActorEquipData::SlotData bufferedslots[ActorEquipData::kMaxSlots];    // 0F30
+	ObjectRefHandle actorRef;                                             // 1E50
+};
+STATIC_ASSERT(sizeof(BipedAnim) == 0x1E58);
 
 class Ammo : public TESBoundObject
 {
