@@ -54,18 +54,20 @@ public:
 		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 		enum
 		{
-			bHasLevel = 0x01,
-			bActive = 0x02,
-			bHasTacticalReload = 0x10,
-			bHasBCR = 0x20
+			bHasLevel = 0x0001,
+			bActive = 0x0002,
+			bHasTacticalReload = 0x0010,
+			bHasBCR = 0x0020,
+			bChamberLIFO = 0x0040, //otherwise FIFO
+			mChamberMask = 0x00F0
 		};
 		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
-		UInt16 chamberSize;
+		UInt16 chamberSize; //if -1: equals to ammoCapacity
 		volatile short shotCount; 
 		volatile int loadedAmmo;
 		TESAmmo* chamberedAmmo;
-		std::vector<TESAmmo*> BCRammo;
+		std::vector<TESAmmo*> BCRammo; //if BCR && TR: size=ammoCap; if !BCR && TR: size=chamber; if BCR && !TR: size=ammoCap
 		//AmmoData::AmmoMod* currentSwitchedAmmo;
 		//AmmoData::AmmoMod* switchToAmmoAfterFire;
 		//std::vector<ModData::Mod*> attachedMods; //maybe later

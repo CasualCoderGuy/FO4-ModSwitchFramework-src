@@ -65,6 +65,7 @@ public:
 			bStandaloneAttach = 0x0001,
 			bStandaloneRemove = 0x0002,
 			bHasSecondaryAmmo = 0x0004,
+			bHasSecondaryChamber = 0x0008,
 			bRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
@@ -111,6 +112,20 @@ public:
 	UInt16 flags;
 	Mod::AttachRequirements* APattachRequirements;
 	std::unordered_map<KeywordValue, ModCycle*> modCycleMap; //hash: attachparent mod's instantiation keyword value, bucket: modcycle; if multiple cycles are found ambiuguity error is thrown
+};
+
+class ChamberData
+{
+public:
+	ChamberData(UInt16 Size, UInt16 Flags, UInt32 Mod = 0)
+	{
+		this->chamberSize = Size;
+		this->flags = Flags;
+		this->mod = Mod;
+	}
+	UInt16 chamberSize;
+	UInt16 flags;
+	UInt32 mod;
 };
 
 class ModCompatibilityEdits
@@ -475,6 +490,7 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 	static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
+	static std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> modChamberMap;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -556,7 +572,7 @@ namespace MSF_Data
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
-	UInt16 GetChamberSize(TESObjectWEAP* baseWeapon, BGSMod::Attachment::Mod* receiverMod);
+	bool GetChamberData(BGSObjectInstanceExtra* mods, UInt16* chamberSize, UInt16* flags);
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);

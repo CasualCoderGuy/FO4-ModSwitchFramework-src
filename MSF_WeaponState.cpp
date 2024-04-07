@@ -110,10 +110,10 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
 	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-	if (!currInstanceData || !baseWeap)
+	if (!currInstanceData || !baseWeap || !attachedMods)
 		return false;
-	BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
-	this->chamberSize = MSF_Data::GetChamberSize(baseWeap, receiver);
+	//BGSMod::Attachment::Mod* receiver = Utilities::GetModAtAttachPoint(attachedMods, MSF_MainData::receiverAP);
+	MSF_Data::GetChamberData(attachedMods, &this->chamberSize, &this->flags);
 	this->chamberedAmmo = currInstanceData->ammo;
 	this->ammoCapacity = currInstanceData->ammoCapacity;
 	if (!equipData)

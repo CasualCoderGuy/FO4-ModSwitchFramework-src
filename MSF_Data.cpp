@@ -67,6 +67,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burs
 std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDataMap;
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
 std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
+std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamberMap;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -1276,6 +1277,33 @@ namespace MSF_Data
 					}
 				}
 
+				data1 = json["chamberSize"];
+				if (data1.isArray())
+				{
+					for (int i = 0; i < data1.size(); i++)
+					{
+						const Json::Value& chamberSize = data1[i];
+						std::string str = chamberSize["weapon"].asString();
+						if (str == "")
+							continue;
+						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+						if (!mod)
+							continue;
+						UInt16 flags = chamberSize["flags"].asInt();
+						flags = (flags << 4) & ExtraWeaponState::WeaponState::mChamberMask;
+						UInt16 size = chamberSize["chamberSize"].asInt();
+
+						auto itChamberMod = MSF_MainData::modChamberMap.find(mod);
+						if (itChamberMod != MSF_MainData::modChamberMap.end())
+						{
+							itChamberMod->second.chamberSize = size;
+							itChamberMod->second.flags = flags;
+						}
+						else
+							MSF_MainData::modChamberMap.insert({ mod, ChamberData(size, flags) });
+					}
+				}
+
 				data1 = json["reloadAnim"];
 				if (data1.isArray())
 				{
@@ -1891,10 +1919,33 @@ namespace MSF_Data
 		return ammoConverted;
 	}
 
-	UInt16 GetChamberSize(TESObjectWEAP* baseWeapon, BGSMod::Attachment::Mod* receiverMod)
+	bool GetChamberData(BGSObjectInstanceExtra* mods, UInt16* chamberSize, UInt16* flags)
 	{
-		//if !hasTacticalReload return 0
-		return 1;
+		return true;
+		if (!mods || !chamberSize || !flags)
+			return false;
+		auto data = mods->data;
+		if (!data || !data->forms)
+			return false;
+		UInt64 priority = 0;
+		ChamberData* currChamberData = nullptr;
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
+			if (currPriority < priority)
+				continue;
+			auto itmoddata = MSF_MainData::modChamberMap.find(objectMod);
+			if (itmoddata == MSF_MainData::modChamberMap.end())
+				continue;
+			currChamberData = &itmoddata->second;
+			priority = currPriority;
+		}
+		if (!currChamberData)
+			return false;
+		*chamberSize = currChamberData->chamberSize;
+		*flags = (*flags & ~ExtraWeaponState::WeaponState::mChamberMask) | currChamberData->flags;
+		return true;
 	}
 
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
