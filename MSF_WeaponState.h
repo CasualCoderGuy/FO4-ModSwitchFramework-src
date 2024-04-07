@@ -22,6 +22,7 @@ public:
 	ExtraWeaponState(ExtraRank* holder);
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	static bool HandleWeaponStateEvents(UInt8 eventType, Actor* actor = nullptr);
+	static TESAmmo* GetAmmoForWorkbenchUI(ExtraDataList* extraList);
 	static ModData::Mod defaultStatePlaceholder;
 	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
 	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
@@ -31,8 +32,9 @@ public:
 	bool HandleAmmoChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
 	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
-	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	bool UpdateWeaponStatesUnequipped(BGSInventoryItem* item, UInt32 stackID);
+	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData, TESAmmo* newAmmo = nullptr);
+	TESAmmo* GetCurrentAmmo();
+	bool SetCurrentAmmo(TESAmmo* ammo);
 
 	enum
 	{
@@ -61,7 +63,7 @@ public:
 		UInt16 ammoCapacity;
 		UInt16 chamberSize;
 		volatile short shotCount; 
-		volatile long long loadedAmmo;
+		volatile int loadedAmmo;
 		TESAmmo* chamberedAmmo;
 		std::vector<TESAmmo*> BCRammo;
 		//AmmoData::AmmoMod* currentSwitchedAmmo;

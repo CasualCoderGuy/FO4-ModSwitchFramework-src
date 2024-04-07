@@ -234,6 +234,16 @@ public:
 		animFlavor = 0;
 		animData = nullptr;
 	};
+	~SwitchData()
+	{
+		SwitchFlags = 0;
+		ModToAttach = nullptr;
+		ModToRemove = nullptr;
+		LooseModToRemove = nullptr;
+		LooseModToAdd = nullptr;
+		animFlavor = 0;
+		animData = nullptr;
+	}
 	enum
 	{
 		bNeedInit = 0x0001,
@@ -338,6 +348,7 @@ public:
 		queueLock.Lock();
 		switchDataQueue.push_back(data);
 		queueLock.Release();
+		_DEBUG("QUEUED");
 		return true;
 	};
 	bool FinishSwitch(SwitchData* data)
@@ -349,7 +360,7 @@ public:
 		if (it != switchDataQueue.end())
 			switchDataQueue.erase(it);
 		queueLock.Release();
-		_DEBUG("data: %p", data);
+		_DEBUG("FINISH data: %p", data);
 		delete data;
 		return true;
 	};
@@ -360,6 +371,7 @@ public:
 		if (switchDataQueue.begin() != switchDataQueue.end())
 			result = switchDataQueue[0];
 		queueLock.Release();
+		_DEBUG("GETNEXT");
 		return result;
 	};
 	bool ClearQueue()
@@ -372,6 +384,7 @@ public:
 			delete data;
 		}
 		switchDataQueue.clear();
+		_DEBUG("CLEARED");
 		InterlockedExchange16((volatile short*)&switchState, 0);
 		//_DEBUG("unlock");
 		queueLock.Release();
@@ -461,6 +474,7 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
+	static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;

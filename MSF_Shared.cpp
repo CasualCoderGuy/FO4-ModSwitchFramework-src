@@ -530,7 +530,7 @@ namespace Utilities
 		return g_AnimFlavorKeywordArray->GetItemIndex(keyword);
 	}
 
-	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW) //+TESObjectWeap
+	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW)
 	{
 		if (!attachPoints || !attachPointKW)
 			return false;
@@ -544,7 +544,7 @@ namespace Utilities
 		return false;
 	}
 
-	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW) //+TESObjectWeap
+	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW)
 	{
 		if (!modData || !attachPointKW)
 			return false;

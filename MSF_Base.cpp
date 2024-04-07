@@ -1,5 +1,6 @@
 #include "MSF_Base.h"
 #include "MSF_Events.h"
+#include "MSF_WeaponState.h"
 
 namespace MSF_Base
 {
@@ -16,9 +17,6 @@ namespace MSF_Base
 			if (!MSF_Base::HandlePendingAnimations())
 				return false;
 		}
-
-		if (!MSF_Base::InitWeapon())
-			return false;
 
 		_DEBUG("checksPassed");
 		SwitchData* switchData = new SwitchData();
@@ -84,8 +82,6 @@ namespace MSF_Base
 			if (!MSF_Base::HandlePendingAnimations())
 				return false;
 		}
-		if (!MSF_Base::InitWeapon())
-			return false;
 
 		SwitchData* switchData = MSF_Data::GetNthAmmoMod(key);
 		if (!switchData)
@@ -162,20 +158,6 @@ namespace MSF_Base
 		{
 			return false;
 		}
-		return true;
-	}
-
-	bool InitWeapon()
-	{
-		//Actor* playerActor = *g_player;
-		//if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
-		//{
-		//	_DEBUG("init");
-		//	if (!AttachModToEquippedWeapon(playerActor, MSF_MainData::APbaseMod, true, 0, false))
-		//		return false;
-		//	if (!Utilities::HasObjectMod(Utilities::GetEquippedModData(playerActor, 41), MSF_MainData::APbaseMod))
-		//		return false;
-		//}
 		return true;
 	}
 
@@ -300,9 +282,6 @@ namespace MSF_Base
 			return false;
 
 		_DEBUG("AcheckOK");
-		EquipWeaponData* eqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData->equippedData;
-		UInt64 loadedAmmoCount = eqData->loadedAmmoCount;
-		TESAmmo* ammoType = eqData->ammo;
 
 		bool ret = false;
 
@@ -312,11 +291,9 @@ namespace MSF_Base
 		UInt32 unk = 0x00200000;
 		AttachRemoveModStack(item, &IDfunctor, &modFunctor, 0, &unk);
 
-		ExtraDataList* newList = stack->extraData;
-		BSExtraData* newExtraMods = newList->GetByType(kExtraData_ObjectInstance);
+		//ExtraDataList* newList = stack->extraData;
+		BSExtraData* newExtraMods = dataList->GetByType(kExtraData_ObjectInstance);
 		BGSObjectInstanceExtra* newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
 		MSF_Base::GetInvalidMods(&invalidMods, newModList, weapBase, mod);
@@ -331,21 +308,41 @@ namespace MSF_Base
 			AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);
 		}
 
-		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(newModList, weapBase);
-		if (invalidAmmoMod)
+		extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+
+		BGSMod::Attachment::Mod* targetAmmoMod = nullptr;
+		bool toAttach = false;
+		TESAmmo* targetAmmo = nullptr;
+		ExtraWeaponState* weaponState = ExtraWeaponState::Init(dataList, nullptr);
+		if (weaponState)
 		{
-			_DEBUG("invalid ammomod: %08X", invalidAmmoMod->formID);
+			weaponState->UpdateWeaponStates(dataList, nullptr, instanceData->ammo);
+			targetAmmo = weaponState->GetCurrentAmmo();
+		}
+		else if (instanceData)
+			targetAmmo = instanceData->ammo;
+
+		//BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(newModList, weapBase);
+		MSF_Base::GetAmmoModToModify(newModList, targetAmmo, weapBase, &targetAmmoMod, &toAttach);
+		if (targetAmmoMod)
+		{
+			_DEBUG("target ammomod: %08X, rem: %02X", targetAmmoMod->formID, toAttach);
 			unk = 0x00200000;
 			bool success = false;
-			ModifyModDataFunctor modifyModFunctor(invalidAmmoMod, 0, false, &success);
+			ModifyModDataFunctor modifyModFunctor(targetAmmoMod, 0, toAttach, &success);
 			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-			AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);;
+			AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);
+			extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 		}
 
 		BGSObjectInstance idStruct;
 		idStruct.baseForm = weapBase;
-		idStruct.instanceData = newInstanceData;
+		idStruct.instanceData = instanceData;
 
+		//_DEBUG("mod ammo count1: %i", eqData->loadedAmmoCount);
+		MSF_MainData::modSwitchManager.SetModChangeEvent(true);
 		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
 		EquipItemInternal(g_ActorEquipManager, actor, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
 		//actor->middleProcess->unk08->unk290[1] &= 0xFFFFFFFF00000000;//0xFF00000000000000;
@@ -425,19 +422,18 @@ namespace MSF_Base
 
 		EquipWeaponData* newEqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData->equippedData;
 		TESAmmo* newAmmoType = newEqData->ammo;
-
-		if (modLoadedAmmoCount == 0 || (modLoadedAmmoCount == 2 && newAmmoType == ammoType)) //BCR!!
-			newEqData->loadedAmmoCount = loadedAmmoCount;
-		else if (modLoadedAmmoCount == 1 || (modLoadedAmmoCount == 2 && newAmmoType != ammoType))
-		{
-			UInt64 ammoCount = Utilities::GetInventoryItemCount(actor->inventoryList, newAmmoType);
-			if (ammoCount < newInstanceData->ammoCapacity)
-				newEqData->loadedAmmoCount = ammoCount;
-			else
-				newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
-		}
-		//ExtraWeaponState* weaponState = ExtraWeaponState::Init(newList, newEqData);
-		//weaponState->HandleModChangeEvent(newList, equipData);
+		_DEBUG("mod ammo count2: %i", newEqData->loadedAmmoCount);
+		weaponState->HandleEquipEvent(dataList, newEqData);
+		//if (modLoadedAmmoCount == 0 || (modLoadedAmmoCount == 2 && newAmmoType == ammoType)) //BCR!!
+		//	newEqData->loadedAmmoCount = loadedAmmoCount;
+		//else if (modLoadedAmmoCount == 1 || (modLoadedAmmoCount == 2 && newAmmoType != ammoType))
+		//{
+		//	UInt64 ammoCount = Utilities::GetInventoryItemCount(actor->inventoryList, newAmmoType);
+		//	if (ammoCount < newInstanceData->ammoCapacity)
+		//		newEqData->loadedAmmoCount = ammoCount;
+		//	else
+		//		newEqData->loadedAmmoCount = newInstanceData->ammoCapacity;
+		//}
 
 		//if (MSF_MainData::activeBurstManager)
 		//	MSF_MainData::activeBurstManager->flags &= ~BurstModeData::bActive;
@@ -472,20 +468,25 @@ namespace MSF_Base
 		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			//_DEBUG("checkInvalid: %p", objectMod);
 			if (objectMod && MSF_MainData::instantiationRequirements.count(objectMod) > 0)
 			{
+				//_DEBUG("instOK");
 				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
 				bool bRemove = false;
 				std::vector<BGSMod::Attachment::Mod*> parentMods;
 				Utilities::GetParentMods(mods, objectMod, &parentMods);
 				for (auto it = range.first; it != range.second; ++it)
 				{
+					//_DEBUG("range");
 					bRemove = true;
 					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
 					{
+						//_DEBUG("parent");
 						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
 						if (instantiationData->GetItemIndex(it->second) >= 0)
 						{
+							//_DEBUG("parentOK");
 							bRemove = false;
 							break;
 						}
@@ -497,6 +498,52 @@ namespace MSF_Base
 					invalidList->push_back(objectMod);
 			}
 		}
+		return true;
+	}
+
+	bool GetAmmoModToModify(BGSObjectInstanceExtra* mods, TESAmmo* targetAmmo, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod** modResult, bool* bAttach)
+	{
+		if (!targetAmmo || !modResult || !bAttach)
+			return false;
+		*modResult = nullptr;
+		*bAttach = false;
+		BGSMod::Attachment::Mod* ammoMod = Utilities::GetModAtAttachPoint(mods, MSF_MainData::ammoAP);
+		BGSMod::Attachment::Mod* targetMod = nullptr;
+		auto itAmmo = MSF_MainData::ammoMap.find(targetAmmo);
+		if (itAmmo != MSF_MainData::ammoMap.end())
+			targetMod = itAmmo->second->mod;
+		if (!targetMod && ammoMod)
+		{
+			*modResult = ammoMod;
+			return true;
+		}
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(mods, baseWeap);
+		if (!baseAmmo)
+		{
+			*modResult = ammoMod;
+			return true;
+		}
+		auto itBaseAmmo = MSF_MainData::ammoDataMap.find(baseAmmo);
+		if (itBaseAmmo != MSF_MainData::ammoDataMap.end())
+		{
+			auto ammoData = (*itBaseAmmo).second;
+			//target mod == baseMod?
+			auto itTargetMod = std::find_if(ammoData->ammoMods.begin(), ammoData->ammoMods.end(), [targetMod](AmmoData::AmmoMod& data) {
+				return data.mod == targetMod;
+				});
+			if (itTargetMod != ammoData->ammoMods.end())
+			{
+				*modResult = targetMod;
+				*bAttach = true;
+				return true;
+			}
+			auto itCurrentMod = std::find_if(ammoData->ammoMods.begin(), ammoData->ammoMods.end(), [ammoMod](AmmoData::AmmoMod& data) {
+				return data.mod == ammoMod;
+				});
+			if (itCurrentMod != ammoData->ammoMods.end())
+				return true;
+		}
+		*modResult = ammoMod;
 		return true;
 	}
 

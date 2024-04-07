@@ -28,14 +28,13 @@ public:
 	{
 	public:
 		// members
-		UInt16 type;  // 00
-		UInt16 changeType;
-		UInt32 owner;                      // 04 RE::ObjectRefHandle
+		UInt16 changeType;  // 00
+		ObjectRefHandle owner;                      // 04 RE::ObjectRefHandle
 		TESBoundObject* objAffected;                // 08
 		UInt32 count;                               // 10
 		UInt32 stackID;                             // 14
 	};
-	//STATIC_ASSERT(sizeof(Event) == 0x18);
+	STATIC_ASSERT(sizeof(Event) == 0x18);
 };
 
 class InventoryList

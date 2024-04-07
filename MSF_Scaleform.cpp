@@ -610,7 +610,7 @@ namespace MSF_Scaleform
 				MSF_MainData::modSwitchManager.menuLock.Release();
 			}
 		}
-		if (!baseAmmo || dst->GetArraySize() < 2 || !MSF_Base::InitWeapon())
+		if (!baseAmmo || dst->GetArraySize() < 2)
 		{
 			MSF_MainData::modSwitchManager.ClearAmmoDisplayChioces();
 			return false;
@@ -651,11 +651,6 @@ namespace MSF_Scaleform
 		if ((modCycle->flags & ModData::ModCycle::bUIRequireWeaponToBeDrawn) && !(*g_player)->actorState.IsWeaponDrawn())
 			return false;
 
-		if (mods->flags & ModData::bRequireAPmod)
-		{
-			if (!MSF_Base::InitWeapon())
-				return false;
-		}
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, mods->attachParentValue);
 		MSF_MainData::modSwitchManager.menuLock.Lock();
 		if (!(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod))
@@ -794,7 +789,7 @@ namespace MSF_Scaleform
 	//			MSF_MainData::modSwitchManager.menuLock.Release();
 	//		}
 	//	}
-	//	if (!baseAmmo || ammoData.GetArraySize() < 2 || !MSF_Base::InitWeapon())
+	//	if (!baseAmmo || ammoData.GetArraySize() < 2)
 	//	{
 	//		MSF_MainData::modSwitchManager.ClearDisplayChioces();
 	//		return false;
@@ -843,11 +838,6 @@ namespace MSF_Scaleform
 	//	if (!modCycle)
 	//		return false;
 
-	//	if (mods->flags & ModData::bRequireAPmod)
-	//	{
-	//		if (!MSF_Base::InitWeapon())
-	//			return false;
-	//	}
 	//	BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, mods->attachParentValue);
 	//	MSF_MainData::modSwitchManager.menuLock.Lock();
 	//	if (!(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod))

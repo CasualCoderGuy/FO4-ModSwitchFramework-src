@@ -55,8 +55,11 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->equippedItem, TESBoundObject, TESObjectWEAP);
 	if (!eventWeapon)
 		return kEvent_Continue;
-	MSF_MainData::modSwitchManager.ClearQueue();
-	MSF_MainData::modSwitchManager.CloseOpenedMenu();
+	if (!MSF_MainData::modSwitchManager.GetModChangeEvent())
+	{
+		MSF_MainData::modSwitchManager.ClearQueue();
+		MSF_MainData::modSwitchManager.CloseOpenedMenu();
+	}
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
 	MSF_Scaleform::UpdateWidgetData(eventInstanceData);
@@ -131,7 +134,7 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 {
 	if (!evn)
 		return kEvent_Continue;
-	switch (evn->type)
+	switch (evn->changeType)
 	{
 	case BGSInventoryListEventData::kAddStack: {} break; //_DEBUG("kAddStack"); }; //
 	case BGSInventoryListEventData::kChangedStack: {} break; //_DEBUG("kChangedStack"); };
@@ -142,12 +145,16 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 		//_DEBUG("own: %p", evn->owner);
 		//Actor* player = *g_player;
 		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
-		//_DEBUG("ownRef2Handle: %p", GetHandle((TESObjectREFR**)&player));
+		//ObjectRefHandle handle = 0;
+		//_DEBUG("ownRef2Handle: %p", GetHandle(&handle, (TESObjectREFR*)player));
 		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
 		//TESObjectREFR* ref = nullptr;
-		//bool ret = GetNiSmartPointer(evn->owner, ref);
+		//bool ret = GetNiSmartPointer(&evn->owner, &ref);
+		//if (ref)
+		//	ref->handleRefObject.DecRefHandle();
 		//_DEBUG("ownHandle2RefNi: %02X, %p", ret, ref);
 		//_DEBUG("count: %08X", (*g_player)->handleRefObject.GetRefCount());
+
 		//ref = nullptr;
 		//ret = GetSmartPointer(evn->owner, ref);
 		//_DEBUG("ownHandle2Ref: %02X, %p", ret, ref);
@@ -160,11 +167,6 @@ EventResult	PlayerInventoryListEventSink::ReceiveEvent(BGSInventoryListEventData
 EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dispatcher)
 {
 	const char* name = evn->menuName.c_str();
-	//if (!_strcmpi("pipboyMenu", name))
-	//{
-	//	if (!evn->isOpen && (MSF_MainData::switchData.SwitchFlags & SwitchData::bNeedInit))
-	//		MSF_Base::InitWeapon();
-	//}
 	if (!_strcmpi("pauseMenu", name) && !evn->isOpen)
 	{
 		MSF_Data::ReadMCMKeybindData();
@@ -240,6 +242,8 @@ void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance,
 {
 	_DEBUG("UpdateEquipData_Hook1");
 	UpdateEquipData_Copied(equipData, instance, r8d);
+	if (MSF_MainData::GameIsLoading)
+		return;
 	//EquipWeaponData* eqdata = Utilities::GetEquippedWeaponData(*g_player);
 	//if (eqdata)
 	//{
@@ -252,9 +256,10 @@ void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance,
 		//MSF_MainData::modSwitchManager.SetModChangeEvent(false);
 		BipedAnim* data = reinterpret_cast<BipedAnim*>(equipData);
 		TESObjectREFR* objref = nullptr;
-		GetNiSmartPointer(data->actorRef, &objref);
+		GetNiSmartPointer(&data->actorRef, &objref);
 		if (objref)
 		{
+			objref->handleRefObject.DecRefHandle();
 			Actor* owner = DYNAMIC_CAST(objref, TESObjectREFR, Actor);
 			if (owner)
 				ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip, owner);
@@ -296,7 +301,7 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 	UInt32 stackID = IDfunctor->stackID;
 	UInt32 unk = *unk_rsp20;
 	UInt8 slotIndex = modWriteFunctor->slotIndex;
-	//_DEBUG("unk: %08X, slot index: %02X", unk, slotIndex);
+	_DEBUG("unk: %08X, slot index: %02X", unk, slotIndex);
 
 	bool result = AttachModToStack_CallFromGameplay_Copied(invItem, IDfunctor, modFunctor, unk_r9d, unk_rsp20);
 	BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
@@ -304,23 +309,27 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 		return result;
 	if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
 		MSF_MainData::modSwitchManager.SetModChangeEvent(true);
-	//else
-	//   recover state
+	_DEBUG("stackOK");
 
 	if (modWriteFunctor && modWriteFunctor->mod)
 	{
+		_DEBUG("functorOK");
 		TESObjectWEAP* weapon = DYNAMIC_CAST(invItem->form, TESForm, TESObjectWEAP);
 		if (!weapon)
 			return result;
+		_DEBUG("weaponOK");
 		BGSMod::Attachment::Mod* attachedMod = modWriteFunctor->mod;
-		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
-			return result;
+		//if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+		//	return result;
+		_DEBUG("typeOK %p", attachedMod);
 		ExtraDataList* extraList = stack->extraData;
 		if (!extraList)
 			return result;
+		_DEBUG("extraOK");
 		BGSObjectInstanceExtra* moddata = DYNAMIC_CAST(extraList->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 		if (!moddata)
 			return result;
+		_DEBUG("dataOK");
 
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
 		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
@@ -334,22 +343,47 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
 		}
 
-		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
-		if (invalidAmmoMod)
+		ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(extraList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		TESObjectWEAP::InstanceData* newInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+
+		BGSMod::Attachment::Mod* targetAmmoMod = nullptr;
+		bool toAttach = false;
+		TESAmmo* targetAmmo = nullptr;
+		ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, nullptr);
+		if (weaponState)
 		{
-			_DEBUG("invalid ammomod: %08X", invalidAmmoMod->formID);
+			weaponState->UpdateWeaponStates(extraList, nullptr, newInstanceData->ammo);
+			targetAmmo = weaponState->GetCurrentAmmo();
+			_DEBUG("GOTammo: %p", targetAmmo);
+		}
+		else if (newInstanceData)
+			targetAmmo = newInstanceData->ammo;
+
+		//BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon); 
+		MSF_Base::GetAmmoModToModify(moddata, targetAmmo, weapon, &targetAmmoMod, &toAttach);
+		if (targetAmmoMod)
+		{
+			_DEBUG("target ammomod WB: %08X, rem: %02X", targetAmmoMod->formID, toAttach);
 			UInt32 newunk = unk;
 			bool success = false;
-			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidAmmoMod, slotIndex, false, &success);
+			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(targetAmmoMod, slotIndex, toAttach, &success);
+			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
 			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
 		}
-		//EquipWeaponData* equipData = Utilities::GetEquippedWeaponData(*g_player);
-		if (!(stack->flags & BGSInventoryItem::Stack::kFlagEquipped))
-		{
-			ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, nullptr);
-			if (weaponState)
-				weaponState->UpdateWeaponStatesUnequipped(invItem, stackID);
-		}
+
+		//BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon); 
+		//if (invalidAmmoMod)
+		//{
+		//	_DEBUG("invalid ammomod: %08X", invalidAmmoMod->formID);
+		//	UInt32 newunk = unk;
+		//	bool success = false;
+		//	ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidAmmoMod, slotIndex, false, &success);
+		//	AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
+		//}
+		//ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraList, nullptr);
+		//if (!weaponState)
+		//	return result;
+		//weaponState->UpdateWeaponStatesModded(invItem, stackID);
 	}
 	return result;
 }
@@ -387,12 +421,36 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
 		}
 
-		BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
-		if (invalidAmmoMod)
+		BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
+		if (!stack)
+			return result;
+		ExtraDataList* extraList = stack->extraData;
+		if (!extraList)
+			return result;
+		TESObjectWEAP::InstanceData* instanceData = nullptr;
+		TESObjectWEAP* weapBase = nullptr;
+		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		if (extraInstanceData)
 		{
-			_DEBUG("invalid ammomod UI: %08X", invalidAmmoMod->formID);
+			instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			weapBase = (TESObjectWEAP*)extraInstanceData->baseForm;
+		}
+
+		BGSMod::Attachment::Mod* targetAmmoMod = nullptr;
+		bool toAttach = false;
+		TESAmmo* targetAmmo = ExtraWeaponState::GetAmmoForWorkbenchUI(extraList);
+		if (instanceData && !targetAmmo)
+			targetAmmo = instanceData->ammo;
+
+		//_DEBUG("targetAmmo %p, ammo: %p", targetAmmo, instanceData->ammo);
+
+		//BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
+		MSF_Base::GetAmmoModToModify(moddata, targetAmmo, weapBase, &targetAmmoMod, &toAttach);
+		if (targetAmmoMod)
+		{
+			//_DEBUG("target ammomod UI: %08X, rem: %02X", targetAmmoMod->formID, toAttach);
 			UInt32 newunk = unk;
-			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidAmmoMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, targetAmmoMod, applyChangesFunctor->ignoreWeapon, !toAttach, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
 			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
 		}
@@ -418,10 +476,10 @@ ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt
 
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v. A9F60 v. 9DC03
 {
-	_DEBUG("COMPARE");
+	//_DEBUG("COMPARE");
 	if (!extra1 || !extra2)
 		return false;
-	_DEBUG("%08X vs %08X", extra1->rank, extra2->rank);
+	//_DEBUG("%08X vs %08X", extra1->rank, extra2->rank);
 	//ExtraWeaponState* state1 = MSF_MainData::weaponStateStore.Get(extra1->rank);
 	//ExtraWeaponState* state2 = MSF_MainData::weaponStateStore.Get(extra2->rank);
 	//if (state1 || state2)

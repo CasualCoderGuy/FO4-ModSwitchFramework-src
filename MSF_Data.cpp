@@ -66,6 +66,7 @@ UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
 std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
 std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDataMap;
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
+std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -178,11 +179,15 @@ namespace MSF_Data
 			AmmoData* itAmmoData = it->second;
 			if (!itAmmoData)
 				continue;
+			MSF_MainData::ammoMap[itAmmoData->baseAmmoData.ammo] = &itAmmoData->baseAmmoData;
 			BGSMod::Attachment::Mod* baseMod = itAmmoData->baseAmmoData.mod;
 			if (baseMod)
 				MSF_MainData::ammoModMap[baseMod] = &itAmmoData->baseAmmoData;
 			for (std::vector<AmmoData::AmmoMod>::iterator itAmmo = itAmmoData->ammoMods.begin(); itAmmo != itAmmoData->ammoMods.end(); itAmmo++)
+			{
 				MSF_MainData::ammoModMap[itAmmo->mod] = itAmmo._Ptr;
+				MSF_MainData::ammoMap[itAmmo->ammo] = itAmmo._Ptr;
+			}
 		}
 		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
 		{
@@ -1252,6 +1257,8 @@ namespace MSF_Data
 										continue;
 									}
 									modData->modCycleMap[ifValue] = cycle;
+									for (ModData::ModVector::iterator itMod = cycle->mods.begin(); itMod != cycle->mods.end(); itMod++)
+										MSF_MainData::instantiationRequirements.insert({ (*itMod)->mod, ifValue });
 								}
 							}
 							if (modData->modCycleMap.size() < 1)

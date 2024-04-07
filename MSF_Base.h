@@ -11,16 +11,13 @@ namespace MSF_Base
 	bool ToggleModHotkey(ModData* modData);
 	bool SwitchModHotkey(UInt8 key, ModData* modData);
 	bool HandlePendingAnimations();
-	bool InitWeapon();
 	void EndSwitch(UInt16 flag);
 	void SwitchFlagsAND(UInt16 flag);
 	void SwitchFlagsOR(UInt16 flag);
 	bool SwitchMod(SwitchData* switchData, bool updateWidget);
 	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modAmmoCount, bool updateAnimGraph);
-	bool ReevalModdedWeapon(TESObjectWEAP* weapon);
-	bool ReevalSwitchedWeapon(Actor* owner, BGSMod::Attachment::Mod* changedMod);
-	bool ReevalAttachedMods(Actor* owner, BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	bool GetInvalidMods(std::vector<BGSMod::Attachment::Mod*>* invalidList, BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod* lastmod);
+	bool GetAmmoModToModify(BGSObjectInstanceExtra* mods, TESAmmo* targetAmmo, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod** modResult, bool* bAttach);
 	BGSMod::Attachment::Mod* GetAmmoModIfInvalid(BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap);
 	void SpawnRandomMods(TESObjectCELL* cell);
 

@@ -26,7 +26,52 @@ BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* 
 ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 
 typedef unsigned short KeywordValue;
-typedef UInt32* ObjectRefHandle;
+typedef UInt32 ObjectRefHandle;
+
+namespace InventoryInterface
+{
+	struct CountChangedEvent
+	{
+	public:
+		// members
+		std::uint32_t inventoryOwnerID;  // 00
+		std::uint32_t itemID;            // 04
+		std::int32_t newCount;           // 08
+		std::int32_t oldCount;           // 0C
+	};
+	STATIC_ASSERT(sizeof(CountChangedEvent) == 0x10);
+
+	struct FavoriteChangedEvent
+	{
+	public:
+		~FavoriteChangedEvent() noexcept {}  // intentional
+
+		// members
+		BGSInventoryItem* itemAffected;  // 0
+	};
+	STATIC_ASSERT(sizeof(FavoriteChangedEvent) == 0x8);
+}
+
+class BGSInventoryInterface
+{
+public:
+	struct Agent
+	{
+	public:
+		// members
+		std::uint32_t handleID;     // 0
+		ObjectRefHandle itemOwner;  // 4
+		std::uint16_t listIndex;    // 8
+		std::uint16_t refCount;     // A
+	};
+	STATIC_ASSERT(sizeof(Agent) == 0xC);
+
+	UInt64 pad;
+	BSTEventDispatcher<InventoryInterface::CountChangedEvent> countChangedEventSource;    // 08
+	BSTEventDispatcher<InventoryInterface::FavoriteChangedEvent> favChangedEventSource;   // 60
+	tArray<Agent> agentArray;  // B8
+};
+STATIC_ASSERT(sizeof(BGSInventoryInterface) == 0xD0);
 
 class TESIdleForm : public TESForm
 {
@@ -103,7 +148,7 @@ public:
 	virtual ~EquipWeaponData();
 
 	TESAmmo* ammo;                                                                               // 10
-	UInt64 loadedAmmoCount;                                                                     // 18
+	volatile int loadedAmmoCount;                                                                     // 18
 	MSFAimModel* aimModel;                                                                          // 20
 	void* muzzleFlash;                                                                    // 28
 	NiAVObject* fireNode;                                                                        // 30
@@ -605,12 +650,14 @@ typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 
-typedef ObjectRefHandle(*_GetHandle)(TESObjectREFR** ref);
+typedef ObjectRefHandle*(*_GetHandle)(ObjectRefHandle* handleOut, TESObjectREFR* ref);
 extern RelocAddr <_GetHandle> GetHandle;
-typedef bool(*_GetNiSmartPointer)(ObjectRefHandle a_handle, TESObjectREFR** a_smartPointerOut);
+typedef bool(*_GetNiSmartPointer)(ObjectRefHandle* a_handle, TESObjectREFR** a_smartPointerOut);
 extern RelocAddr <_GetNiSmartPointer> GetNiSmartPointer;
-typedef bool(*_GetSmartPointer)(ObjectRefHandle a_handle, TESObjectREFR** a_smartPointerOut);
+typedef bool(*_GetSmartPointer)(ObjectRefHandle* a_handle, TESObjectREFR** a_smartPointerOut);
 extern RelocAddr <_GetSmartPointer> GetSmartPointer;
+typedef BGSInventoryItem*(*_RequestInventoryItem)(BGSInventoryInterface* itfc, UInt32* a_handleID);
+extern RelocAddr <_RequestInventoryItem> RequestInventoryItem;
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl;
 extern RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl;
@@ -669,6 +716,7 @@ extern RelocPtr <void*> g_reloadSpeedAnimValueHolder;
 extern RelocPtr <float> g_reloadSpeedMultiplier;
 extern RelocPtr <std::unordered_map<UInt32, TESForm*>> g_FormMap;
 extern RelocPtr <BSReadWriteLock*> g_FormMapLock;
+extern RelocPtr <BGSInventoryInterface*> g_InventoryInterface;
 
 extern RelocPtr  <DWORD> hkLifoAllocator_TLS;
 extern RelocPtr  <DWORD> unk1_TLS;

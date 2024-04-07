@@ -55,7 +55,7 @@ public:
 		UInt16 ammoCapacity;
 		UInt16 chamberSize;
 		UInt16 shotCount;
-		UInt64 loadedAmmo;
+		UInt32 loadedAmmo;
 		UInt32 chamberedAmmo;
 		std::vector<UInt32> BCRammo;
 		//StoredAmmoMod switchToAmmoAfterFire;

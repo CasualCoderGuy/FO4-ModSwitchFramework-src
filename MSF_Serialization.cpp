@@ -27,7 +27,7 @@ namespace MSF_Serialization
 			case 'EXWS':
 			{
 				_DEBUG("Load info: %08X %08X %08X", type, version, length);
-				MSF_Serialization::Load(intfc, SERIALIZATION_VERSION);
+				MSF_Serialization::Load(intfc, version);
 			}
 			break;
 			}
@@ -40,6 +40,8 @@ namespace MSF_Serialization
 		//UInt32 dataCount = 0;
 		//Serialization::ReadData(intfc, &dataCount);
 		//for (UInt32 idx = 0; idx < dataCount; idx++)
+		if (version < MIN_SUPPORTED_SERIALIZATION_VERSION)
+			return false;
 		StoredExtraWeaponState loadedExtraState(intfc, version);
 		loadedExtraState.Recover(intfc, version);
 		return true;
@@ -56,7 +58,7 @@ namespace MSF_Serialization
 		//intfc->OpenRecord(StoredExtraWeaponState::dataType, SERIALIZATION_VERSION);
 		//UInt32 dataCount = MSF_MainData::weaponStateStore.GetCount();
 		//intfc->WriteRecordData(&dataCount, sizeof(dataCount));
-		MSF_MainData::weaponStateStore.SaveWeaponStates(MSF_Serialization::Save, intfc, SERIALIZATION_VERSION);
+		MSF_MainData::weaponStateStore.SaveWeaponStates(MSF_Serialization::Save, intfc, MSF_VERSION);
 	}
 
 	bool Save(const F4SESerializationInterface * intfc, UInt32 version, ExtraWeaponState* extraState)
@@ -109,7 +111,14 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &this->ammoCapacity);
 	Serialization::ReadData(intfc, &this->chamberSize);
 	Serialization::ReadData(intfc, &this->shotCount);
-	Serialization::ReadData(intfc, &this->loadedAmmo);
+	if (version == MAKE_EXE_VERSION_EX(0, 0, 0, 3))
+	{
+		UInt64 ammoData = 0;
+		intfc->ReadRecordData(&ammoData, sizeof(ammoData));
+		this->loadedAmmo = (UInt32)ammoData;
+	}
+	else
+		Serialization::ReadData(intfc, &this->loadedAmmo);
 	Serialization::ReadData(intfc, &this->chamberedAmmo);
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
