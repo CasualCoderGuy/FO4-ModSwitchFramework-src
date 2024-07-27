@@ -24,11 +24,11 @@ namespace MSF_Papyrus
 		TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(owner, 41);
 		if (instanceData) 
 		{
-			if (instanceData->ammo != newAmmo && owner->middleProcess->unk08->equipData->equippedData) 
+			if (instanceData->ammo != newAmmo && owner->middleProcess->unk08->equipData[0].equippedData)
 			{
 				instanceData->ammo = newAmmo;
-				owner->middleProcess->unk08->equipData->equippedData->ammo = newAmmo;
-				//owner->middleProcess->unk08->equipData->equippedData->unk18 = 0;
+				owner->middleProcess->unk08->equipData[0].equippedData->ammo = newAmmo;
+				//owner->middleProcess->unk08->equipData[0].equippedData->unk18 = 0;
 				return true;
 			}
 		}
@@ -98,9 +98,9 @@ namespace MSF_Papyrus
 	{
 		if (!owner)
 			return 0;
-		if (owner->middleProcess && owner->middleProcess->unk08->equipData && owner->middleProcess->unk08->equipData->equippedData) 
+		if (owner->middleProcess && owner->middleProcess->unk08->equipData.entries && owner->middleProcess->unk08->equipData[0].equippedData)
 		{
-			return (UInt32)owner->middleProcess->unk08->equipData->equippedData->unk18;
+			return (UInt32)owner->middleProcess->unk08->equipData[0].equippedData->unk18;
 		}
 		return 0;
 	}
@@ -109,9 +109,9 @@ namespace MSF_Papyrus
 	{
 		if (!owner || amount < 0)
 			return false;
-		if (owner->middleProcess && owner->middleProcess->unk08->equipData && owner->middleProcess->unk08->equipData->equippedData)
+		if (owner->middleProcess && owner->middleProcess->unk08->equipData.entries && owner->middleProcess->unk08->equipData[0].equippedData)
 		{
-			owner->middleProcess->unk08->equipData->equippedData->unk18 = (UInt64)amount;
+			owner->middleProcess->unk08->equipData[0].equippedData->unk18 = (UInt64)amount;
 			return true;
 		}
 		return false;
@@ -192,11 +192,11 @@ namespace MSF_Papyrus
 	UInt32 GetEquippedStackCount(StaticFunctionTag*, Actor* owner, UInt32 slotIndex)
 	{
 		UInt32 count = 0;
-		if (slotIndex >= ActorEquipData::kMaxSlots)
+		if (slotIndex >= BIPOBJECT::BIPED_OBJECT::kTotal)
 			return 0;
-		if (!owner->equipData)
+		if (!owner->biped.get())
 			return 0;
-		auto item = owner->equipData->slots[slotIndex].item;
+		auto item = owner->biped.get()->object[slotIndex].parent.object;
 		if (!item)
 			return 0;
 		if (!owner->inventoryList)
@@ -226,11 +226,11 @@ namespace MSF_Papyrus
 
 	bool SetEquippedStackCount(StaticFunctionTag*, Actor* owner, UInt32 count, UInt32 slotIndex)
 	{
-		if (slotIndex >= ActorEquipData::kMaxSlots || count < 0)
+		if (slotIndex >= BIPOBJECT::BIPED_OBJECT::kTotal || count < 0)
 			return false;
-		if (!owner->equipData)
+		if (!owner->biped.get())
 			return false;
-		auto item = owner->equipData->slots[slotIndex].item;
+		auto item = owner->biped.get()->object[slotIndex].parent.object;
 		if (!item)
 			return false;
 		if (!owner->inventoryList)

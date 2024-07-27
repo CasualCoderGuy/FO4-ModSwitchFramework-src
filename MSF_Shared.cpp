@@ -228,15 +228,15 @@ namespace Utilities
 	{
 		if (ownerActor) 
 		{
-			if (iEquipSlot >= ActorEquipData::kMaxSlots)
+			if (iEquipSlot >= BIPOBJECT::BIPED_OBJECT::kTotal)
 				return nullptr;
-			//ActorEquipData * equipData = ownerActor->equipData;
+			//BipedAnim * equipData = ownerActor->equipData;
 			//if (!equipData)
 			//	return nullptr;
-			//auto item = equipData->slots[iEquipSlot].item;
+			//auto item = equipData->object[iEquipSlot].parent.object;
 			//if (!item)
 			//	return nullptr;
-			//return (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(equipData->slots[iEquipSlot].instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			//return (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(equipData->object[iEquipSlot].parent.instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 			BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(ownerActor, iEquipSlot);
 			if (!eqStack)
 				return nullptr;
@@ -253,15 +253,15 @@ namespace Utilities
 	{
 		if (ownerActor)
 		{
-			if (iEquipSlot >= ActorEquipData::kMaxSlots)
+			if (iEquipSlot >= BIPOBJECT::BIPED_OBJECT::kTotal)
 				return nullptr;
 			//ActorEquipData * equipData = ownerActor->equipData;
 			//if (!equipData)
 			//	return nullptr;
-			//auto item = equipData->slots[iEquipSlot].item;
+			//auto item = equipData->object[iEquipSlot].parent.object;
 			//if (!item)
 			//	return nullptr;
-			//return equipData->slots[iEquipSlot].extraData;
+			//return equipData->object[iEquipSlot].extraData;
 			BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedStack(ownerActor, iEquipSlot);
 			if (!eqStack)
 				return nullptr;
@@ -278,10 +278,10 @@ namespace Utilities
 	{
 		if (ownerActor)
 		{
-			ActorEquipData * equipData = ownerActor->equipData;
+			BipedAnim * equipData = ownerActor->biped.get();
 			if (!equipData)
 				return nullptr;
-			auto item = equipData->slots[41].item;
+			auto item = equipData->object[41].parent.object;
 			if (!item)
 				return nullptr;
 			return DYNAMIC_CAST(item, TESForm, TESObjectWEAP);
@@ -293,12 +293,12 @@ namespace Utilities
 	{
 		if (owner) 
 		{
-			if (slotIndex >= ActorEquipData::kMaxSlots)
+			if (slotIndex >= BIPOBJECT::BIPED_OBJECT::kTotal)
 				return 0x0;
-			ActorEquipData * equipData = owner->equipData;
+			BipedAnim* equipData = owner->biped.get();
 			if (!equipData)
 				return 0x0;
-			TESForm *item = equipData->slots[slotIndex].item;
+			TESForm *item = equipData->object[slotIndex].parent.object;
 			if (!item)
 				return 0x0;
 			return item->formID;
@@ -309,13 +309,13 @@ namespace Utilities
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex)
 	{
 		BGSInventoryItem::Stack* eqStack = nullptr;
-		if (slotIndex >= ActorEquipData::kMaxSlots)
+		if (slotIndex >= BIPOBJECT::BIPED_OBJECT::kTotal)
 			return nullptr;
 		if (!owner)
 			return nullptr;
-		if (!owner->equipData)
+		if (!owner->biped.get())
 			return nullptr;
-		auto item = owner->equipData->slots[slotIndex].item;
+		auto item = owner->biped.get()->object[slotIndex].parent.object;
 		if (!item)
 			return nullptr;
 		if (!owner->inventoryList)
@@ -388,9 +388,9 @@ namespace Utilities
 
 	EquipWeaponData* GetEquippedWeaponData(Actor* owner)
 	{
-		if (!owner || !owner->middleProcess || !owner->middleProcess->unk08 || !owner->middleProcess->unk08->equipData)
+		if (!owner || !owner->middleProcess || !owner->middleProcess->unk08 || !owner->middleProcess->unk08->equipData.entries)
 			return nullptr;
-		return (EquipWeaponData*)owner->middleProcess->unk08->equipData->equippedData;
+		return (EquipWeaponData*)owner->middleProcess->unk08->equipData[0].equippedData;
 	}
 
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod)
@@ -730,7 +730,7 @@ namespace Utilities
 		if (!extraInstanceData || !extraInstanceData->baseForm || !extraInstanceData->instanceData)
 			return;
 		BGSObjectInstance idStruct;
-		idStruct.baseForm = extraInstanceData->baseForm;
+		idStruct.object = extraInstanceData->baseForm;
 		idStruct.instanceData = extraInstanceData->instanceData;
 		FireWeaponInternal(actor, idStruct, 41, shots);
 	}
@@ -747,7 +747,7 @@ namespace Utilities
 		if (!extraInstanceData || !extraInstanceData->baseForm || !extraInstanceData->instanceData)
 			return;
 		BGSObjectInstance idStruct;
-		idStruct.baseForm = extraInstanceData->baseForm;
+		idStruct.object = extraInstanceData->baseForm;
 		idStruct.instanceData = extraInstanceData->instanceData;
 		ReloadWeaponInternal(actor, idStruct, 41);
 	}

@@ -82,10 +82,12 @@ namespace MSF_Base
 			if (!MSF_Base::HandlePendingAnimations())
 				return false;
 		}
+		_DEBUG("animOK");
 
 		SwitchData* switchData = MSF_Data::GetNthAmmoMod(key);
 		if (!switchData)
 			return false;
+		_DEBUG("ammoSwitchDataOK");
 
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))
 		{
@@ -98,6 +100,7 @@ namespace MSF_Base
 
 		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
 			return false;
+		_DEBUG("queue/stateOK");
 
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
@@ -338,7 +341,7 @@ namespace MSF_Base
 		}
 
 		BGSObjectInstance idStruct;
-		idStruct.baseForm = weapBase;
+		idStruct.object = weapBase;
 		idStruct.instanceData = instanceData;
 
 		//_DEBUG("mod ammo count1: %i", eqData->loadedAmmoCount);
@@ -349,7 +352,7 @@ namespace MSF_Base
 		//UpdateMiddleProcess(actor->middleProcess, actor, idStruct, newInstanceData->equipSlot);
 		//actor->middleProcess->unk08->unk290[1] = actor->middleProcess->unk08->unk290[1] & 0xFFFFFFFF00000000 | 0x1;
 
-		//UpdateEquippedWeaponData(actor->middleProcess->unk08->equipData->equippedData);
+		//UpdateEquippedWeaponData(actor->middleProcess->unk08->equipData[0].equippedData);
 
 		//unkEquipSlotStruct equipSlotStruct;
 		//equipSlotStruct.unk00 = 0;
@@ -373,7 +376,7 @@ namespace MSF_Base
 		//	InterlockedDecrement64(lockcnt);
 		//}
 		
-		//InterlockedIncrement(&newList->m_refCount);
+		//InterlockedIncrement(&newList->refCount);
 		//NiStuff(*g_player, weapBase, &newList, 0, false, 0);
 
 		//UpdateEnchantments(actor, idStruct, newList);
@@ -420,7 +423,7 @@ namespace MSF_Base
 			}
 		}
 
-		EquipWeaponData* newEqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData->equippedData;
+		EquipWeaponData* newEqData = (EquipWeaponData*)actor->middleProcess->unk08->equipData[0].equippedData;
 		TESAmmo* newAmmoType = newEqData->ammo;
 		_DEBUG("mod ammo count2: %i", newEqData->loadedAmmoCount);
 		weaponState->HandleEquipEvent(dataList, newEqData);
@@ -572,20 +575,20 @@ namespace MSF_Base
 	{
 		if (MSF_MainData::MCMSettingFlags & (MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods))
 		{
-			_DEBUG("mod spawn");
+			//_DEBUG("mod spawn");
 			for (UInt32 i = 0; i < cell->objectList.count; i++)
 			{
 				Actor* randomActor = DYNAMIC_CAST(cell->objectList[i], TESObjectREFR, Actor);
-				if (!randomActor || !randomActor->equipData || randomActor == (*g_player))
+				if (!randomActor || !randomActor->biped.get() || randomActor == (*g_player))
 					continue;
 				//check if unique
-				TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+				TESObjectWEAP* firearm = DYNAMIC_CAST(randomActor->biped.get()->object[41].parent.object, TESForm, TESObjectWEAP);
 				if (!firearm)
 					continue;
-				if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData && randomActor->middleProcess->unk08->equipData->equippedData)
+				if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData.entries && randomActor->middleProcess->unk08->equipData[0].equippedData)
 				{
 					_DEBUG("actor ok");
-					TESAmmo* ammo = randomActor->middleProcess->unk08->equipData->equippedData->ammo;
+					TESAmmo* ammo = randomActor->middleProcess->unk08->equipData[0].equippedData->ammo;
 					std::vector<BGSMod::Attachment::Mod*> mods;
 					UInt32 count = 0;
 					MSF_Data::PickRandomMods(&mods, &ammo, &count);

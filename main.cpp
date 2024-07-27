@@ -18,6 +18,7 @@
 #include "MSF_Papyrus.h"
 #include "MSF_WeaponState.h"
 #include "MSF_Serialization.h"
+#include "MSF_Addresses.h"
 #ifdef DEBUG
 #include "MSF_Test.h"
 #endif
@@ -168,12 +169,19 @@ bool WriteHooks()
 			LoadExtraRank_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
 			{
 				Xbyak::Label hook, retnLabel;
-
+#ifndef NEXTGEN
 				mov(edx, dword[r13 + 0x24]);
 				add(rdx, qword[r13 + 0x8]);
-				mov(r9, qword[rsp + 0x318]);
 				mov(r8, r12);
 				mov(edx, dword[rdx]);
+				mov(r9, qword[rsp + 0x318]);
+#else
+				mov(edx, dword[r15 + 0x24]);
+				add(rdx, qword[r15 + 0x8]);
+				mov(r8, r13);
+				mov(edx, dword[rdx]);
+				xor(r9, r9);
+#endif
 				mov(rcx, rax);
 				call(ptr[rip + hook]);
 				jmp(ptr[rip + retnLabel]);
@@ -195,6 +203,7 @@ bool WriteHooks()
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
+	//g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromGameplay_Hook);
@@ -243,10 +252,15 @@ bool InitializeOffsets()
 
 bool InitPlugin(UInt32 runtimeVersion = 0) {
 	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
+#ifdef NEXTGEN
+	_MESSAGE("NextGen version\n");
+#endif
 	_MESSAGE("Runtime version: %08X", runtimeVersion);
 #ifdef DEBUG
 	_MESSAGE("DebugMode enabled!");
 #endif
+
+	_MESSAGE("Base address: %p", IDDatabase::get().base());//reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
 	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
 	{
@@ -267,8 +281,6 @@ bool InitPlugin(UInt32 runtimeVersion = 0) {
 		_ERROR("Fatal Error - Couldn't create branch trampoline. Skipping remainder of init process.");
 		return false;
 	}
-
-	_MESSAGE("Base address: %p", reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
 	//InitializeOffsets();
 
@@ -304,11 +316,12 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 	
 	g_pluginHandle =	f4se->GetPluginHandle();
 	
+#ifndef NEXTGEN
 	// Check game version
 	if (!COMPATIBLE(f4se->runtimeVersion)) 
 	{
 		char str[512];
-		sprintf_s(str, sizeof(str), "Your game version: v%d.%d.%d.%d\nExpected version: v%d.%d.%d.%d\n%s will be disabled.",
+		sprintf_s(str, sizeof(str), "Error! Your game version: v%d.%d.%d.%d\nExpected version: v%d.%d.%d.%d\n%s will be disabled.",
 			GET_EXE_VERSION_MAJOR(f4se->runtimeVersion),
 			GET_EXE_VERSION_MINOR(f4se->runtimeVersion),
 			GET_EXE_VERSION_BUILD(f4se->runtimeVersion),
@@ -323,11 +336,21 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 		MessageBox(NULL, str, PLUGIN_NAME_LONG, MB_OK | MB_ICONEXCLAMATION);
 		return false;
 	}
-
-	if (f4se->runtimeVersion > SUPPORTED_RUNTIME_VERSION) 
+#else
+	if (f4se->runtimeVersion <= RUNTIME_VERSION_1_10_163)
 	{
-		_FATALERROR("Error: Newer game version (%08X) than target (%08X).", f4se->runtimeVersion, SUPPORTED_RUNTIME_VERSION);
+		char str[512];
+		sprintf_s(str, sizeof(str), "Error! NextGen plugin loaded, but game version is OldGen (v%d.%d.%d.%d).\n%s will be disabled.",
+			GET_EXE_VERSION_MAJOR(f4se->runtimeVersion),
+			GET_EXE_VERSION_MINOR(f4se->runtimeVersion),
+			GET_EXE_VERSION_BUILD(f4se->runtimeVersion),
+			GET_EXE_VERSION_SUB(f4se->runtimeVersion),
+			PLUGIN_NAME_LONG
+		);
+		MessageBox(NULL, str, PLUGIN_NAME_LONG, MB_OK | MB_ICONEXCLAMATION);
+		return false;
 	}
+#endif
 
 	g_messaging = (F4SEMessagingInterface *)f4se->QueryInterface(kInterface_Messaging);
 	if (!g_messaging) 
@@ -360,6 +383,23 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 	return true;
 }
 
+#if CURRENT_RELEASE_RUNTIME > RUNTIME_VERSION_1_10_163 
+	__declspec(dllexport) F4SEPluginVersionData F4SEPlugin_Version =
+	{
+		F4SEPluginVersionData::kVersion,
+
+		MSF_VERSION,
+		PLUGIN_NAME_LONG,
+		AUTHOR_NAME,
+
+		0,	// not version independent
+		0,	// not version independent
+		{ CURRENT_RELEASE_RUNTIME, 0 },
+
+		0,	// works with any version of the script extender
+	};
+#endif
+
 bool F4SEPlugin_Load(const F4SEInterface *f4se)
 {
 	if (g_messaging) 
@@ -385,7 +425,8 @@ bool F4SEPlugin_Load(const F4SEInterface *f4se)
 	}
 
 	
-	return InitPlugin(f4se->runtimeVersion);
+	InitPlugin(f4se->runtimeVersion);
+	return true;
 }
 
 }

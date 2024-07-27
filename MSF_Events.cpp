@@ -82,7 +82,7 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
-	_DEBUG("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
+	//_DEBUG("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
 	ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeAmmoCount);
 	//ExtraDataList* extralist = nullptr;
 	//(*g_player)->GetEquippedExtraData(41, &extralist);
@@ -232,15 +232,23 @@ void* AttackBlockHandler_Hook(void* handler)
 	return AttackBlockHandler_Original(handler);
 }
 
-//bool UpdMidProc_Hook(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot)
+bool AttackInputHandler_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d)
+{
+	_DEBUG("Attack");
+	if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
+		return false;
+	return AttackInputHandler_Original(PlayerInputHandler, inputCode, r8d);
+}
+
+//bool UpdMidProc_Hook(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot)
 //{
 //	_DEBUG("UpdMidProc_Hook");
 //	UpdMidProc_Copied(midProc, actor, weaponBaseStruct, equipSlot);
 //}
 
-void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d)
+void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt32* r8d)
 {
-	_DEBUG("UpdateEquipData_Hook1");
+	//_DEBUG("UpdateEquipData_Hook1");
 	UpdateEquipData_Copied(equipData, instance, r8d);
 	if (MSF_MainData::GameIsLoading)
 		return;
@@ -249,14 +257,17 @@ void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance,
 	//{
 	//	_DEBUG("eq: %i", eqdata->loadedAmmoCount);
 	//}
-	if (equipData == (*g_player)->equipData)
+	if (equipData == (*g_player)->biped.get())
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
 	else
 	{
 		//MSF_MainData::modSwitchManager.SetModChangeEvent(false);
-		BipedAnim* data = reinterpret_cast<BipedAnim*>(equipData);
+#ifndef NEXTGEN
 		TESObjectREFR* objref = nullptr;
-		GetNiSmartPointer(&data->actorRef, &objref);
+		GetNiSmartPointer(&equipData->actorRef, &objref);
+#else
+		TESObjectREFR* objref = equipData->actorRef.get().get();
+#endif
 		if (objref)
 		{
 			objref->handleRefObject.DecRefHandle();
@@ -558,7 +569,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		//}
 		//_DEBUG("Anim: fire %i", MSF_MainData::tmr.stop());
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::KEventTypeFireWeapon);
-		_DEBUG("Anim: fire");
+		//_DEBUG("Anim: fire");
 	}
 	else if (!_strcmpi("switchMod", name))
 	{

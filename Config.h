@@ -40,13 +40,13 @@
 #define MIN_SUPPORTED_SERIALIZATION_VERSION		MAKE_EXE_VERSION_EX(0, 0, 0, 3)
 
 #define SUPPORTED_RUNTIME_VERSION			CURRENT_RELEASE_RUNTIME
-#define MINIMUM_RUNTIME_VERSION				CURRENT_RELEASE_RUNTIME
-#define COMPATIBLE(runtimeVersion)			(runtimeVersion >= MINIMUM_RUNTIME_VERSION)
+#define COMPATIBLE(runtimeVersion)			(runtimeVersion == SUPPORTED_RUNTIME_VERSION)
 
 #define PLUGIN_NAME_SHORT		"MSF"
 #define PLUGIN_NAME_LONG		"Mod Switch Framework"
 #define SCRIPTNAME				"ModSwitchFramework"
 #define MODNAME					"ModSwitchFramework.esl"
+#define AUTHOR_NAME				"CasualCoderGuy"
 
 class VersionData
 {

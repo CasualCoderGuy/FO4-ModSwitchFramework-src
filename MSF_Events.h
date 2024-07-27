@@ -219,6 +219,10 @@ typedef void*(*AttackBlockHandler)(void* handler);
 extern RelocAddr <AttackBlockHandler> AttackBlockHandler_HookTarget;
 extern RelocAddr <AttackBlockHandler> AttackBlockHandler_Original;
 
+typedef bool (*AttackInputHandler)(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d);
+extern RelocAddr <AttackInputHandler> AttackInputHandler_HookTarget;
+extern RelocAddr <AttackInputHandler> AttackInputHandler_Original;
+
 
 typedef UInt64(*HUDShowAmmoCounter)(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget;
@@ -250,12 +254,13 @@ extern uintptr_t ExtraRankCompare_Copied;
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
+bool AttackInputHandler_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d);
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx);
 bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
 bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
 bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, ExtraDataType type);
-bool UpdMidProc_Hook(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
-void UpdateEquipData_Hook(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
+bool UpdMidProc_Hook(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
+void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt32* r8d);
 void UpdateEquippedWeaponData_Hook(EquippedWeaponData* data);
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack);
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);

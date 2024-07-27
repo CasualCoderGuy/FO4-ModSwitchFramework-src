@@ -139,15 +139,15 @@ bool BurstModeManager::HandleModChangeEvent(ExtraDataList* extraDataList)
 		_DEBUG("av: %f", av);
 		return true;
 
-		TESObjectWEAP* eqWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+		TESObjectWEAP* eqWeap = DYNAMIC_CAST(actor->equipData->object[41].parent.object, TESForm, TESObjectWEAP);
 		if (!eqWeap)
 			return false;
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(actor->equipData->slots[41].instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(actor->equipData->object[41].parent.instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 		if (!instanceData)
 			return false;
-		if (!actor->middleProcess || !actor->middleProcess->unk08->equipData || !actor->middleProcess->unk08->equipData->equippedData)
+		if (!actor->middleProcess || !actor->middleProcess->unk08->equipData.entries || !actor->middleProcess->unk08->equipData[0].equippedData)
 			return false;
-		if (actor->middleProcess->unk08->equipData->equippedData->unk18 <= 0)
+		if (actor->middleProcess->unk08->equipData[0].equippedData->unk18 <= 0)
 			return false; //if resetshotcountsonreload
 		//isAnimPlaying
 		UInt16 wait = (UInt16)roundp(Utilities::GetActorValue(&actor->actorValueData, MSF_MainData::BurstModeTime->formID));

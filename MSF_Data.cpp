@@ -1585,9 +1585,11 @@ namespace MSF_Data
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 		if (!baseAmmo)
 			return nullptr;
+		_DEBUG("baseOK");
 		auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 		if (itAD != MSF_MainData::ammoDataMap.end())
 		{
+			_DEBUG("ammofound");
 			AmmoData* itAmmoData = itAD->second;
 			if (num == 0)
 			{
@@ -1996,7 +1998,7 @@ namespace MSF_Data
 	//========================= Animations =======================
 	TESIdleForm* GetReloadAnimation(Actor* actor)
 	{
-		if (!actor || !actor->equipData)
+		if (!actor || !actor->biped.get())
 			return nullptr;
 		SInt32 state = 7;
 		if (actor == *g_player)
@@ -2004,7 +2006,7 @@ namespace MSF_Data
 			PlayerCamera* playerCamera = *g_playerCamera;
 			SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
 		}
-		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->biped.get()->object[41].parent.object, TESForm, TESObjectWEAP);
 		if (!equippedWeap)
 			return nullptr;
 		bool isInPA = IsInPowerArmor(actor);
@@ -2036,7 +2038,7 @@ namespace MSF_Data
 
 	TESIdleForm* GetFireAnimation(Actor* actor)
 	{
-		if (!actor || !actor->equipData)
+		if (!actor || !actor->biped.get())
 			return nullptr;
 		SInt32 state = 7;
 		if (actor == *g_player)
@@ -2044,7 +2046,7 @@ namespace MSF_Data
 			PlayerCamera* playerCamera = *g_playerCamera;
 			SInt32 state = playerCamera->GetCameraStateId(playerCamera->cameraState);
 		}
-		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->equipData->slots[41].item, TESForm, TESObjectWEAP);
+		TESObjectWEAP* equippedWeap = DYNAMIC_CAST(actor->biped.get()->object[41].parent.object, TESForm, TESObjectWEAP);
 		if (!equippedWeap)
 			return nullptr;
 		bool isInPA = IsInPowerArmor(actor);

@@ -287,13 +287,6 @@ struct unkTBOStruct
 	UInt64 unk08;
 };
 
-class BGSObjectInstance
-{
-public:
-	TESForm* baseForm;
-	TBO_InstanceData* instanceData;
-};
-
 struct ActorStruct
 {
 	Actor* actor;
@@ -608,15 +601,15 @@ typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TES
 typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_ModifyStackData)(BGSInventoryItem* invItem, BGSInventoryItem::Stack** stack, StackDataWriteFunctor* modFuntor);
-typedef bool(*_UpdMidProc)(Actor::MiddleProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
-typedef void(*_UpdateEquipData)(ActorEquipData* equipData, BGSObjectInstance instance, UInt32* r8d);
+typedef bool(*_UpdMidProc)(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
+typedef void(*_UpdateEquipData)(BipedAnim* equipData, BGSObjectInstance instance, UInt32* r8d);
 typedef void*(*_UpdateAnimGraph)(Actor* actor, bool rdx);
 typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInstance, ExtraDataList* extraDataList);
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
 typedef bool(*_DeleteExtraData)(BSExtraData** extraDataHead, ExtraDataType type);
 
-typedef void(*_UpdateEquippedWeaponData)(EquippedWeaponData* data);
+typedef void(*_UpdateEquippedWeaponData)(EquippedWeaponData* data, UInt32 edx);
 typedef bool(*_MainEquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef bool(*_EquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
 typedef void(*_UniversalEquipHandler)(Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
@@ -842,18 +835,6 @@ T* GetOffsetPtr(const void * baseObject, int offset)
 {
 	return reinterpret_cast<T*>((uintptr_t)baseObject + offset);
 }
-
-class BipedAnim :
-	public BSIntrusiveRefCounted  // 0000
-{
-public:
-	// members
-	NiNode* root;                                                         // 0008
-	ActorEquipData::SlotData slots[ActorEquipData::kMaxSlots];            // 0010
-	ActorEquipData::SlotData bufferedslots[ActorEquipData::kMaxSlots];    // 0F30
-	ObjectRefHandle actorRef;                                             // 1E50
-};
-STATIC_ASSERT(sizeof(BipedAnim) == 0x1E58);
 
 class Ammo : public TESBoundObject
 {

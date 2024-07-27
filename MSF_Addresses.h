@@ -68,8 +68,8 @@ class ID
 public:
 	constexpr ID() noexcept = default;
 
-	explicit constexpr ID(std::uint64_t a_id) noexcept :
-		_id(a_id)
+	explicit constexpr ID(std::uint64_t a_id, std::uint64_t a_id_ng = 0) noexcept :
+		_id(a_id), _id_ng(a_id_ng)
 	{}
 
 	constexpr ID& operator=(std::uint64_t a_id) noexcept
@@ -86,4 +86,5 @@ private:
 	[[nodiscard]] static std::uintptr_t base() { return IDDatabase::get().base(); }
 
 	std::uint64_t _id{ static_cast<std::uint64_t>(-1) };
+	std::uint64_t _id_ng{ static_cast<std::uint64_t>(-1) };
 };

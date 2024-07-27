@@ -33,21 +33,46 @@ class MSFWidgetMenu : public GameMenuBase
 public:
 	MSFWidgetMenu() : GameMenuBase()
 	{
-		flags = kFlag_DoNotPreventGameSave | kFlag_DoNotDeleteOnClose | kFlag_DisableInteractive;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000;// | 0x40000 | 0x80000 | 0x200000;
+		enum
+		{
+			//Confirmed
+			kFlag_PauseGame = 0x01,
+			kFlag_DoNotDeleteOnClose = 0x02,
+			kFlag_ShowCursor = 0x04,
+			kFlag_EnableMenuControl = 0x08, // 1, 2
+			kFlag_ShaderdWorld = 0x20,
+			kFlag_Open = 0x40,//set it after open.
+			kFlag_DoNotPreventGameSave = 0x800,
+			kFlag_ApplyDropDownFilter = 0x8000, //
+			kFlag_BlurBackground = 0x400000,
+
+			//Unconfirmed
+			kFlag_Modal = 0x10,
+			kFlag_PreventGameLoad = 0x80,
+			kFlag_Unk0100 = 0x100,
+			kFlag_HideOther = 0x200,
+			kFlag_DisableInteractive = 0x4000,
+			kFlag_UpdateCursorOnPlatformChange = 0x400,
+			kFlag_Unk1000 = 0x1000,
+			kFlag_ItemMenu = 0x2000,
+			kFlag_Unk10000 = 0x10000,	// mouse cursor
+			kFlag_Unk800000 = 0x800000
+		};
+		flags = kFlag_AllowSaving | kFlag_AlwaysOpen | kFlag_DontHideCursorWhenTopmost;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000;// | 0x40000 | 0x80000 | 0x200000;
 		depth = 0x6;
 		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFwidget", "root1", 0))
 		{
 
 			_MESSAGE("MSF widget loaded.");
 
-			CreateBaseShaderTarget(this->shaderTarget, this->stage);
+			CreateBaseShaderTarget(this->filterHolder, this->stage);
 
 			//inherit_colors
-			this->shaderTarget->SetFilterColor(false);
-			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->shaderTarget);
+			this->filterHolder->SetFilterColor(false);
+			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->filterHolder);
 
 			if (flags & kFlag_ApplyDropDownFilter)
-				this->subcomponents.Push(this->shaderTarget);
+				this->shaderFXObjects.Push(this->filterHolder);
 		}
 	}
 	virtual void	Invoke(Args * args) final
@@ -76,7 +101,7 @@ public:
 
 	virtual void	DrawNextFrame(float unk0, void * unk1) final
 	{
-		return this->GameMenuBase::DrawNextFrame(unk0, unk1);
+		return this->GameMenuBase::AdvanceMovie(unk0, unk1);
 	};
 
 	static IMenu * CreateMSFMenu()
@@ -113,21 +138,21 @@ public:
 
 	MSFMenu() : GameMenuBase()
 	{
-		flags = kFlag_DoNotPreventGameSave | kFlag_DoNotDeleteOnClose;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000 | kFlag_DisableInteractive;// | 0x40000 | 0x80000 | 0x200000;
+		flags = kFlag_AllowSaving | kFlag_AlwaysOpen;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000 | kFlag_DisableInteractive;// | 0x40000 | 0x80000 | 0x200000;
 		depth = 0x6;
 		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFMenu", "root1", 0))
 		{
 
 			_MESSAGE("MSF Menu loaded.");
 
-			CreateBaseShaderTarget(this->shaderTarget, this->stage);
+			CreateBaseShaderTarget(this->filterHolder, this->stage);
 
 			//inherit_colors
-			this->shaderTarget->SetFilterColor(false);
-			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->shaderTarget);
+			this->filterHolder->SetFilterColor(false);
+			(*g_colorUpdateDispatcher)->eventDispatcher.AddEventSink(this->filterHolder);
 
-			if (flags & kFlag_ApplyDropDownFilter)
-				this->subcomponents.Push(this->shaderTarget);
+			if (flags & kFlag_CustomRendering)
+				this->shaderFXObjects.Push(this->filterHolder);
 		}
 	}
 
@@ -229,7 +254,7 @@ public:
 	virtual void	DrawNextFrame(float unk0, void * unk1) final
 	{
 		//_DMESSAGE("DrawNextFrame");
-		return this->GameMenuBase::DrawNextFrame(unk0, unk1);
+		return this->GameMenuBase::AdvanceMovie(unk0, unk1);
 	};
 
 	static IMenu * CreateMSFMenu()
