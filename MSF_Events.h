@@ -60,7 +60,7 @@ public:
 	virtual	EventResult	ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher) override;
 };
 extern BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
-DECLARE_EVENT_DISPATCHER(BGSOnPlayerUseWorkBenchEvent, 0x0441A10);
+//DECLARE_EVENT_DISPATCHER(BGSOnPlayerUseWorkBenchEvent, 0x0441A10); lastgen
 
 //Player Mod Event
 struct BGSOnPlayerModArmorWeaponEvent
@@ -74,7 +74,7 @@ public:
 	virtual	EventResult	ReceiveEvent(BGSOnPlayerModArmorWeaponEvent * evn, void * dispatcher) override;
 };
 extern BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
-DECLARE_EVENT_DISPATCHER(BGSOnPlayerModArmorWeaponEvent, 0x0441790);
+//DECLARE_EVENT_DISPATCHER(BGSOnPlayerModArmorWeaponEvent, 0x0441790); lastgen
 
 //Cell Load Event
 struct TESCellFullyLoadedEvent
@@ -87,6 +87,14 @@ public:
 	virtual	EventResult	ReceiveEvent(TESCellFullyLoadedEvent * evn, void * dispatcher) override;
 };
 extern TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
+
+#if CURRENT_RELEASE_RUNTIME == RUNTIME_VERSION_1_10_163
+DECLARE_EVENT_DISPATCHER(TESCellFullyLoadedEvent, 0x00442050); //diff: A0 
+#elif CURRENT_RELEASE_RUNTIME == MAKE_EXE_VERSION(1, 10, 980) 
+DECLARE_EVENT_DISPATCHER(TESCellFullyLoadedEvent, 0x004DCB30); //diff: D0 //2201825
+#elif CURRENT_RELEASE_RUNTIME == MAKE_EXE_VERSION(1, 10, 984) 
+DECLARE_EVENT_DISPATCHER(TESCellFullyLoadedEvent, 0x004DCB60);
+#endif
 
 //CombatEvent
 class CombatEvnHandler : public BSTEventSink<TESCombatEvent>
@@ -115,7 +123,6 @@ public:
 	virtual EventResult ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher) override;
 };
 extern PlayerAmmoCountEventSink playerAmmoCountEventSink;
-DECLARE_EVENT_DISPATCHER(TESCellFullyLoadedEvent, 0x00442050);
 
 //Menu OpenClose Event
 class MenuOpenCloseSink : public BSTEventSink<MenuOpenCloseEvent>

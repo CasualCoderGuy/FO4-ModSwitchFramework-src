@@ -1572,6 +1572,8 @@ namespace MSF_Data
 		for (std::vector<HUDMuzzleData>::iterator itData = MSF_MainData::muzzleDisplayData.begin(); itData != MSF_MainData::muzzleDisplayData.end(); itData++)
 			_MESSAGE("mzKeyword: %08X, display: %s", itData->keyword->formID, itData->displayString.c_str());
 
+		MSF_MainData::weaponStateStore.PrintStoredWeaponStates();
+
 		_MESSAGE("");
 	}
 
@@ -1593,8 +1595,10 @@ namespace MSF_Data
 			AmmoData* itAmmoData = itAD->second;
 			if (num == 0)
 			{
+				_DEBUG("num0");
 				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 				{
+					_DEBUG("invcount base");
 					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
 						return nullptr;
 				}
@@ -1603,16 +1607,19 @@ namespace MSF_Data
 				return switchData;
 			}
 			num--;
+			_DEBUG("check: %02X, %02X", (num + 1), itAmmoData->ammoMods.size());
 			if ((num + 1) > itAmmoData->ammoMods.size())
 				return nullptr;
 			AmmoData::AmmoMod* ammoMod = &itAmmoData->ammoMods[num];
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 			{
+				_DEBUG("invcount");
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
 					return nullptr;
 			}
 			SwitchData* switchData = new SwitchData();
 			switchData->ModToAttach = ammoMod->mod;
+			_DEBUG("retOK");
 			return switchData;
 		}
 		return nullptr;

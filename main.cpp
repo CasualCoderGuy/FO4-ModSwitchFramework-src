@@ -51,8 +51,8 @@ bool RegisterAfterLoadEvents()
 		return false;
 	}
 
-	REGISTER_EVENT(BGSOnPlayerModArmorWeaponEvent, modArmorWeaponEventSink);
-	REGISTER_EVENT(BGSOnPlayerUseWorkBenchEvent, useWorkbenchEventSink);
+	//REGISTER_EVENT(BGSOnPlayerModArmorWeaponEvent, modArmorWeaponEventSink);
+	//REGISTER_EVENT(BGSOnPlayerUseWorkBenchEvent, useWorkbenchEventSink);
 
 	if (!RegisterInventoryEvent((*g_player)->inventoryList, &MSF_MainData::playerInventoryEventSink))
 	{
@@ -133,7 +133,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
 
-				//MSF_Data::InitCompatibility();
+				MSF_Data::InitCompatibility();
 			}
 		}
 	}
@@ -250,75 +250,22 @@ bool InitializeOffsets()
 	return true;
 }
 
-bool InitPlugin(UInt32 runtimeVersion = 0) {
+bool InitPlugin(const F4SEInterface* f4se) 
+{
+	gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Fallout4\\F4SE\\ModSwitchFramework.log");
 	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
 #ifdef NEXTGEN
 	_MESSAGE("NextGen version\n");
 #endif
-	_MESSAGE("Runtime version: %08X", runtimeVersion);
+	_MESSAGE("Runtime version: %08X", f4se->runtimeVersion);
 #ifdef DEBUG
 	_MESSAGE("DebugMode enabled!");
 #endif
-
 	_MESSAGE("Base address: %p", IDDatabase::get().base());//reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
-	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
-	{
-		_WARNING("Warning - Missing mcm.dll - Keybinds and settings are read from MCM files. While it is possible to maintain these manually, installing and using MCM is highly recommended.");
-		//_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
-		//return false;
-	}
-
-	Globals::Init();
-	RVAManager::UpdateAddresses(runtimeVersion);
-
-	if (!g_localTrampoline.Create(1024 * 64, nullptr)) {
-		_ERROR("Fatal Error - Couldn't create codegen buffer. Skipping remainder of init process.");
-		return false;
-	}
-
-	if (!g_branchTrampoline.Create(1024 * 64)) {
-		_ERROR("Fatal Error - Couldn't create branch trampoline. Skipping remainder of init process.");
-		return false;
-	}
-
-	//InitializeOffsets();
-
-	if (!WriteHooks())
-		return false;
-
-	if (!MSF_Data::ReadKeybindData())
-	{
-		_FATALERROR("Fatal Error - MSF was unable to initialize keybinds");
-		return false;
-	}
-
-	if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformCallback))
-		_MESSAGE("MSF scaleform registration failed");
-	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformTest))
-	//	_MESSAGE("MSF widget scaleform registration failed");
-
-	srand(time(NULL));
-
-	return true;
-}
-
-extern "C"
-{
-
-bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
-{
-	gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Fallout4\\F4SE\\ModSwitchFramework.log");
-
-	info->infoVersion = PluginInfo::kInfoVersion;
-	info->name =		PLUGIN_NAME_SHORT;
-	info->version =		MSF_VERSION;
-	
-	g_pluginHandle =	f4se->GetPluginHandle();
-	
 #ifndef NEXTGEN
 	// Check game version
-	if (!COMPATIBLE(f4se->runtimeVersion)) 
+	if (!COMPATIBLE(f4se->runtimeVersion))
 	{
 		char str[512];
 		sprintf_s(str, sizeof(str), "Error! Your game version: v%d.%d.%d.%d\nExpected version: v%d.%d.%d.%d\n%s will be disabled.",
@@ -331,7 +278,7 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 			GET_EXE_VERSION_BUILD(SUPPORTED_RUNTIME_VERSION),
 			GET_EXE_VERSION_SUB(SUPPORTED_RUNTIME_VERSION),
 			PLUGIN_NAME_LONG
-			);
+		);
 
 		MessageBox(NULL, str, PLUGIN_NAME_LONG, MB_OK | MB_ICONEXCLAMATION);
 		return false;
@@ -352,33 +299,88 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 	}
 #endif
 
-	g_messaging = (F4SEMessagingInterface *)f4se->QueryInterface(kInterface_Messaging);
-	if (!g_messaging) 
+	g_pluginHandle = f4se->GetPluginHandle();
+	if (!g_localTrampoline.Create(1024 * 64, nullptr)) {
+		_ERROR("Fatal Error - Couldn't create codegen buffer. Skipping remainder of init process.");
+		return false;
+	}
+	if (!g_branchTrampoline.Create(1024 * 64)) {
+		_ERROR("Fatal Error - Couldn't create branch trampoline. Skipping remainder of init process.");
+		return false;
+	}
+
+	g_messaging = (F4SEMessagingInterface*)f4se->QueryInterface(kInterface_Messaging);
+	if (!g_messaging)
 	{
 		_FATALERROR("Fatal Error - Messaging query failed");
 		return false;
 	}
-
-	g_papyrus = (F4SEPapyrusInterface *)f4se->QueryInterface(kInterface_Papyrus);
-	if (!g_papyrus) 
+	g_papyrus = (F4SEPapyrusInterface*)f4se->QueryInterface(kInterface_Papyrus);
+	if (!g_papyrus)
 	{
 		_FATALERROR("Fatal Error - Papyrus query failed");
 		return false;
 	}
-
-	g_scaleform = (F4SEScaleformInterface *)f4se->QueryInterface(kInterface_Scaleform);
-	if (!g_scaleform) 
+	g_scaleform = (F4SEScaleformInterface*)f4se->QueryInterface(kInterface_Scaleform);
+	if (!g_scaleform)
 	{
 		_FATALERROR("Fatal Error - Scaleform query failed");
 		return false;
 	}
-
 	g_serialization = (F4SESerializationInterface*)f4se->QueryInterface(kInterface_Serialization);
 	if (!g_serialization)
 	{
 		_FATALERROR("Fatal Error - Serialization query failed");
 		return false;
 	}
+	
+	g_messaging->RegisterListener(g_pluginHandle, "F4SE", F4SEMessageHandler);
+	//g_messaging->RegisterListener(g_pluginHandle, NULL, MSFMessageHandler);
+	if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformCallback))
+		_MESSAGE("MSF scaleform registration failed");
+	//if (!g_scaleform->Register(PLUGIN_NAME_SHORT, MSF_Scaleform::RegisterScaleformTest))
+	//	_MESSAGE("MSF widget scaleform registration failed");
+	g_serialization->SetUniqueID(g_pluginHandle, 'MSF');
+	g_serialization->SetRevertCallback(g_pluginHandle, MSF_Serialization::RevertCallback);
+	g_serialization->SetLoadCallback(g_pluginHandle, MSF_Serialization::LoadCallback);
+	g_serialization->SetSaveCallback(g_pluginHandle, MSF_Serialization::SaveCallback);
+	g_papyrus->Register(MSF_Papyrus::RegisterPapyrus);
+#ifdef DEBUG
+	g_papyrus->Register(MSF_Test::RegisterPapyrus);
+#endif
+
+	if (GetFileAttributes("Data\\F4SE\\Plugins\\mcm.dll") == INVALID_FILE_ATTRIBUTES)
+	{
+		_WARNING("Warning - Missing mcm.dll - Keybinds and settings are read from MCM files. While it is possible to maintain these manually, installing and using MCM is highly recommended.");
+		//_FATALERROR("Fatal Error - Missing mcm.dll - Install MCM for this plugin to properly function");
+		//return false;
+	}
+
+	if (!MSF_Data::ReadKeybindData())
+	{
+		_FATALERROR("Fatal Error - MSF was unable to initialize keybinds");
+		return false;
+	}
+
+	Globals::Init();
+	RVAManager::UpdateAddresses(f4se->runtimeVersion);
+	//InitializeOffsets();
+	if (!WriteHooks())
+		return false;
+
+	srand(time(NULL));
+
+	return true;
+}
+
+extern "C"
+{
+
+bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
+{
+	info->infoVersion = PluginInfo::kInfoVersion;
+	info->name =		PLUGIN_NAME_SHORT;
+	info->version =		MSF_VERSION;
 
 	return true;
 }
@@ -402,30 +404,7 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 
 bool F4SEPlugin_Load(const F4SEInterface *f4se)
 {
-	if (g_messaging) 
-	{
-		g_messaging->RegisterListener(g_pluginHandle, "F4SE", F4SEMessageHandler);
-		//g_messaging->RegisterListener(g_pluginHandle, NULL, MSFMessageHandler);
-	}
-	
-	if (g_serialization)
-	{
-		g_serialization->SetUniqueID(g_pluginHandle, 'MSF');
-		g_serialization->SetRevertCallback(g_pluginHandle, MSF_Serialization::RevertCallback);
-		g_serialization->SetLoadCallback(g_pluginHandle, MSF_Serialization::LoadCallback);
-		g_serialization->SetSaveCallback(g_pluginHandle, MSF_Serialization::SaveCallback);
-	}
-
-	if (g_papyrus) 
-	{
-		g_papyrus->Register(MSF_Papyrus::RegisterPapyrus);
-#ifdef DEBUG
-		g_papyrus->Register(MSF_Test::RegisterPapyrus);
-#endif
-	}
-
-	
-	InitPlugin(f4se->runtimeVersion);
+	InitPlugin(f4se);
 	return true;
 }
 

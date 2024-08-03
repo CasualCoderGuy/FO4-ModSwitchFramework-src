@@ -195,9 +195,9 @@ namespace Utilities
 		if ((formID & 0xFF000000) == 0xFE000000)
 		{
 			std::ostringstream str;
-			UInt8 modIndex = (UInt8)(formID >> 12 & 0xFF);
+			UInt8 modIndex = (UInt8)(formID >> 12 & 0xFFF);
 			str << (*g_dataHandler)->modList.lightMods[modIndex]->name << '|';
-			formID &= 0xFFFF;
+			formID &= 0xFFF;
 			str << std::hex << formID;
 			return str.str().c_str();
 		}

@@ -93,9 +93,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
 				//Utilities::PlayIdle(*g_player, sw);
 
-				//MSF_Test::ExtraDataTest();
-				MSF_Test::TestIdle(true);
-				//CALL_MEMBER_FN((*g_player), UpdateEquipment)();
+				MSF_Test::ExtraDataTest();
+				//MSF_Test::TestIdle(true);
+
 				_DEBUG("test1");
 			}
 		}
@@ -112,7 +112,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::MenuFlagTest();
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
-				MSF_Test::TestIdle(false);
+				//MSF_Test::TestIdle(false);
+
 				_DEBUG("test2");
 			}
 		}
@@ -127,8 +128,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallRemoveModFromInvItem();
 				//MSF_Test::DamageEquippedWeapon(*g_player);
 				//MSF_Test::ListExtraData();
-				MSF_Test::SplitStackTest(13, false);
+				//MSF_Test::SplitStackTest(13, false);
 				//Utilities::FireWeapon(*g_player, 1);
+
 				_DEBUG("test3");
 			}
 		}

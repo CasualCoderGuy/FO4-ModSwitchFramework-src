@@ -453,13 +453,13 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 		if (instanceData && !targetAmmo)
 			targetAmmo = instanceData->ammo;
 
-		//_DEBUG("targetAmmo %p, ammo: %p", targetAmmo, instanceData->ammo);
+		_DEBUG("targetAmmo %p, ammo: %p", targetAmmo, instanceData->ammo);
 
 		//BGSMod::Attachment::Mod* invalidAmmoMod = MSF_Base::GetAmmoModIfInvalid(moddata, weapon);
 		MSF_Base::GetAmmoModToModify(moddata, targetAmmo, weapBase, &targetAmmoMod, &toAttach);
 		if (targetAmmoMod)
 		{
-			//_DEBUG("target ammomod UI: %08X, rem: %02X", targetAmmoMod->formID, toAttach);
+			_DEBUG("target ammomod UI: %08X, rem: %02X", targetAmmoMod->formID, toAttach);
 			UInt32 newunk = unk;
 			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, targetAmmoMod, applyChangesFunctor->ignoreWeapon, !toAttach, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
 			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);

@@ -35,6 +35,7 @@ public:
 	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData, TESAmmo* newAmmo = nullptr);
 	TESAmmo* GetCurrentAmmo();
 	bool SetCurrentAmmo(TESAmmo* ammo);
+	void PrintStoredData();
 
 	enum
 	{
@@ -149,6 +150,46 @@ public:
 			if (state)
 				f_callback(intfc, version, state);
 		}
+	};
+	void PrintStoredWeaponStates()
+	{
+		_MESSAGE("");
+		_MESSAGE("===Printing stored WeaponStates===");
+		for (const auto& state : vectorstorage)
+		{
+			if (state)
+				state->PrintStoredData();
+		}
+		_MESSAGE("===Printing WeaponState IDs in Player inventory===");
+		for (UInt32 i = 0; i < (*g_player)->inventoryList->items.count; i++)
+		{
+			BGSInventoryItem inventoryItem;
+			(*g_player)->inventoryList->items.GetNthItem(i, inventoryItem);
+			TESObjectWEAP* weap = DYNAMIC_CAST(inventoryItem.form, TESForm, TESObjectWEAP);
+			if (!weap || !inventoryItem.stack)
+				continue;
+			UInt32 stackID = -1;
+			for (BGSInventoryItem::Stack* stack = inventoryItem.stack; stack; stack = stack->next)
+			{
+				stackID++;
+				if (stack->extraData)
+				{
+					ExtraRank* extraRank = (ExtraRank*)stack->extraData->GetByType(kExtraData_Rank);
+					if (!extraRank)
+						continue;
+					UInt32 modNo = 0;
+					BGSObjectInstanceExtra* oie = (BGSObjectInstanceExtra*)stack->extraData->GetByType(kExtraData_ObjectInstance);
+					if (oie)
+						modNo = oie->data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form);
+					uint8_t isEquipped = 0;
+					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
+						isEquipped = 1;
+					_MESSAGE("ID: %08X, item: %08X, stackID: %08X, modNo: %i, isEquipped: %02X", extraRank->rank, weap->formID, stackID, modNo, isEquipped);
+
+				}
+			}
+		}
+		_MESSAGE("");
 	};
 private:
 	std::unordered_map<WeaponStateID, ExtraRank*> mapstorage; //used only for the loading of f4se serialized data, WeaponStateID is invalid afterwards

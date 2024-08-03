@@ -379,6 +379,33 @@ TESAmmo* ExtraWeaponState::GetCurrentAmmo()
 		return nullptr;
 }
 
+void ExtraWeaponState::PrintStoredData()
+{
+	_MESSAGE("ID: %08X; total states: %08X; active state marked with *", this->ID, this->weaponStates.size());
+	UInt32 idx = 0;
+	for (const auto& state : this->weaponStates)
+	{
+		UInt32 modFormID = 0;
+		if (state.first)
+			modFormID = state.first->formID;
+		if (state.second)
+		{
+			UInt32 ammoFormID = 0;
+			if (state.second->chamberedAmmo)
+				ammoFormID = state.second->chamberedAmmo->formID;
+			if (state.second == this->currentState)
+				_MESSAGE("-State*%02X: mod: %08X; chamberedAmmo: %08X; loadedAmmoCount %i; chamberSize: %i; ammoCapacity: %i; shotCount: %i; flags: %04X", idx, modFormID, ammoFormID, state.second->loadedAmmo, state.second->chamberSize, state.second->ammoCapacity, state.second->shotCount, state.second->flags);
+			else
+				_MESSAGE("-State %02X: mod: %08X; chamberedAmmo: %08X; loadedAmmoCount %i; chamberSize: %i; ammoCapacity: %i; shotCount: %i; flags: %04X", idx, modFormID, ammoFormID, state.second->loadedAmmo, state.second->chamberSize, state.second->ammoCapacity, state.second->shotCount, state.second->flags);
+		}
+		else if (state.second == this->currentState)
+			_MESSAGE("-State*%02X: mod: %08X", idx, modFormID);
+		else
+			_MESSAGE("-State %02X: mod: %08X", idx, modFormID);
+		idx++;
+	}
+}
+
 //bool ExtraWeaponState::SetParentRef(ObjectRefHandle refHandle)
 //{
 //	//validate refHandle
