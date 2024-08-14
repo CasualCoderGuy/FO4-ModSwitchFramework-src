@@ -38,7 +38,7 @@ public:
 			else
 				return animIdle_1stP;
 		}
-		else if (state == 7 || state == 8)
+		else if (state == 8)
 		{
 			if (isInPA)
 				return animIdle_3rdP_PA;
@@ -293,6 +293,7 @@ private:
 	volatile UInt16 ignoreAnimGraphUpdate;
 	volatile UInt16 ignoreDeleteExtraData;
 	volatile UInt16 modChangeEvent;
+	volatile UInt16 isInPA;
 	volatile UInt16 switchState;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
@@ -316,6 +317,7 @@ public:
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
+		InterlockedExchange16((volatile short*)&isInPA, 0);
 	};
 	enum
 	{
@@ -438,6 +440,7 @@ public:
 	};
 	void ClearAmmoDisplayChioces() { menuLock.Lock(); displayedAmmoChoices.clear(); displayedAmmoChoices.reserve(20); menuLock.Release(); }
 	void ClearModDisplayChioces() { menuLock.Lock(); displayedModChoices.clear(); displayedModChoices.reserve(20); menuLock.Release(); }
+	void HandlePAEvent();
 
 	void Reset()
 	{
@@ -449,6 +452,8 @@ public:
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		ClearDisplayChioces();
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
+		UInt16 inPA = IsInPowerArmor(*g_player);
+		InterlockedExchange16((volatile short*)&isInPA, inPA);
 	};
 };
 

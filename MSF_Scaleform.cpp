@@ -95,6 +95,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 
 				MSF_Test::ExtraDataTest();
 				//MSF_Test::TestIdle(true);
+				_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
 
 				_DEBUG("test1");
 			}
@@ -526,14 +527,18 @@ namespace MSF_Scaleform
 		UInt32 shapeID = 0; //baseAmmoID << 10 + ammoType + muzzleID << 20 + scopeID << 26
 		if (instanceData && instanceData->ammo)
 			ammoName = instanceData->ammo->GetFullName();
-		GFxValue arrArgs[5];
+		bool isInPA = IsInPowerArmor(playerActor);
+		_DEBUG("updWidget: %02X", isInPA);
+		//BSTEventSink_ExitPowerArmor__Event_ /BSTEventSink_PreloadPowerArmor__Event_
+		GFxValue arrArgs[6];
 		arrArgs[0].SetString(ammoName);
 		arrArgs[1].SetString(firingMode);
 		arrArgs[2].SetString(muzzleName);
 		arrArgs[3].SetString(scopeName);
 		arrArgs[4].SetUInt(shapeID);
+		arrArgs[5].SetBool(isInPA);
 		//_DEBUG("ammo: %s, fm: %s, muzzle: %s, sc: %s", ammoName, firingMode, muzzleName, scopeName);
-		movieRoot->Invoke("root.UpdateWidgetData", nullptr, arrArgs, 5);
+		movieRoot->Invoke("root.UpdateWidgetData", nullptr, arrArgs, 6);
 		return true;
 		//out of ammo, full (+1?)
 	}

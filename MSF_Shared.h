@@ -751,13 +751,53 @@ enum ActorStateFlags0C
 	kWeaponState_Drawn = 0x2, 
 	kWeaponState_Draw = 0x4, 
 	kWeaponState_Sheathing = 0x8,
+
 	kWeaponState_Aim = 0x18000, 
-	kWeaponState_Lowered = 0x08000, 
+	kWeaponState_Lowered1stP = 0x08000, 
+	kWeaponState_Lowered3rdP = 0x04000,
+	kWeaponState_Ready1stP = 0,
+	kWeaponState_Ready3rdP = 0x14000,
 	kWeaponState_Reloading = 0x10000, 
-	kWeaponState_Fire = 0x1C000,
+	kWeaponState_Firing = 0x1C000,
+	mWeaponActivityMask = 0x000FF000,
+
 	kActorState_Sneak = 0x900,
 	kActorState_FurnitureState = 0xE0000 //4: enter, 8: in, C:exit
 };
+
+/*
+		std::uint32_t moveMode: 14;             // 08:00
+		std::uint32_t flyState: 3;              // 08:14
+		std::uint32_t lifeState: 4;             // 08:17
+		std::uint32_t knockState: 4;            // 08:21
+		std::uint32_t meleeAttackState: 3;      // 08:25
+		std::uint32_t talkingToPlayer: 1;       // 08:28
+		std::uint32_t forceRun: 1;              // 08:29
+		std::uint32_t forceSneak: 1;            // 08:30
+		std::uint32_t headTracking: 1;          // 08:31
+		std::uint32_t reanimating: 1;           // 0C:00
+		WEAPON_STATE weaponState: 3;            // 0C:01
+		std::uint32_t wantBlocking: 1;          // 0C:04
+		std::uint32_t flightBlocked: 1;         // 0C:05
+		std::uint32_t recoil: 2;                // 0C:06
+		std::uint32_t allowFlying: 1;           // 0C:08
+		std::uint32_t staggered: 1;             // 0C:09
+		std::uint32_t inWrongProcessLevel: 1;   // 0C:10
+		std::uint32_t stance: 3;                // 0C:11
+		std::uint32_t gunState: 4;              // 0C:14 3rdP 14,16
+		INTERACTING_STATE interactingState: 2;  // 0C:18
+		std::uint32_t headTrackRotation: 1;     // 0C:20
+		std::uint32_t inSyncAnim: 1;            // 0C:21
+		
+		000FF000
+		1stP, 3rdP fire:	0001 1100 no
+		1stP, 3rdP aim:		0001 1000 yes
+		3rdP up:			0001 0100 yes
+		3rdP low:			0000 0100 yes
+		1stP low:			0000 1000 yes
+		1stP, 3rdP reload:	0001 0000 no
+		
+*/
 
 enum AttachFlags
 {

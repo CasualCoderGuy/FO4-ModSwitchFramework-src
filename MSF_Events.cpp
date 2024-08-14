@@ -51,7 +51,8 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//return kEvent_Continue;
 	if (!evn->data || (evn->targetActor != *g_player))
 		return kEvent_Continue;
-	_DEBUG("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip);
+	_DEBUG("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X, bPA: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip, IsInPowerArmor(*g_player));
+	MSF_MainData::modSwitchManager.HandlePAEvent();
 	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->equippedItem, TESBoundObject, TESObjectWEAP);
 	if (!eventWeapon)
 		return kEvent_Continue;
@@ -514,7 +515,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
-				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
+				if ((*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState) == 0)
+					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
 				MSF_Base::SwitchMod(switchData, true);
 				//_DEBUG("switchOK");
 			}
@@ -528,7 +530,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
-			delayTask delayEnd(100, true, &MSF_Base::EndSwitch, endFlag);
+			delayTask delayEnd(500, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -579,7 +581,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			if (switchData->SwitchFlags & SwitchData::bAnimInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bAnimInProgress;
-				MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
+				if ((*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState) == 0)
+					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_AnimNotFinished);
 				MSF_Base::SwitchMod(switchData, true);
 			}
 		}

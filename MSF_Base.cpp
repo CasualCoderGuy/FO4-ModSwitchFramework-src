@@ -75,7 +75,7 @@ namespace MSF_Base
 	bool SwitchAmmoHotkey(UInt8 key)
 	{
 		Actor* playerActor = *g_player;
-		_DEBUG("queueCount: %i; unk08: %08X; flags: %08X", MSF_MainData::modSwitchManager.GetQueueCount(), playerActor->actorState.unk08, playerActor->actorState.flags);
+		_DEBUG("queueCount: %i; state: %02X; unk08: %08X; flags: %08X", MSF_MainData::modSwitchManager.GetQueueCount(), MSF_MainData::modSwitchManager.GetState(), playerActor->actorState.unk08, playerActor->actorState.flags);
 
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))// || (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled))
 		{
@@ -155,8 +155,15 @@ namespace MSF_Base
 	bool HandlePendingAnimations()
 	{
 		Actor* playerActor = *g_player;
+		SInt32 state = (*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState);
+		UInt32 weaponActivity = playerActor->actorState.flags & ActorStateFlags0C::mWeaponActivityMask;
+		//bool is3rdPersonModelShown : 1;                                                          //player:: DFE:4
+		_DEBUG("ActorState: %p %08X %08X %08X", playerActor, playerActor->actorState.unk08, playerActor->actorState.flags, state);
+		if (state != 0 && state != 8)
+			return false;
 		if ((playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing)) || // | ActorStateFlags08::kActorState_Sprint
-			(playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Reloading | ActorStateFlags0C::kWeaponState_Fire | ActorStateFlags0C::kWeaponState_Sheathing)) || // | ActorStateFlags0C::kWeaponState_Lowered | ActorStateFlags0C::kWeaponState_Aim
+			(playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Sheathing)) ||
+			(weaponActivity == ActorStateFlags0C::kWeaponState_Reloading || weaponActivity == ActorStateFlags0C::kWeaponState_Firing) ||
 			(!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && (playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Draw)))
 		{
 			return false;

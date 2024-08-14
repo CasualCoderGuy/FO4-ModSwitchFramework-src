@@ -72,8 +72,17 @@ Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
 
+void ModSwitchManager::HandlePAEvent()
+{
+	UInt16 inPA = IsInPowerArmor(*g_player);
+	UInt16 wasInPA = InterlockedExchange16((volatile short*)&isInPA, inPA);
+	if (inPA != wasInPA)
+		MSF_Scaleform::UpdateWidgetData();
+}
+
 namespace MSF_Data
 {
+
 
 	bool InjectAttachPoints()
 	{
@@ -1602,8 +1611,11 @@ namespace MSF_Data
 					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
 						return nullptr;
 				}
+				BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				if (!currSwitchedMod)
+					return nullptr;
 				SwitchData* switchData = new SwitchData();
-				switchData->ModToRemove = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				switchData->ModToRemove = currSwitchedMod;
 				return switchData;
 			}
 			num--;
@@ -1617,6 +1629,9 @@ namespace MSF_Data
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
 					return nullptr;
 			}
+			BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+			if (currSwitchedMod == ammoMod->mod)
+				return nullptr;
 			SwitchData* switchData = new SwitchData();
 			switchData->ModToAttach = ammoMod->mod;
 			_DEBUG("retOK");
@@ -1757,6 +1772,7 @@ namespace MSF_Data
 
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove)
 	{
+		_DEBUG("Queueing");
 		if (modToAttach == modToRemove)
 			return false; //no change
 		SwitchData* switchRemove = nullptr;
@@ -1790,11 +1806,13 @@ namespace MSF_Data
 			}
 			if (!(modToAttach->flags & SwitchData::bIgnoreAnimations) || ((!switchRemove && modToRemove) && !(modToRemove->flags & SwitchData::bIgnoreAnimations)))
 			{
+				_DEBUG("Pending");
 				if (!MSF_Base::HandlePendingAnimations())
 				{
 					delete switchRemove;
 					return false;
 				}
+				_DEBUG("PendingOK");
 			}
 			switchAttach = new SwitchData();
 			switchAttach->LooseModToRemove = looseMod;
@@ -2007,7 +2025,7 @@ namespace MSF_Data
 	{
 		if (!actor || !actor->biped.get())
 			return nullptr;
-		SInt32 state = 7;
+		SInt32 state = 8;
 		if (actor == *g_player)
 		{
 			PlayerCamera* playerCamera = *g_playerCamera;
@@ -2027,7 +2045,7 @@ namespace MSF_Data
 				else
 					return itAnim->second->animIdle_1stP;
 			}
-			else if (state == 7 || state == 8)
+			else if (state == 8)
 			{
 				if (isInPA)
 					return itAnim->second->animIdle_3rdP_PA;
@@ -2038,7 +2056,7 @@ namespace MSF_Data
 		}
 		if (state == 0)
 			return MSF_MainData::reloadIdle1stP;
-		else if (state == 7 || state == 8)
+		else if (state == 8)
 			return MSF_MainData::reloadIdle3rdP;
 		return nullptr;
 	}
@@ -2047,7 +2065,7 @@ namespace MSF_Data
 	{
 		if (!actor || !actor->biped.get())
 			return nullptr;
-		SInt32 state = 7;
+		SInt32 state = 8;
 		if (actor == *g_player)
 		{
 			PlayerCamera* playerCamera = *g_playerCamera;
@@ -2067,7 +2085,7 @@ namespace MSF_Data
 				else
 					return itAnim->second->animIdle_1stP;
 			}
-			else if (state == 7 || state == 8)
+			else if (state == 8)
 			{
 				if (isInPA)
 					return itAnim->second->animIdle_3rdP_PA;
@@ -2078,7 +2096,7 @@ namespace MSF_Data
 		}
 		if (state == 0)
 			return MSF_MainData::fireIdle1stP;
-		else if (state == 7 || state == 8)
+		else if (state == 8)
 			return MSF_MainData::fireIdle3rdP;
 		return nullptr;
 	}
