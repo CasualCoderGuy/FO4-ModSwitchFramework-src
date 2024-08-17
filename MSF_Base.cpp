@@ -51,6 +51,13 @@ namespace MSF_Base
 
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+			{
+				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+				MSF_Base::SwitchMod(switchData, true);
+				MSF_Base::ReloadWeapon();
+				return true;
+			}
 			_DEBUG("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
@@ -104,6 +111,13 @@ namespace MSF_Base
 
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+			{
+				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+				MSF_Base::SwitchMod(switchData, true);
+				MSF_Base::ReloadWeapon();
+				return true;
+			}
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			if (!MSF_Base::ReloadWeapon())
@@ -183,7 +197,13 @@ namespace MSF_Base
 			{
 				if (switchData->SwitchFlags & SwitchData::bReloadNeeded)
 				{
-					switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress | ~SwitchData::bReloadNeeded); // | SwitchData::bReloadNotFinished
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+					{
+						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+						MSF_Base::SwitchMod(switchData, true);
+					}
+					else
+						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress | ~SwitchData::bReloadNeeded); // | SwitchData::bReloadNotFinished
 					if (!MSF_Base::ReloadWeapon())
 						MSF_MainData::modSwitchManager.ClearQueue();
 				}

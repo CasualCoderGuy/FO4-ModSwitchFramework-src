@@ -530,7 +530,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
-			delayTask delayEnd(500, true, &MSF_Base::EndSwitch, endFlag);
+			delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -545,8 +545,14 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				if ((switchData->SwitchFlags & SwitchData::bReloadNeeded))
 				{
 					//_DEBUG("reloading");
-					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-					delayTask delayReload(400, true, &MSF_Base::ReloadWeapon);
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+					{
+						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+						MSF_Base::SwitchMod(switchData, true);
+					}
+					else
+						switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
+					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon);
 					//if (!MSF_Base::ReloadWeapon())
 					//	MSF_MainData::modSwitchManager.ClearQueue();
 				}
@@ -592,8 +598,12 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_AnimNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
-			delayTask delayEnd(100, true, &MSF_Base::EndSwitch, endFlag);
+			delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
 		}
+	}
+	else if (!_strcmpi("Event00", name))
+	{
+		_DEBUG("BCR Event00");
 	}
 	else if (!_strcmpi("toggleMenu", name))
 	{

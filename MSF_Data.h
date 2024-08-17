@@ -106,7 +106,8 @@ public:
 	};
 	enum
 	{
-		bRequireAPmod = 0x0001
+		bRequireAPmod = 0x0001,
+		bHasUniqueState = 0x0002
 	};
 	UInt16 attachParentValue;
 	UInt16 flags;
@@ -496,6 +497,7 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 	static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> modChamberMap;
+	static std::vector<KeywordValue> uniqueStateAPValues;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -545,12 +547,16 @@ public:
 		bEnableTacticalReloadAll = 0x00040000,
 		bEnableTacticalReloadAnim = 0x00080000,
 		bEnableBCRSupport = 0x00100000,
+		bReloadCompatibilityMode = 0x00200000,
 		mMakeExtraRankMask = bEnableAmmoSaving | bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt32 MCMSettingFlags;
 	static UInt16 iMinRandomAmmo;
 	static UInt16 iMaxRandomAmmo;
 	static UInt16 iAutolowerTimeSec;
+	static UInt16 iReloadAnimEndEventDelayMS;
+	static UInt16 iCustomAnimEndEventDelayMS;
+	static UInt16 iDrawAnimEndEventDelayMS;
 	static std::unordered_map<std::string, float> MCMfloatSettingMap;
 };
 

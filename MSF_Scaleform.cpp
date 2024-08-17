@@ -225,7 +225,7 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetInt(0);
 			if (args->numArgs != 0) return;
-			args->result->SetInt(110163);
+			args->result->SetUInt(PACKED_F4SE_VERSION);
 		}
 	};
 
@@ -234,16 +234,16 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetInt(0);
 			if (args->numArgs != 0) return;
-			args->result->SetInt(110163);
+			args->result->SetUInt(CURRENT_RELEASE_RUNTIME);
 		}
 	};
 
 	class SendMSFVersion : public GFxFunctionHandler {
 	public:
 		virtual void Invoke(Args* args) {
-			args->result->SetInt(0);
+			args->result->SetUInt(0);
 			if (args->numArgs != 0) return;
-			args->result->SetInt(110163);
+			args->result->SetUInt(MSF_VERSION);
 		}
 	};
 

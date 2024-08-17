@@ -45,6 +45,9 @@ UInt32 MSF_MainData::MCMSettingFlags = 0;
 UInt16 MSF_MainData::iMinRandomAmmo = 5;
 UInt16 MSF_MainData::iMaxRandomAmmo = 50;
 UInt16 MSF_MainData::iAutolowerTimeSec = 0;
+UInt16 MSF_MainData::iReloadAnimEndEventDelayMS = 500;
+UInt16 MSF_MainData::iCustomAnimEndEventDelayMS = 100;
+UInt16 MSF_MainData::iDrawAnimEndEventDelayMS = 500;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu;
 
@@ -68,6 +71,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDat
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
 std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
 std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamberMap;
+std::vector<KeywordValue> MSF_MainData::uniqueStateAPValues;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -636,6 +640,8 @@ namespace MSF_Data
 				flag = MSF_MainData::bEnableTacticalReloadAnim;
 			else if (settingName == "bEnableBCRSupport")
 				flag = MSF_MainData::bEnableBCRSupport;
+			else if (settingName == "bReloadCompatibilityMode")
+				flag = MSF_MainData::bReloadCompatibilityMode;
 			else
 				return false;
 
@@ -654,6 +660,12 @@ namespace MSF_Data
 				MSF_MainData::iMinRandomAmmo = std::stoi(settingValue);
 			else if (settingName == "iMaxRandomAmmo")
 				MSF_MainData::iMaxRandomAmmo = std::stoi(settingValue);
+			else if (settingName == "iReloadAnimEndEventDelayMS")
+				MSF_MainData::iReloadAnimEndEventDelayMS = std::stoi(settingValue);
+			else if (settingName == "iCustomAnimEndEventDelayMS")
+				MSF_MainData::iCustomAnimEndEventDelayMS = std::stoi(settingValue);
+			else if (settingName == "iDrawAnimEndEventDelayMS")
+				MSF_MainData::iDrawAnimEndEventDelayMS = std::stoi(settingValue);
 			return true;
 		}
 		else if (section == "Float")
@@ -952,6 +964,29 @@ namespace MSF_Data
 								MSF_MainData::compatibilityEdits[mod] = compatibility;
 							}
 						}
+					}
+				}
+
+				data1 = json["uniqueStateAPs"];
+				if (data1.isArray())
+				{
+					for (int i = 0; i < data1.size(); i++)
+					{
+						//const Json::Value& dataN = data1[i];
+						//std::string pluginName = dataN["pluginName"].asString();
+						std::string kwIdentifier = data1[i].asString();
+						if (kwIdentifier == "")
+							continue;
+						BGSKeyword* ifKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(kwIdentifier), TESForm, BGSKeyword);
+						KeywordValue value = Utilities::GetInstantiationValueForTypedKeyword(ifKW);
+						if (!ifKW || value < 0)
+						{
+							_MESSAGE("Data error in %s: attach parent keyword '%s' or its value could not be found in loaded game data", fileName.c_str(), kwIdentifier.c_str());
+							continue;
+						}
+						auto stateIt = std::find(MSF_MainData::uniqueStateAPValues.begin(), MSF_MainData::uniqueStateAPValues.end(), value);
+						if (stateIt == MSF_MainData::uniqueStateAPValues.end())
+							MSF_MainData::uniqueStateAPValues.push_back(value);
 					}
 				}
 
@@ -1611,7 +1646,8 @@ namespace MSF_Data
 					if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, baseAmmo) == 0)
 						return nullptr;
 				}
-				BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				///BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+				BGSMod::Attachment::Mod* currSwitchedMod = Utilities::GetModAtAttachPoint(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::ammoAP);
 				if (!currSwitchedMod)
 					return nullptr;
 				SwitchData* switchData = new SwitchData();
@@ -1629,7 +1665,8 @@ namespace MSF_Data
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammoMod->ammo) == 0)
 					return nullptr;
 			}
-			BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+			//BGSMod::Attachment::Mod* currSwitchedMod = Utilities::FindModByUniqueKeyword(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::hasSwitchedAmmoKW);
+			BGSMod::Attachment::Mod* currSwitchedMod = Utilities::GetModAtAttachPoint(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::ammoAP);
 			if (currSwitchedMod == ammoMod->mod)
 				return nullptr;
 			SwitchData* switchData = new SwitchData();
@@ -1919,7 +1956,7 @@ namespace MSF_Data
 			//UInt64 currPriority = ((objectMod->priority & 0x80) >> 7) * (objectMod->priority & ~0x80) + (((objectMod->priority & 0x80) >> 7) ^ 1)*(objectMod->priority & ~0x80) + (((objectMod->priority & 0x80) >> 7) ^ 1) * 127;
 			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
 			TESAmmo* currModAmmo = nullptr;
-			bool isSwitchedAmmo = false;
+			//bool isSwitchedAmmo = false;
 			for (UInt32 i4 = 0; i4 < objectMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
 			{
 				BGSMod::Container::Data * data = &objectMod->modContainer.data[i4];
@@ -1928,13 +1965,14 @@ namespace MSF_Data
 					if (currPriority >= priority)
 						currModAmmo = (TESAmmo*)data->value.form;
 				}
-				else if (data->target == 31 && data->value.form && data->op == 144)
-				{
-					if ((BGSKeyword*)data->value.form == MSF_MainData::hasSwitchedAmmoKW)
-						isSwitchedAmmo = true;
-				}
+				//else if (data->target == 31 && data->value.form && data->op == 144)
+				//{
+				//	if ((BGSKeyword*)data->value.form == MSF_MainData::hasSwitchedAmmoKW)
+				//		isSwitchedAmmo = true;
+				//}
 			}
-			if (!isSwitchedAmmo && currModAmmo)
+			//if (!isSwitchedAmmo && currModAmmo)
+			if (objectMod->unkC0 != MSF_MainData::ammoAP && currModAmmo)
 			{
 				ammoConverted = currModAmmo;
 				priority = currPriority;
