@@ -73,11 +73,45 @@ public:
 };
 STATIC_ASSERT(sizeof(BGSInventoryInterface) == 0xD0);
 
+class NiFormArray;
+class TESConditionItem;
+
+class TESCondition
+{
+public:
+	TESConditionItem* head;
+};
+
+struct IDLE_DATA
+{
+public:
+	// members
+	std::int8_t loopMin;        // 0
+	std::int8_t loopMax;        // 1
+	std::int8_t flags;          // 2
+	std::uint16_t replayDelay;  // 4
+};
+STATIC_ASSERT(sizeof(IDLE_DATA) == 0x6);
+
 class TESIdleForm : public TESForm
 {
 public:
 	enum { kTypeID = kFormType_IDLE };
+
+
+	// members
+	TESCondition conditions;          // 20
+	IDLE_DATA data;                   // 28
+	NiFormArray* childIdles;          // 30
+	TESIdleForm* parentIdle;          // 38
+	TESIdleForm* prevIdle;            // 40
+	BSFixedString behaviorGraphName;  // 48
+	BSFixedString animEventName;      // 50
+	BSFixedString animFileName;       // 58
+	BSString formEditorID;     // 60
+
 };
+STATIC_ASSERT(sizeof(TESIdleForm) == 0x70);
 
 class MSFAimModel : public TESForm //https://github.com/isathar/F4SE_AmmoTweaksExtension cast AimModel as MSFAimModel, edit result
 {
@@ -474,10 +508,15 @@ namespace Utilities
 	UInt32 GetEquippedItemFormID(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
+	BGSObjectInstanceExtra* GetEquippedWeaponModData(Actor* ownerActor);
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex);
+	BGSInventoryItem::Stack* GetEquippedWeaponStack(Actor* owner);
+	TESObjectWEAP* GetEquippedGun(Actor* ownerActor);
 	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor);
+	UInt8 GetEquippedWeaponSlotIndex(Actor* ownerActor);
 	UInt32 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack);
 	BGSInventoryItem::Stack* GetStack(BGSInventoryItem* item, UInt32 stackID);
+	BGSInventoryItem::Stack* GetStackFromItem(TESObjectREFR* owner, TESForm* item, UInt32 stackID);
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item);
 	EquipWeaponData* GetEquippedWeaponData(Actor* owner);
 	TESObjectMISC* GetLooseMod(BGSMod::Attachment::Mod* thisMod);
@@ -487,6 +526,7 @@ namespace Utilities
 	bool HasObjectMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
 	BGSKeyword* GetAttachParent(BGSMod::Attachment::Mod* mod);
 	bool GetParentMods(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod, std::vector<BGSMod::Attachment::Mod*>* parents);
+	BGSMod::Attachment::Mod* GetParentMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod);
 	KeywordValue GetAttachValueForTypedKeyword(BGSKeyword* keyword);
 	KeywordValue GetInstantiationValueForTypedKeyword(BGSKeyword* keyword);
 	KeywordValue GetAnimFlavorValueForTypedKeyword(BGSKeyword* keyword);
@@ -598,7 +638,7 @@ public:
 };
 
 typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod, bool unkbool);
-typedef void(*_AttachMod)(Actor* actor, TESObjectWEAP* baseWeap, void** CheckStackIDFunctor, void** ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
+typedef void(*_AttachMod)(Actor* actor, TESBoundObject* baseItem, CheckStackIDFunctor* CheckStackIDFunctor, StackDataWriteFunctor* ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_ModifyStackData)(BGSInventoryItem* invItem, BGSInventoryItem::Stack** stack, StackDataWriteFunctor* modFuntor);
 typedef bool(*_UpdMidProc)(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
@@ -641,7 +681,7 @@ typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UI
 typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex, UInt32 a_shotCount);                                                         // 0F0 EFCE90
 typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
-typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance* a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
+typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 
 typedef ObjectRefHandle*(*_GetHandle)(ObjectRefHandle* handleOut, TESObjectREFR* ref);
 extern RelocAddr <_GetHandle> GetHandle;
@@ -848,7 +888,17 @@ enum EquipSlotType
 	kType_FX,
 	kType_UnarmedWeapon,
 	kType_MeleeWeapon,
-	kType_Weapon = 41
+	kType_WeaponDagger,
+	kType_WeaponAxe,
+	kType_WeaponMace,
+	kType_WeaponTwoHandMelee,
+	kType_WeaponBow,
+	kType_WeaponStaff,
+	kType_Quiver,
+	kType_WeaponGun,
+	kType_WeaponGrenade,
+	kType_WeaponMine,
+	kTotal
 };
 
 template <typename T> 
@@ -1056,5 +1106,180 @@ public:
 	UInt64 soundLevel;  // 180
 };
 STATIC_ASSERT(sizeof(Projectile) == 0x188);
+
+struct SubgraphIdentifier
+{
+public:
+	// members
+	std::size_t identifier;  // 0
+};
+STATIC_ASSERT(sizeof(SubgraphIdentifier) == 0x8);
+
+struct SubgraphHandle
+{
+public:
+	// members
+	std::uint64_t handle;  // 0
+};
+STATIC_ASSERT(sizeof(SubgraphHandle) == 0x8);
+
+struct SubGraphIdleRootData
+{
+public:
+	// members
+	SubgraphIdentifier subGraphID;  // 00
+	BSFixedString idleRootName;     // 08
+	std::int8_t count;              // 10
+	std::int8_t activeCount;        // 11
+	bool forFirstPerson;            // 12
+};
+STATIC_ASSERT(sizeof(SubGraphIdleRootData) == 0x18);
+
+struct BGSBehaviorRootData
+{
+public:
+	// members
+	BSFixedString idleManagerRootToUse;  // 00
+	BSFixedString behaviorRootFilename;  // 08
+	SubgraphIdentifier identifier;       // 10
+	bool firstPerson;                    // 18
+};
+STATIC_ASSERT(sizeof(BGSBehaviorRootData) == 0x20);
+
+class BGSInventoryListEventData__Event
+{
+
+};
+
+struct MiddleHighProcessData
+{
+public:
+	// members
+	BSTEventDispatcher<BGSInventoryListEventData__Event> inventoryEventSource;                                                 // 000
+	NiPointer<bhkNPCollisionObject> poseBound;                                                                // 058
+	UInt64 runOncePackage[6];                                                                              // 060
+	tArray<UInt32> deadDetectList;                                                                     // 090
+	tList<TESObjectREFR*> refListChairBed;                                                             // 0A8
+	NiPoint3 rotation;                                                                                        // 0B8
+	NiPoint3 rotationSpeed;                                                                                   // 0C4
+	NiPoint3 actorMountPosition;                                                                              // 0D0
+	NiPoint3 furniturePathPoint;                                                                              // 0DC
+	NiPoint3 lastSeenPosition;                                                                                // 0E8
+	UInt32 bleedoutAttacker;                                                                             // 0F4
+	UInt32 wardState;                                         // 0F8
+	void* animResponse;  // 100
+	tArray<void*> commandedActors;                                                             // 108
+	NiNode* damageRootNode[26];                                                                               // 120
+	NiNode* weaponBone;                                                                                       // 1F0
+	NiAVObject* headNode;                                                                                     // 1F8
+	NiAVObject* torsoNode;                                                                                    // 200
+	NiAVObject* faceTargetSourceNode;                                                                         // 208
+	void* faceNodeSkinned;                                                                         // 210
+	void* lightingProperty;                                                     // 218
+	void* listItemstoEquipUnequip;                                                                      // 220
+	void* lastHitData;                                                                                     // 228
+	void* headDeferredHideLimb;                                                                   // 230
+	tArray<void*> activeEffects;                                                                           // 238
+	UInt64 it;
+	void* animationGraphManager;                                           // 258
+	void* animationVariableCache;                                                    // 260
+	tArray<SubGraphIdleRootData> subGraphIdleManagerRoots;                                                  // 268
+	SimpleLock equippedItemsLock;                                                                             // 280
+	tArray<EquippedItemData> equippedItems;                                                                     // 288
+	tArray<void*> clothExtraDataCache;                                                          // 2A0
+	tArray<SubgraphHandle[2]> subGraphHandles;                                               // 2B8
+	SubgraphIdentifier currentDefaultSubGraphID[4];                                            // 2D0
+	SubgraphIdentifier requestedDefaultSubGraphID[4];                                          // 2F0
+	SubgraphIdentifier currentWeaponSubGraphID[4];                                             // 310
+	SubgraphIdentifier requestedWeaponSubGraphID[4];                                           // 330
+	void* stanceData;                                                         // 350
+	tArray<void*> nodeLocationArray;           // 358
+	float stanceHeightArray[6][2];                                                                            // 370
+	float headHeightOffset;                                                                                   // 3A0
+	ObjectRefHandle currentFurniture;                                                                         // 3A4
+	ObjectRefHandle occupiedFurniture;                                                                        // 3A8
+	TESIdleForm* currentIdle;                                                                                 // 3B0
+	UInt32 commandingActor;                                                                              // 3B8
+	const TESIdleForm* furnitureIdle;                                                                         // 3C0
+	void* faceAnimationData;                                                                // 3C8
+	MagicItem* currentPackageSpell;                                                                           // 3D0
+	TESObjectWEAP* lastBoundWeapon;                                                                           // 3D8
+	void* charController;                                                         // 3E0
+	void* penetrationDetectUtil;                                         // 3E8
+	void* bodyPartPreload;                                                                    // 3F0
+	TESIdleForm* lastIdlePlayed;                                                                              // 3F8
+	void* perkData;                                                                                     // 400
+	NiPoint3 lookAtLocation;                                                                                  // 408
+	float pursueTimer;                                                                                        // 414
+	float furnitureAngle;                                                                                     // 418
+	float furnitureEntryFootstepDeltaTarget;                                                                  // 41C
+	float packageIdleTimer;                                                                                   // 420
+	float equippedWeight;                                                                                     // 424
+	float desiredSpeed;                                                                                       // 428
+	float animationSpeed;                                                                                     // 42C
+	float bleedoutTimer;                                                                                      // 430
+	float bleedoutRate;                                                                                       // 434
+	float bleedoutMaxHealth;                                                                                  // 438
+	float maxWardPower;                                                                                       // 43C
+	float animGraphEventTimeout;                                                                              // 440
+	float torchEvalTimer;                                                                                     // 444
+	float alphaMult;                                                                                          // 448
+	float scriptRefractPower;                                                                                 // 44C
+	float sleepingTimer;                                                                                      // 450
+	float deferredKillTimer;                                                                                  // 454
+	float killMoveTimer;                                                                                      // 458
+	float staggerTimer;                                                                                       // 45C
+	float mountDismountSafetyTimer;                                                                           // 460
+	float rangeWaypointIdleTimer;                                                                       // 464
+	std::int32_t packageIdleNumber;                                                                           // 468
+	std::int32_t reservationSlot;                                                                             // 46C
+	SubgraphIdentifier currentFurnitureSubgraphID;                                                            // 470
+	std::uint32_t currentFurnitureMarkerID;                                                                   // 478
+	std::uint32_t occupiedFurnitureMarkerID;                                                                  // 47C
+	std::uint64_t nextExtraArrow3DUpdate;                                                                     // 480
+	std::uint32_t deferredKill;                                                                               // 488
+	std::uint32_t flareFlags;                                                                                 // 48C
+	std::int32_t useItem;                                              // 490
+	std::int16_t animActionSuccess;                                                                           // 494
+	std::uint16_t update3DModel;                                                                              // 496
+	std::int8_t weaponCullCounter;                                                                            // 498
+	std::int8_t archetypeChangeType;                                                                          // 499
+	bool animWeaponCull;                                                                                      // 49A
+	bool aimingTarget;                                                                                        // 49B
+	bool doneClothesChange;                                                                                   // 49C
+	bool pickPackIdle;                                                                                        // 49D
+	bool doneOnce;                                                                                            // 49E
+	bool refreshFlareFlags;                                                                                   // 49F
+	bool pickPocketed;                                                                                        // 4A0
+	bool summonedCreature;                                                                                    // 4A1
+	bool forceNextUpdate;                                                                                     // 4A2
+	bool playedBeginIdles;                                                                                    // 4A3
+	bool playedEndIdles;                                                                                      // 4A4
+	bool quickPlacement;                                                                                      // 4A5
+	bool beenAttacked;                                                                                        // 4A6
+	bool alwaysHit;                                                                                           // 4A7
+	bool doNoDamage;                                                                                          // 4A8
+	bool soulTrapped;                                                                                         // 4A9
+	bool lookAt;                                                                                              // 4AA
+	bool eating;                                                                                              // 4AB
+	bool calcLight;                                                                                           // 4AC
+	bool preventCombat;                                                                                       // 4AD
+	bool dyingFromBleedout;                                                                                   // 4AE
+	bool fleeing;                                                                                             // 4AF
+	bool instantGetOut;                                                                                       // 4B0
+	bool hostileGuard;                                                                                        // 4B1
+	bool stopIdleFailed;                                                                                      // 4B2
+	bool killQueued;                                                                                          // 4B3
+	bool ragdollInstant;                                                                                      // 4B4
+	bool scriptDeferredKill;                                                                                  // 4B5
+	bool furnitureEntryLeftFootFirst;                                                                         // 4B6
+	bool furnitureAnimationPlayed;                                                                            // 4B7
+	bool queuedInstantInteractionAnimation;                                                                   // 4B8
+	bool queuedModifyInitialAnimationPose;                                                                    // 4B9
+	bool avoidPlayer;                                                                                         // 4BA
+	bool usingPathingFaceTargetWhileTrackingOutOfRange;                                                       // 4BB
+};
+STATIC_ASSERT(offsetof(MiddleHighProcessData, lastIdlePlayed) == 0x3F8);
+STATIC_ASSERT(sizeof(MiddleHighProcessData) == 0x4C0);
 
 	

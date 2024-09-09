@@ -15,6 +15,8 @@ namespace MSF_Serialization
 	{
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
 		{
+			MSF_MainData::weaponStateStore.InvalidateAllIDs();
+			MSF_MainData::weaponStateStore.ClearInvalidWeaponStates();
 			_MESSAGE("MSF serialization data loading disabled.");
 			return;
 		}
@@ -32,7 +34,7 @@ namespace MSF_Serialization
 			break;
 			}
 		}
-
+		MSF_MainData::weaponStateStore.ClearInvalidWeaponStates();
 	}
 
 	bool Load(const F4SESerializationInterface * intfc, UInt32 version)
@@ -40,10 +42,19 @@ namespace MSF_Serialization
 		//UInt32 dataCount = 0;
 		//Serialization::ReadData(intfc, &dataCount);
 		//for (UInt32 idx = 0; idx < dataCount; idx++)
-		if (version < MIN_SUPPORTED_SERIALIZATION_VERSION)
+		if (version >= MIN_SUPPORTED_SERIALIZATION_VERSION)
+		{
+			StoredExtraWeaponState loadedExtraState(intfc, version);
+			loadedExtraState.Recover(intfc, version);
+		}
+		else
+		{
+			WeaponStateID id = 0;
+			Serialization::ReadData(intfc, &id);
+			MSF_MainData::weaponStateStore.InvalidateID(id);
+			_MESSAGE("WARNING: deserialization failure at extra weapon state with ID %08X: unsupported save file version", id);
 			return false;
-		StoredExtraWeaponState loadedExtraState(intfc, version);
-		loadedExtraState.Recover(intfc, version);
+		}
 		return true;
 	}
 
@@ -80,6 +91,8 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::W
 	this->chamberedAmmo = weaponState->chamberedAmmo->formID;
 	for (auto itAmmo = weaponState->BCRammo.begin(); itAmmo != weaponState->BCRammo.end(); itAmmo++)
 		this->BCRammo.push_back((*itAmmo)->formID);
+	for (auto itMod = weaponState->stateMods.begin(); itMod != weaponState->stateMods.end(); itMod++)
+		this->stateMods.push_back((*itMod)->formID);
 }
 
 StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
@@ -111,14 +124,7 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &this->ammoCapacity);
 	Serialization::ReadData(intfc, &this->chamberSize);
 	Serialization::ReadData(intfc, &this->shotCount);
-	if (version == MAKE_EXE_VERSION_EX(0, 0, 0, 3))
-	{
-		UInt64 ammoData = 0;
-		intfc->ReadRecordData(&ammoData, sizeof(ammoData));
-		this->loadedAmmo = (UInt32)ammoData;
-	}
-	else
-		Serialization::ReadData(intfc, &this->loadedAmmo);
+	Serialization::ReadData(intfc, &this->loadedAmmo);
 	Serialization::ReadData(intfc, &this->chamberedAmmo);
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
@@ -128,6 +134,16 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 		UInt32 ammoFormID = 0;
 		Serialization::ReadData(intfc, &ammoFormID);
 		this->BCRammo.push_back(ammoFormID);
+	}
+	UInt32 modsize = 0;
+	Serialization::ReadData(intfc, &modsize);
+	for (UInt32 dataidx = 0; dataidx < modsize; dataidx++)
+	{
+		UInt32 formIdKW = 0;
+		UInt32 formIdMod = 0;
+		Serialization::ReadData(intfc, &formIdKW);
+		Serialization::ReadData(intfc, &formIdMod);
+		this->stateMods[formIdKW] = formIdMod;
 	}
 }
 
@@ -146,6 +162,13 @@ bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializatio
 	{
 		UInt32 formId = *itAmmo;
 		intfc->WriteRecordData(&formId, sizeof(formId));
+	}
+	UInt32 modsize = this->stateMods.size();
+	intfc->WriteRecordData(&modsize, sizeof(modsize));
+	for (auto itMod = this->stateMods.begin(); itMod != this->stateMods.end(); itMod++)
+	{
+		UInt32 formIdMod = *itMod;
+		intfc->WriteRecordData(&formIdMod, sizeof(formIdMod));
 	}
 	return true;
 }
@@ -167,7 +190,18 @@ ExtraWeaponState::WeaponState* StoredExtraWeaponState::StoredWeaponState::Recove
 			continue;
 		recoveredBCRammoVector.push_back(recoveredBCRAmmo);
 	}
-	return new ExtraWeaponState::WeaponState(this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, recoveredAmmo, &recoveredBCRammoVector);
+	std::vector<BGSMod::Attachment::Mod*> recoveredStateMods;
+	for (auto itMod = this->stateMods.begin(); itMod != this->stateMods.end(); itMod++)
+	{
+		UInt32 newModFormID = 0;
+		if (!intfc->ResolveFormId(*itMod, &newModFormID))
+			continue;
+		BGSMod::Attachment::Mod* recoveredStateMod = (BGSMod::Attachment::Mod*)LookupFormByID(newModFormID);
+		if (!recoveredStateMod)
+			continue;
+		recoveredStateMods.push_back(recoveredStateMod);
+	}
+	return new ExtraWeaponState::WeaponState(this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, recoveredAmmo, &recoveredBCRammoVector, &recoveredStateMods);
 }
 
 bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, UInt32 version)
@@ -208,7 +242,10 @@ bool StoredExtraWeaponState::Recover(const F4SESerializationInterface* intfc, UI
 {
 	ExtraRank* holder = MSF_MainData::weaponStateStore.GetForLoad(this->ID);
 	if (!holder)
+	{
+		_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found", this->ID);
 		return false;
+	}
 	ExtraWeaponState* recoveredExtraWeaponState = new ExtraWeaponState(holder);
 	_DEBUG("Loading ExtraRank %p, %08X", holder, holder->rank);
 	UInt32 idx = 0;

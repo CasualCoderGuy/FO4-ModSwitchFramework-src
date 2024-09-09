@@ -58,6 +58,7 @@ public:
 		UInt32 loadedAmmo;
 		UInt32 chamberedAmmo;
 		std::vector<UInt32> BCRammo;
+		std::vector<UInt32> stateMods;
 		//StoredAmmoMod switchToAmmoAfterFire;
 		//StoredAmmoMod currentSwitchedAmmo;
 		//std::vector<ModData::Mod*> attachedMods; //maybe later

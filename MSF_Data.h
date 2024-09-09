@@ -65,7 +65,7 @@ public:
 			bStandaloneAttach = 0x0001,
 			bStandaloneRemove = 0x0002,
 			bHasSecondaryAmmo = 0x0004,
-			bHasSecondaryChamber = 0x0008,
+			bHasUniqueState = 0x0008,
 			bRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
@@ -128,6 +128,12 @@ public:
 	UInt16 flags;
 	UInt32 mod;
 };
+
+//class UniqueState
+//{
+//public:
+//	std::vector<KeywordValue> uniqueStateAPs;
+//};
 
 class ModCompatibilityEdits
 {
@@ -497,6 +503,8 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 	static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> modChamberMap;
+	//static std::unordered_map<BGSMod::Attachment::Mod*, UniqueState> modUniqueStateMap;
+	//static std::unordered_map<TESObjectWEAP*, UniqueState> weapUniqueStateMap;
 	static std::vector<KeywordValue> uniqueStateAPValues;
 
 	//Mandatory Data, filled during mod initialization
@@ -508,11 +516,18 @@ public:
 	static BGSKeyword* hasSwitchedAmmoKW;
 	static BGSKeyword* hasUniqueStateKW;
 	static BGSKeyword* tacticalReloadKW;
+	static ActorValueInfo* BCR_AVIF;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
 	static BGSKeyword* FiringModBurstKW;
 	static BGSKeyword* FiringModeUnderbarrelKW;
+	static BGSKeyword* BallisticWeaponKW;
+	static BGSKeyword* MineKW;
+	static BGSKeyword* GrenadeKW;
+	static BGSKeyword* UnarmedKW;
+	static BGSKeyword* Melee1HKW;
+	static BGSKeyword* Melee2HKW;
 	static TESIdleForm* reloadIdle1stP;
 	static TESIdleForm* reloadIdle3rdP;
 	static TESIdleForm* fireIdle1stP; //single
@@ -583,10 +598,14 @@ namespace MSF_Data
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
-	bool GetChamberData(BGSObjectInstanceExtra* mods, UInt16* chamberSize, UInt16* flags);
+	bool GetChamberData(BGSObjectInstanceExtra* mods, TESObjectWEAP::InstanceData* weapInstance, UInt16* chamberSize, UInt16* flags);
+	bool GetAttachedChildren(BGSObjectInstanceExtra* mods, BGSMod::Attachment::Mod* parent, std::vector<BGSMod::Attachment::Mod*>* children, bool checkIF);
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);
+	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance);
+	bool WeaponHasBCRSupport(TESObjectWEAP* weapon);
+	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance);
 	std::string GetFMString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetScopeString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetMuzzleString(TESObjectWEAP::InstanceData* instanceData);

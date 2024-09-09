@@ -23,11 +23,18 @@ BGSKeyword* MSF_MainData::baseModCompatibilityKW;
 BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
 BGSKeyword* MSF_MainData::hasUniqueStateKW;
 BGSKeyword* MSF_MainData::tacticalReloadKW = nullptr;
+ActorValueInfo* MSF_MainData::BCR_AVIF;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
 BGSKeyword* MSF_MainData::FiringModBurstKW;
 BGSKeyword* MSF_MainData::FiringModeUnderbarrelKW;
+BGSKeyword* MSF_MainData::BallisticWeaponKW;
+BGSKeyword* MSF_MainData::MineKW;
+BGSKeyword* MSF_MainData::GrenadeKW;
+BGSKeyword* MSF_MainData::UnarmedKW;
+BGSKeyword* MSF_MainData::Melee1HKW;
+BGSKeyword* MSF_MainData::Melee2HKW;
 TESIdleForm* MSF_MainData::reloadIdle1stP;
 TESIdleForm* MSF_MainData::reloadIdle3rdP;
 TESIdleForm* MSF_MainData::fireIdle1stP;
@@ -133,6 +140,12 @@ namespace MSF_Data
 
 		MSF_MainData::NullMuzzleMod = (BGSMod::Attachment::Mod*)LookupFormByID((UInt32)0x004F21D);
 		MSF_MainData::CanHaveNullMuzzleKW = (BGSKeyword*)LookupFormByID((UInt32)0x01C9E78);
+		MSF_MainData::BallisticWeaponKW = (BGSKeyword*)LookupFormByID((UInt32)0x0092A86);
+		MSF_MainData::MineKW = (BGSKeyword*)LookupFormByID((UInt32)0x010C414);
+		MSF_MainData::GrenadeKW = (BGSKeyword*)LookupFormByID((UInt32)0x010C415);
+		MSF_MainData::UnarmedKW = (BGSKeyword*)LookupFormByID((UInt32)0x0226453);
+		MSF_MainData::Melee1HKW = (BGSKeyword*)LookupFormByID((UInt32)0x004A0A4);
+		MSF_MainData::Melee2HKW = (BGSKeyword*)LookupFormByID((UInt32)0x004A0A5);
 		MSF_MainData::FiringModBurstKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000024);
 		MSF_MainData::FiringModeUnderbarrelKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000021);
 		MSF_MainData::hasUniqueStateKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000001);
@@ -146,6 +159,7 @@ namespace MSF_Data
 		MSF_MainData::ActionDraw = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x00132AF));
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
 		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
+		MSF_MainData::BCR_AVIF = reinterpret_cast<ActorValueInfo*>(LookupFormByID((UInt32)0x0000300)); 
 
 		UInt8 tacticalReloadModIndex = (*g_dataHandler)->GetLoadedModIndex("TacticalReload.esm");
 		if (tacticalReloadModIndex != 0xFF)
@@ -967,29 +981,6 @@ namespace MSF_Data
 					}
 				}
 
-				data1 = json["uniqueStateAPs"];
-				if (data1.isArray())
-				{
-					for (int i = 0; i < data1.size(); i++)
-					{
-						//const Json::Value& dataN = data1[i];
-						//std::string pluginName = dataN["pluginName"].asString();
-						std::string kwIdentifier = data1[i].asString();
-						if (kwIdentifier == "")
-							continue;
-						BGSKeyword* ifKW = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(kwIdentifier), TESForm, BGSKeyword);
-						KeywordValue value = Utilities::GetInstantiationValueForTypedKeyword(ifKW);
-						if (!ifKW || value < 0)
-						{
-							_MESSAGE("Data error in %s: attach parent keyword '%s' or its value could not be found in loaded game data", fileName.c_str(), kwIdentifier.c_str());
-							continue;
-						}
-						auto stateIt = std::find(MSF_MainData::uniqueStateAPValues.begin(), MSF_MainData::uniqueStateAPValues.end(), value);
-						if (stateIt == MSF_MainData::uniqueStateAPValues.end())
-							MSF_MainData::uniqueStateAPValues.push_back(value);
-					}
-				}
-
 				data1 = json["ammoData"];
 				if (data1.isArray())
 				{
@@ -1250,7 +1241,7 @@ namespace MSF_Data
 											}
 										
 											UInt16 modflags = switchmod["modFlags"].asInt();
-											float spawnChance = modCycle["spawnChance"].asFloat();
+											float spawnChance = switchmod["spawnChance"].asFloat();
 											KeywordValue animFlavor = 0;
 											str = switchmod["animFlavor"].asString();
 											if (str != "")
@@ -1277,7 +1268,6 @@ namespace MSF_Data
 											str = switchmod["animIdle_3rdP_PA"].asString();
 											if (str != "")
 												animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
-
 											ModData::Mod* modDataMod = new ModData::Mod();
 											modDataMod->mod = mod; 
 											modDataMod->flags = modflags;
@@ -1321,13 +1311,13 @@ namespace MSF_Data
 					}
 				}
 
-				data1 = json["chamberSize"];
+				data1 = json["chamberData"];
 				if (data1.isArray())
 				{
 					for (int i = 0; i < data1.size(); i++)
 					{
 						const Json::Value& chamberSize = data1[i];
-						std::string str = chamberSize["weapon"].asString();
+						std::string str = chamberSize["mod"].asString();
 						if (str == "")
 							continue;
 						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
@@ -1627,7 +1617,7 @@ namespace MSF_Data
 		if (num < 0)
 			return nullptr;
 		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
-		TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+		TESObjectWEAP* baseWeapon = Utilities::GetEquippedGun(*g_player);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 		if (!baseAmmo)
 			return nullptr;
@@ -1984,10 +1974,11 @@ namespace MSF_Data
 		return ammoConverted;
 	}
 
-	bool GetChamberData(BGSObjectInstanceExtra* mods, UInt16* chamberSize, UInt16* flags)
+	bool GetChamberData(BGSObjectInstanceExtra* mods, TESObjectWEAP::InstanceData* weapInstance, UInt16* chamberSize, UInt16* flags)
 	{
 		return true;
-		if (!mods || !chamberSize || !flags)
+
+		if (!mods || !weapInstance || !weapInstance->ammo || !chamberSize || !flags)
 			return false;
 		auto data = mods->data;
 		if (!data || !data->forms)
@@ -2007,9 +1998,60 @@ namespace MSF_Data
 			priority = currPriority;
 		}
 		if (!currChamberData)
-			return false;
-		*chamberSize = currChamberData->chamberSize;
+		{
+			if (Utilities::WeaponInstanceHasKeyword(weapInstance, MSF_MainData::BallisticWeaponKW))
+				*chamberSize = 1;
+			else
+				*chamberSize = 0;
+			return true;
+		}
+		if (currChamberData->chamberSize == -1)
+			*chamberSize = weapInstance->ammoCapacity;
+		else
+			*chamberSize = currChamberData->chamberSize;
 		*flags = (*flags & ~ExtraWeaponState::WeaponState::mChamberMask) | currChamberData->flags;
+		return true;
+	}
+
+	bool GetAttachedChildren(BGSObjectInstanceExtra* mods, BGSMod::Attachment::Mod* parent, std::vector<BGSMod::Attachment::Mod*>* children, bool checkIF)
+	{
+		if (!children || !mods || !parent)
+			return false;
+		AttachParentArray* attachParentArray = reinterpret_cast<AttachParentArray*>(&parent->unk98);
+		KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&parent->unkB0);
+		for (UInt32 idx = 0; idx < attachParentArray->kewordValueArray.count; idx++)
+		{
+			KeywordValue ap = attachParentArray->kewordValueArray[idx];
+			BGSMod::Attachment::Mod* child = Utilities::GetModAtAttachPoint(mods, ap);
+			if (checkIF)
+			{
+				auto range = MSF_MainData::instantiationRequirements.equal_range(child);
+				auto it = range.first;
+				if (it != range.second)
+				{
+					for (it; it != range.second; ++it)
+					{
+						if (instantiationData->GetItemIndex(it->second) >= 0)
+						{
+							//_DEBUG("parentOK");
+							children->push_back(child);
+							GetAttachedChildren(mods, child, children, checkIF);
+							break;
+						}
+					}
+				}
+				else
+				{
+					children->push_back(child);
+					GetAttachedChildren(mods, child, children, checkIF);
+				}
+			}
+			else
+			{
+				children->push_back(child);
+				GetAttachedChildren(mods, child, children, checkIF);
+			}
+		}
 		return true;
 	}
 
@@ -2137,6 +2179,21 @@ namespace MSF_Data
 		else if (state == 8)
 			return MSF_MainData::fireIdle3rdP;
 		return nullptr;
+	}
+
+	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance)
+	{
+		return instance->skill == MSF_MainData::BCR_AVIF;
+	}
+
+	bool WeaponHasBCRSupport(TESObjectWEAP* weapon)
+	{
+		return weapon->weapData.skill == MSF_MainData::BCR_AVIF;
+	}
+
+	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance)
+	{
+		return Utilities::WeaponInstanceHasKeyword(instance, MSF_MainData::tacticalReloadKW);
 	}
 
 	//================= Interface Data ==================

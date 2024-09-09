@@ -274,7 +274,21 @@ namespace Utilities
 		return nullptr;
 	}
 
-	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor)
+	BGSObjectInstanceExtra* GetEquippedWeaponModData(Actor* ownerActor)
+	{
+		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedWeaponStack(ownerActor);
+		if (!eqStack)
+			return nullptr;
+		ExtraDataList* dataList = eqStack->extraData;
+		if (!dataList)
+			return nullptr;
+		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
+		if (!extraMods)
+			return nullptr;
+		return DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
+	}
+
+	TESObjectWEAP* GetEquippedGun(Actor* ownerActor)
 	{
 		if (ownerActor)
 		{
@@ -287,6 +301,47 @@ namespace Utilities
 			return DYNAMIC_CAST(item, TESForm, TESObjectWEAP);
 		}
 		return nullptr;
+	}
+
+	TESObjectWEAP* GetEquippedWeapon(Actor* ownerActor)
+	{
+		//if (!ownerActor || !ownerActor->middleProcess || !ownerActor->middleProcess->unk08 || !ownerActor->middleProcess->unk08->equipData.entries)
+		//	return nullptr;
+		BipedAnim* equipData = ownerActor->biped.get();
+		if (!equipData)
+			return nullptr;
+		auto item = equipData->object[41].parent.object;
+		if (!item)
+		{
+			item = equipData->object[33].parent.object;
+			if (!item)
+			{
+				item = equipData->object[37].parent.object;
+				if (!item)
+					item = equipData->object[32].parent.object;
+			}
+		}
+		if (!item)
+			return nullptr;
+		return DYNAMIC_CAST(item, TESForm, TESObjectWEAP);
+	}
+
+	UInt8 GetEquippedWeaponSlotIndex(Actor* ownerActor)
+	{
+		UInt8 idx = -1;
+		BipedAnim* equipData = ownerActor->biped.get();
+		if (!equipData)
+			return idx;
+		if (equipData->object[41].parent.object)
+			return 41;
+		else if (equipData->object[33].parent.object)
+			return 33;
+		else if (equipData->object[37].parent.object)
+			return 37;
+		else if (equipData->object[32].parent.object)
+			return 32;
+		else
+			return idx;
 	}
 
 	UInt32 GetEquippedItemFormID(Actor * owner, UInt32 slotIndex)
@@ -343,6 +398,35 @@ namespace Utilities
 		return eqStack;
 	}
 
+	BGSInventoryItem::Stack* GetEquippedWeaponStack(Actor* owner)
+	{
+		BGSInventoryItem::Stack* eqStack = nullptr;
+		auto item = Utilities::GetEquippedWeapon(owner);
+		if (!item)
+			return nullptr;
+		if (!owner->inventoryList)
+			return nullptr;
+		for (UInt32 i = 0; i < owner->inventoryList->items.count; i++)
+		{
+			BGSInventoryItem inventoryItem;
+			owner->inventoryList->items.GetNthItem(i, inventoryItem);
+			if (inventoryItem.form != item || !inventoryItem.stack)
+				continue;
+			bool ret = inventoryItem.stack->Visit([&](BGSInventoryItem::Stack* stack)
+				{
+					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped)
+					{
+						eqStack = stack;
+						return false;
+					}
+					return true;
+				});
+			if (!ret)
+				break;
+		}
+		return eqStack;
+	}
+
 	UInt32 GetStackID(BGSInventoryItem* item, BGSInventoryItem::Stack* stack) //equipped stack ID should always be 0 but check nevertheless
 	{
 		UInt32 IDcount = 0;
@@ -352,7 +436,7 @@ namespace Utilities
 				return IDcount;
 			IDcount++;
 		}
-		return 0;
+		return -1;
 	}
 
 	BGSInventoryItem::Stack* GetStack(BGSInventoryItem* item, UInt32 stackID)
@@ -367,6 +451,21 @@ namespace Utilities
 			IDcount++;
 		}
 		return nullptr;
+	}
+
+	BGSInventoryItem::Stack* GetStackFromItem(TESObjectREFR* owner, TESForm* item, UInt32 stackID)
+	{
+		if (!item || !owner)
+			return false;
+		if (!owner->inventoryList)
+			return false;
+		BGSInventoryItem inventoryItem;
+		for (UInt32 i = 0; i < owner->inventoryList->items.count; i++)
+		{
+			owner->inventoryList->items.GetNthItem(i, inventoryItem);
+			if (inventoryItem.form == item && inventoryItem.stack)
+				return GetStack(&inventoryItem, stackID);
+		}
 	}
 
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item)
@@ -509,6 +608,33 @@ namespace Utilities
 		return true;
 	}
 
+	BGSMod::Attachment::Mod* GetParentMod(BGSObjectInstanceExtra* modData, BGSMod::Attachment::Mod* mod)
+	{
+		BGSMod::Attachment::Mod* parentMod = nullptr;
+		if (!modData || !mod)
+			return parentMod;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return parentMod;
+		UInt64 priority = 0;
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod || objectMod == mod)
+				continue;
+			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
+			if (currPriority < priority)
+				continue;
+			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
+			if (attachPoints->kewordValueArray.GetItemIndex(mod->unkC0) >= 0)
+			{
+				parentMod = objectMod;
+				priority = currPriority;
+			}
+		}
+		return parentMod;
+	}
+
 	KeywordValue GetAttachValueForTypedKeyword(BGSKeyword* keyword)
 	{
 		if (!keyword)
@@ -594,10 +720,15 @@ namespace Utilities
 		if (!data || !data->forms)
 			return false;
 		instantiationValues->clear();
+		UInt64 priority = 0;
+		KeywordValueArray* instantiationData = nullptr;
 		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 			if (!objectMod)
+				continue;
+			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
+			if (currPriority < priority)
 				continue;
 			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
 			for (UInt32 i = 0; i < attachPoints->kewordValueArray.count; i++)
@@ -606,13 +737,16 @@ namespace Utilities
 				KeywordValue value = attachPoints->kewordValueArray[i];
 				if (value == parentValue)
 				{
-					KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&objectMod->unkB0);
+					instantiationData = reinterpret_cast<KeywordValueArray*>(&objectMod->unkB0);
 					//_DEBUG("if count: %i", instantiationData->count);
-					for (UInt32 i = 0; i < instantiationData->count; i++)
-						instantiationValues->push_back((*instantiationData)[i]);
-					break;
+					priority = currPriority;
 				}
 			}
+		}
+		if (instantiationData)
+		{
+			for (UInt32 i = 0; i < instantiationData->count; i++)
+				instantiationValues->push_back((*instantiationData)[i]);
 		}
 		//_DEBUG("if counts: %i", instantiationValues->size());
 		return true;

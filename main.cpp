@@ -87,7 +87,6 @@ public:
 		if (MSF_MainData::IsInitialized)
 		{
 			MSF_MainData::modSwitchManager.Reset();
-			MSF_MainData::modSwitchManager.SetCurrentWeapon(Utilities::GetEquippedInstanceData(*g_player, 41));
 
 			_MESSAGE("Registering MSF menus.");
 			MSFWidgetMenu::RegisterMenu();

@@ -93,9 +93,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
 				//Utilities::PlayIdle(*g_player, sw);
 
-				MSF_Test::ExtraDataTest();
+				//MSF_Test::ExtraDataTest();
 				//MSF_Test::TestIdle(true);
-				_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
+				//_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
+
+				MSF_Test::ArmorAttachTest();
 
 				_DEBUG("test1");
 			}
@@ -114,7 +116,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
 				//MSF_Test::TestIdle(false);
-
+				MSF_Test::DumpActorAnimData();
 				_DEBUG("test2");
 			}
 		}
@@ -131,7 +133,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::ListExtraData();
 				//MSF_Test::SplitStackTest(13, false);
 				//Utilities::FireWeapon(*g_player, 1);
-
+				//MSF_Test::DumpActorAnimData();
+				MSF_Test::DumpEquippedWeaponIdx();
 				_DEBUG("test3");
 			}
 		}
@@ -576,7 +579,7 @@ namespace MSF_Scaleform
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bAmmoRequireWeaponToBeDrawn) && !(*g_player)->actorState.IsWeaponDrawn())
 			return false;
 		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
-		TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+		TESObjectWEAP* baseWeapon = Utilities::GetEquippedGun(*g_player);
 		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 		menuRoot->CreateArray(dst);
 		if (baseAmmo)
@@ -629,7 +632,8 @@ namespace MSF_Scaleform
 	{
 		if (!mods)
 			return false;
-		BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+		//BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41); 
+		BGSObjectInstanceExtra* modData = Utilities::GetEquippedWeaponModData(*g_player);
 		if (!modData)
 			return false;
 		auto data = modData->data;
@@ -754,7 +758,7 @@ namespace MSF_Scaleform
 	//	if (!menuRoot)
 	//		return false;
 	//  BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
-	//  TESObjectWEAP* baseWeapon = Utilities::GetEquippedWeapon(*g_player);
+	//  TESObjectWEAP* baseWeapon = Utilities::GetEquippedGun(*g_player);
 	//  TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
 	//	GFxValue ammoData;
 	//	menuRoot->CreateArray(&ammoData);

@@ -23,6 +23,8 @@ public:
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	static bool HandleWeaponStateEvents(UInt8 eventType, Actor* actor = nullptr);
 	static TESAmmo* GetAmmoForWorkbenchUI(ExtraDataList* extraList);
+	//static auto GetCurrentUniqueState(BGSObjectInstanceExtra* attachedMods);
+	static ModData::Mod* ExtraWeaponState::GetCurrentUniqueStateMod(BGSObjectInstanceExtra* attachedMods);
 	static ModData::Mod defaultStatePlaceholder;
 	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
 	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
@@ -31,8 +33,8 @@ public:
 	bool HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleAmmoChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
-	bool HandleModChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData); //update burst manager
-	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData, TESAmmo* newAmmo = nullptr);
+	static bool HandleModChangeEvent(ExtraDataList* extraDataList, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify, UInt8 eventType); //update burst manager
+	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify = nullptr);
 	TESAmmo* GetCurrentAmmo();
 	bool SetCurrentAmmo(TESAmmo* ammo);
 	void PrintStoredData();
@@ -41,18 +43,25 @@ public:
 	{
 		kEventTypeUndefined,
 		kEventTypeEquip,
-		KEventTypeAmmoCount,
-		KEventTypeFireWeapon,
-		KEventTypeReload,
-		KEventTypeModded //WB vs switch?
+		kEventTypeAmmoCount,
+		kEventTypeFireWeapon,
+		kEventTypeReload,
+		kEventTypeModded,
+		kEventTypeModdedWorkbench,
+		kEventTypeModdedGameplay,
+		kEventTypeModdedSwitch,
+		kEventTypeModdedAmmo,
+		kEventTypeModdedNewChamber
 	};
 
 	class WeaponState
 	{
 	public:
-		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo);
-		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, ModData::Mod* currUniqueStateMod);
+		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo, std::vector<BGSMod::Attachment::Mod*>* newStateMods);
+		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData, ModData::Mod* currUniqueStateMod);
+		bool UpdateAmmoState(ExtraDataList* extraDataList, BGSObjectInstanceExtra* attachedMods, UInt8 eventType, bool stateChange, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify);
+		WeaponState* Clone();
 		enum
 		{
 			bHasLevel = 0x0001,
@@ -69,11 +78,15 @@ public:
 		volatile int loadedAmmo;
 		TESAmmo* chamberedAmmo;
 		std::vector<TESAmmo*> BCRammo; //if BCR && TR: size=ammoCap; if !BCR && TR: size=chamber; if BCR && !TR: size=ammoCap
+		std::vector<BGSMod::Attachment::Mod*> stateMods;
 		//AmmoData::AmmoMod* currentSwitchedAmmo;
 		//AmmoData::AmmoMod* switchToAmmoAfterFire;
 		//std::vector<ModData::Mod*> attachedMods; //maybe later
+	private:
+		WeaponState() {};
 	};
 	friend class StoredExtraWeaponState;
+	bool GetUniqueStateModsToModify(BGSObjectInstanceExtra* attachedMods, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify, std::pair<WeaponState*, WeaponState*>* stateChange);
 private:
 	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	WeaponStateID ID;
@@ -90,6 +103,7 @@ public:
 	{
 		mapstorage.reserve(100);
 		vectorstorage.reserve(100);
+		ranksToClear.reserve(100);
 	};
 	void Free()
 	{
@@ -97,6 +111,7 @@ public:
 			delete state;
 		vectorstorage.clear();
 		mapstorage.clear();
+		ranksToClear.clear();
 	};
 	WeaponStateID Add(ExtraWeaponState* state)
 	{
@@ -124,13 +139,27 @@ public:
 	{
 		if (!holder || id == 0)
 			return false;
-		ExtraRank* occupied = mapstorage[id];
-		if (!occupied)
+		auto itMap = mapstorage.find(id);
+		auto itClear = ranksToClear.find(id);
+		if (itMap == mapstorage.end() && itClear == ranksToClear.end())
 			mapstorage[id] = holder;
+		else
+		{
+			_MESSAGE("WARNING: duplicate WeaponStateID found");
+			ranksToClear.insert(ranksToClear.begin(), std::pair<WeaponStateID, ExtraRank*>(id, holder));
+			ranksToClear.insert(ranksToClear.begin(), std::pair<WeaponStateID, ExtraRank*>(id, itMap->second));
+			mapstorage.erase(itMap);
+			return false;
+		}
+		//ExtraRank* occupied = mapstorage[id];
+		//if (!occupied)
+		//	mapstorage[id] = holder;
 		return true;
 	};
 	ExtraRank* GetForLoad(WeaponStateID id)
 	{
+		if (id == 0)
+			return nullptr;
 		ExtraRank* holder = mapstorage[id];
 		if (holder && holder->rank != id)
 		{
@@ -150,6 +179,31 @@ public:
 			if (state)
 				f_callback(intfc, version, state);
 		}
+	};
+	void InvalidateID(WeaponStateID id)
+	{
+		if (id == 0)
+			return;
+		auto itMap = mapstorage.find(id);
+		if (itMap == mapstorage.end())
+			return;
+		ranksToClear.insert(ranksToClear.begin(), std::pair<WeaponStateID, ExtraRank*>(itMap->first, itMap->second));
+		mapstorage.erase(itMap);
+	};
+	void InvalidateAllIDs()
+	{
+		ranksToClear.insert(mapstorage.begin(), mapstorage.end());
+		mapstorage.clear();
+	};
+	bool ClearInvalidWeaponStates()
+	{
+		for (auto holder : ranksToClear)
+		{
+			_DEBUG("invalid: %08X %p", holder.first, holder.second);
+			holder.second->rank = 0;
+		}
+		ranksToClear.clear();
+		return true;
 	};
 	void PrintStoredWeaponStates()
 	{
@@ -193,5 +247,6 @@ public:
 	};
 private:
 	std::unordered_map<WeaponStateID, ExtraRank*> mapstorage; //used only for the loading of f4se serialized data, WeaponStateID is invalid afterwards
+	std::unordered_multimap<WeaponStateID, ExtraRank*> ranksToClear;
 	std::vector<ExtraWeaponState*> vectorstorage; // used for quick access of WeaponState with ExtraRank->rank (WeaponStateID) being the vector index +1
 };
