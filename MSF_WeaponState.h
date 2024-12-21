@@ -1,6 +1,7 @@
 #pragma once
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
+#include "rva\ModuleRelocation.h"
 //#include "MSF_Serialization.h"
 
 
@@ -21,7 +22,7 @@ public:
 	~ExtraWeaponState();
 	ExtraWeaponState(ExtraRank* holder);
 	static ExtraWeaponState* Init(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	static bool HandleWeaponStateEvents(UInt8 eventType, Actor* actor = nullptr);
+	static bool HandleWeaponStateEvents(UInt8 eventType, Actor* actor = nullptr, UInt8 eventSubtype = 0, UInt32 oldLoadedAmmoCount = 0);
 	static TESAmmo* GetAmmoForWorkbenchUI(ExtraDataList* extraList);
 	//static auto GetCurrentUniqueState(BGSObjectInstanceExtra* attachedMods);
 	static ModData::Mod* ExtraWeaponState::GetCurrentUniqueStateMod(BGSObjectInstanceExtra* attachedMods);
@@ -32,11 +33,13 @@ public:
 	bool HandleEquipEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleFireEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
 	bool HandleAmmoChangeEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData);
-	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType);
+	bool HandleReloadEvent(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType, UInt32 oldLoadedAmmoCount);
 	static bool HandleModChangeEvent(ExtraDataList* extraDataList, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify, UInt8 eventType); //update burst manager
 	bool UpdateWeaponStates(ExtraDataList* extraDataList, EquipWeaponData* equipData, UInt8 eventType, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify = nullptr);
 	TESAmmo* GetCurrentAmmo();
 	bool SetCurrentAmmo(TESAmmo* ammo);
+	bool SetEquippedAmmo(TESAmmo* ammo);
+	TESAmmo* GetEquippedAmmo();
 	void PrintStoredData();
 
 	enum
@@ -51,14 +54,27 @@ public:
 		kEventTypeModdedGameplay,
 		kEventTypeModdedSwitch,
 		kEventTypeModdedAmmo,
-		kEventTypeModdedNewChamber
+		kEventTypeModdedNewChamber,
+
+		bEventTypeReloadBCR,
+		bEventTypeReloadFullBCR,
+		bEventTypeReloadEndBCR,
+		bEventTypeReloadTactical
 	};
+	struct AmmoStateData
+	{
+		UInt16 ammoCapacity;
+		UInt16 chamberSize; //if -1: equals to ammoCapacity
+		UInt32 loadedAmmo;
+		UInt32 chamberedCount;
+	};
+	AmmoStateData* GetAmmoStateData();
 
 	class WeaponState
 	{
 	public:
 		WeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, ModData::Mod* currUniqueStateMod);
-		WeaponState(UInt16 flags, UInt16 ammoCapacity, UInt16 chamberSize, UInt16 shotCount, UInt64 loadedAmmo, TESAmmo* chamberedAmmo, std::vector<TESAmmo*>* BCRammo, std::vector<BGSMod::Attachment::Mod*>* newStateMods);
+		WeaponState(UInt16 newflags, UInt16 newammoCapacity, UInt16 newchamberSize, UInt32 newchamberedCount, UInt16 newshotCount, UInt64 newloadedAmmo, TESAmmo* newchamberedAmmo, TESAmmo* newequippedAmmo, std::vector<TESAmmo*>* newBCRammo, std::vector<BGSMod::Attachment::Mod*>* newStateMods);
 		bool FillData(ExtraDataList* extraDataList, EquipWeaponData* equipData, ModData::Mod* currUniqueStateMod);
 		bool UpdateAmmoState(ExtraDataList* extraDataList, BGSObjectInstanceExtra* attachedMods, UInt8 eventType, bool stateChange, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify);
 		WeaponState* Clone();
@@ -76,12 +92,11 @@ public:
 		UInt16 chamberSize; //if -1: equals to ammoCapacity
 		volatile short shotCount; 
 		volatile int loadedAmmo;
+		volatile int chamberedCount;
 		TESAmmo* chamberedAmmo;
+		TESAmmo* equippedAmmo;
 		std::vector<TESAmmo*> BCRammo; //if BCR && TR: size=ammoCap; if !BCR && TR: size=chamber; if BCR && !TR: size=ammoCap
 		std::vector<BGSMod::Attachment::Mod*> stateMods;
-		//AmmoData::AmmoMod* currentSwitchedAmmo;
-		//AmmoData::AmmoMod* switchToAmmoAfterFire;
-		//std::vector<ModData::Mod*> attachedMods; //maybe later
 	private:
 		WeaponState() {};
 	};
@@ -134,6 +149,22 @@ public:
 		if (state)// && state->ValidateParent())
 			return state;
 		return nullptr;
+	};
+	ExtraWeaponState* GetEquipped(Actor* owner)
+	{
+		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedWeaponStack(owner);
+		if (!eqStack)
+			return nullptr;
+		ExtraDataList* dataList = eqStack->extraData;
+		if (!dataList)
+			return nullptr;
+		ExtraRank* holder = (ExtraRank*)dataList->GetByType(kExtraData_Rank);
+		if (!holder)
+			return nullptr;
+		ExtraWeaponState* state = nullptr;
+		if (holder->rank && holder->rank <= vectorstorage.size())
+			state = vectorstorage[holder->rank - 1];
+		return state;
 	};
 	bool StoreForLoad(WeaponStateID id, ExtraRank* holder)
 	{
@@ -249,4 +280,28 @@ private:
 	std::unordered_map<WeaponStateID, ExtraRank*> mapstorage; //used only for the loading of f4se serialized data, WeaponStateID is invalid afterwards
 	std::unordered_multimap<WeaponStateID, ExtraRank*> ranksToClear;
 	std::vector<ExtraWeaponState*> vectorstorage; // used for quick access of WeaponState with ExtraRank->rank (WeaponStateID) being the vector index +1
+};
+
+class BCRinterface
+{
+public:
+	BCRinterface()
+	{
+		_base = reinterpret_cast<uintptr_t>(GetModuleHandle("BulletCountedReload.dll"));
+		if (_base)
+			_MESSAGE("BulletCountedReload.dll found at %p", _base);
+		else
+			_MESSAGE("BulletCountedReload.dll not found");
+		//73004
+		//730B8
+		BCR_ammoCount = RelocModuleAddr<UInt32>(_base, 0x79B24);
+		BCR_ammoCapacity = RelocModuleAddr<UInt32>(_base, 0x79B20);
+	};
+private:
+	uintptr_t _base;
+	RelocModuleAddr<UInt32> BCR_ammoCount;
+	RelocModuleAddr<UInt32> BCR_ammoCapacity;
+public:
+
+
 };

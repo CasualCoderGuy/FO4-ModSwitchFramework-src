@@ -20,6 +20,16 @@
 #include  <sstream>
 #include <algorithm>
 
+template<typename ... Args>
+std::string string_format(const std::string& format, Args ... args)
+{
+	int size_s = std::snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
+	if (size_s <= 0) { return ""; }
+	auto size = static_cast<size_t>(size_s);
+	std::unique_ptr<char[]> buf(new char[size]);
+	std::snprintf(buf.get(), size, format.c_str(), args ...);
+	return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+}
 
 UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
@@ -277,6 +287,13 @@ public:
 STATIC_ASSERT(sizeof(ApplyChangesFunctor) == 0x30);
 STATIC_ASSERT(offsetof(ApplyChangesFunctor, remove) == 0x29);
 
+class BGSEquipIndex
+{
+public:
+	std::uint32_t index;  // 0
+};
+STATIC_ASSERT(sizeof(BGSEquipIndex) == 0x4);
+
 class ExtraEnchantment : public BSExtraData
 {
 public:
@@ -339,6 +356,18 @@ struct unkEquipSlotStruct
 	BGSEquipSlot* equipSlot;
 	UInt64 unk10; //=0
 	UInt64 unk18; //=0x10001 or 0x10000
+};
+
+class RemoveItemData
+{
+public:
+
+};
+
+class RemoveItemData2
+{
+public:
+
 };
 
 template <typename T> class TypedKeywordValueArray
@@ -506,6 +535,7 @@ namespace Utilities
 	const char* GetIdentifierFromForm(TESForm* form);
 	bool AddToFormList(BGSListForm* flst, TESForm* form, SInt64 idx);
 	UInt32 GetEquippedItemFormID(Actor * ownerActor, UInt32 iEquipSlot = 41);
+	UInt32 GetLoadedAmmoCount(Actor* owner);
 	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedWeaponModData(Actor* ownerActor);
@@ -665,11 +695,15 @@ typedef bool(*_HasPerkInternal)(Actor* actor, BGSPerk* perk);
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
 typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent);
 typedef void(*_RemoveItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent, TESObjectREFR* toContainer);
+typedef ObjectRefHandle(*_RemoveItem_Virtual)(TESObjectREFR* ref, RemoveItemData& a_data, RemoveItemData2& a_data2);    // 6D, ObjREF
 typedef void(*_SetAnimationVariableBool)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
 typedef bool(*_PlayIdle)(VirtualMachine* vm, UInt32 stackId, Actor* actor, TESIdleForm* idle);
 typedef bool(*_PlayIdle2)(Actor* actor, TESIdleForm* idle, UInt64 unk, VirtualMachine* vm, UInt32 stackId);
 typedef bool(*_PlayIdleAction)(Actor* actor, BGSAction* action, TESObjectREFR* target, VirtualMachine* vm, UInt32 stackId);
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
+typedef bool(*_InitializeActorInstant)(Actor* actor, UInt32 edx);
+typedef void(*_UpdateAnimation)(PlayerCharacter* player, float delta);
+typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ChangeAnimArchetype)(Actor* target, BGSKeyword* archetypeKW);
 typedef void(*_ChangeAnimFlavor)(Actor* target, BGSKeyword* flavorKW);
 typedef void(*_CheckKeywordType)(BGSKeyword* keyword, UInt32 type); //7: AnimArchetype; 13: AnimFlavor
@@ -679,6 +713,7 @@ typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex);                                                                                        // 0EF E9BE00
 typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex, UInt32 a_shotCount);                                                         // 0F0 EFCE90
+typedef void(*_EjectShellCasing)(TESObjectREFR* ref, TESObjectWEAP::InstanceData* instanceData, BGSEquipIndex eqIdx);
 typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
@@ -707,6 +742,8 @@ extern RelocAddr <_PlayIdle> PlayIdleInternal; //0x13863A0
 extern RelocAddr <_PlayIdle2> PlayIdleInternal2;
 extern RelocAddr <_PlayIdleAction> PlayIdleActionInternal; //0x13864A0 
 extern RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal; //0x138A130
+extern RelocAddr <_InitializeActorInstant> InitializeActorInstant;
+extern RelocAddr <_UpdateAnimation> UpdateAnimation;
 extern RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype; //1387C10(vm*,0,actor*,kw*)
 extern RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor; //1387CA0(vm*,0,actor*,kw*)
 extern RelocAddr <_CheckKeywordType> CheckKeywordType;
@@ -714,6 +751,7 @@ extern RelocAddr <_IsInIronSights> IsInIronSights;
 extern RelocAddr <_IsInPowerArmor> IsInPowerArmor;
 extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
 extern RelocAddr <_UseAmmo> FireWeaponInternal;
+extern RelocAddr <_EjectShellCasing> EjectShellCasing;
 extern RelocAddr <_ReloadWeapon> ReloadWeaponInternal;
 extern RelocAddr <_ShowNotification> ShowNotification;
 extern RelocAddr <_GetKeywordFromValueArray> GetKeywordFromValueArray;

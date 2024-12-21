@@ -1,4 +1,11 @@
 ---
+v1.0.0
+features:
+- optional BCR and TR support mode 
+- added custom mod switch animation compatibility setting (for behavior file incompatibilities); if this is turned on in the MCM, the mod change will happen at the end of the animation instead of after the "switchMod" event (Note: this can cause the mod to not be switched even if the custom animation sent the "switchMod" event before it was interrupted)
+fixes:
+- the animations called with PlayIdle will not play WPNEquipFast 
+---
 v0.1.1
 features:
 - added OMOD storage for Weapon States (bHasUniqueState)

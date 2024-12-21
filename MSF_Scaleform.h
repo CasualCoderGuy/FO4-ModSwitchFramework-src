@@ -26,7 +26,217 @@ namespace MSF_Scaleform
 	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu);
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);
+	void RegisterString(GFxValue* dst, GFxMovieRoot* root, const char* name, const char* str);
+	void RegisterObject(GFxValue* dst, GFxMovieRoot* root, const char* name, void* obj);
+	void RegisterBool(GFxValue* dst, GFxMovieRoot* root, const char* name, bool value);
+	void RegisterInt(GFxValue* dst, GFxMovieRoot* root, const char* name, SInt32 value);
 }
+
+class PipboyMenu : public IMenu
+{
+public:
+	class ScaleformArgs
+	{
+	public:
+
+		GFxValue* result;	// 00
+		GFxMovieView* movie;	// 08
+		GFxValue* thisObj;	// 10
+		GFxValue* unk18;	// 18
+		GFxValue* args;		// 20
+		UInt32			numArgs;	// 28
+		UInt32			pad2C;		// 2C
+		UInt32			optionID;	// 30 pUserData
+	};
+
+	//using FnInvoke = void(__thiscall PipboyMenu::*)(ScaleformArgs*);
+	//static FnInvoke Invoke_Original;
+
+	bool CreateItemData(PipboyMenu::ScaleformArgs* args, std::string text, std::string value);
+};
+typedef void(*_PipboyMenuInvoke)(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args);
+extern RelocAddr<_PipboyMenuInvoke> PipboyMenuInvoke_HookAddress;
+extern RelocAddr<_PipboyMenuInvoke> PipboyMenuInvoke_Original;
+extern _PipboyMenuInvoke PipboyMenuInvoke_Copied;
+void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args);
+
+
+class ItemMenuDataManager
+{
+public:
+
+	DEFINE_MEMBER_FN_1(GetSelectedForm, TESForm*, 0x1A3740, UInt32& handleID);
+	DEFINE_MEMBER_FN_1(GetSelectedItem, BGSInventoryItem*, 0x1A3650, UInt32& handleID);
+	//BGSInventoryItem
+};
+extern RelocPtr<ItemMenuDataManager*> g_itemMenuDataMgr;
+
+class PipboyDataManager
+{
+public:
+	//4B8
+	UInt64							unk00[0x4A8 >> 3];
+	tArray<PipboyObject*>			itemData;
+};
+STATIC_ASSERT(sizeof(PipboyDataManager) == 0x4C0);
+extern RelocPtr<PipboyDataManager*> g_pipboyDataMgr;
+
+class PipboyArray : public PipboyValue
+{
+public:
+	tArray<PipboyValue*> values;
+};
+
+class HUDMenuAmmoDisplay
+{
+public:
+	static HUDMenuAmmoDisplay* Init(GFxMovieRoot* root = nullptr)
+	{
+		if (!root)
+		{
+			IMenu* menu = (*g_ui)->GetMenu(BSFixedString("HUDMenu"));
+			if (!menu) { _MESSAGE("HUDMenu TextField injection failure : menu"); return nullptr; }
+			GFxMovieView* movie = menu->movie;
+			if (!movie) { _MESSAGE("HUDMenu TextField injection failure : movie"); return nullptr; }
+			root = movie->movieRoot;
+			if (!root) { _MESSAGE("HUDMenu TextField injection failure : movieRoot"); return nullptr; }
+		}
+		HUDMenuAmmoDisplay* tf = new HUDMenuAmmoDisplay(root);
+		if (tf->IsOK())
+			return tf;
+		delete tf;
+		return nullptr;
+	}
+	bool IsOK() { return textfieldOK; }
+	bool SetDisplayChamber(bool visible)
+	{
+		if (!movieRoot || !textfieldOK)
+			return false;
+		if (chamberVisible != visible)
+		{
+			chamberVisible = visible;
+			return ChamberCount_tf.SetMember("visible", &GFxValue(visible));
+		}
+		return true;
+	}
+	bool SetDisplayedAmmo(UInt32 newmag, UInt32 newchamber, UInt32 newreserve, bool hasChamber)
+	{
+		if (!movieRoot || !textfieldOK)
+			return false;
+		mag = newmag;
+		reserve = newreserve;
+		SetDisplayChamber(hasChamber && true);// (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayChamberedAmmoOnHUD));
+		if (chamber != newchamber)
+		{
+			chamber = newchamber;
+			if (!hasChamber)
+				chamber = 0;
+			snprintf(chamberText, sizeof(chamberText), formatting.c_str(), chamber);
+			ChamberCount_tf.SetMember("text", &GFxValue(chamberText));
+		}
+		return true;
+	}
+	UInt32 GetDisplayedChamberAmmo()
+	{
+		return chamber;
+	}
+private:
+	HUDMenuAmmoDisplay(GFxMovieRoot* root = nullptr)
+	{
+		textfieldOK = false;
+		movieRoot = root;
+		formatting = "+%u";
+		mag = 0; chamber = 0; reserve = 0;
+		textfieldOK = InjectTextField(&ChamberCount_tf, "ChamberCount_tf");
+		if (textfieldOK)
+		{
+			movieRoot->GetVariable(&ReserveCount_tf, "root.RightMeters_mc.AmmoCount_mc.ReserveCount_tf");
+			movieRoot->GetVariable(&ClipCount_tf, "root.RightMeters_mc.AmmoCount_mc.ClipCount_tf");
+			CopyGFxParameters(&ChamberCount_tf, &ClipCount_tf, { "x", "y", "width", "height", "defaultTextFormat"});
+			//CopyGFxParametersWithOffset(&ChamberCount_tf, &ClipCount_tf, { {"x",5}, {"y",5}, {"width",0}, {"height",0}, {"scaleX",-0.75}, {"scaleY",-0.75} }, false);
+			_MESSAGE("HUDMenu TextField injection success");
+			return;
+		}
+		_MESSAGE("HUDMenu TextField injection failed");
+	}
+	bool InjectTextField(GFxValue* textField, std::string name)
+	{
+		if (!movieRoot)
+			return false;
+		movieRoot->CreateObject(textField, "flash.text.TextField");
+		bool added = movieRoot->Invoke("root.RightMeters_mc.AmmoCount_mc.addChild", nullptr, textField, 1);
+		if (added)
+			ChamberCount_tf.SetMember("name", &GFxValue(name.c_str()));
+		return added;
+	}
+	bool CopyGFxParameters(GFxValue* target, GFxValue* source, std::vector<std::string> parameters)
+	{
+		GFxValue buf;
+		for (std::string parameter : parameters)
+		{
+			source->GetMember(parameter.c_str(), &buf);
+			target->SetMember(parameter.c_str(), &buf);
+		}
+		return true;
+	}
+
+	bool CopyGFxParametersWithOffset(GFxValue* target, GFxValue* source, std::map<std::string, float> floatParameters, bool textFormat)
+	{
+		if (textFormat)
+		{
+			GFxValue formatTarget;
+			GFxValue formatSource;
+			if (!target->GetMember("defaultTextFormat", &formatTarget))
+				return false;
+			if (!source->GetMember("defaultTextFormat", &formatSource))
+				return false;
+			target = &formatTarget;
+			source = &formatSource;
+		}
+		GFxValue buf;
+		for (auto parameter : floatParameters)
+		{
+			for (auto parameter : floatParameters)
+				source->GetMember(parameter.first.c_str(), &buf);
+			double par = buf.GetNumber() + parameter.second;
+			target->SetMember(parameter.first.c_str(), &GFxValue(par));
+		}
+		return true;
+	}
+
+	bool SetGFxParameters(GFxValue* target, std::map<std::string, float> floatParameters, std::map<std::string, std::string> stringParameters, bool textFormat)
+	{
+		if (textFormat)
+		{
+			GFxValue formatTarget;
+			if (!target->GetMember("defaultTextFormat", &formatTarget))
+				return false;
+			target = &formatTarget;
+		}
+		for (auto parameter : stringParameters)
+			target->SetMember(parameter.first.c_str(), &GFxValue(parameter.second.c_str()));
+		for (auto parameter : floatParameters)
+			target->SetMember(parameter.first.c_str(), &GFxValue(parameter.second));
+		return true;
+	}
+
+	bool textfieldOK;
+	GFxMovieRoot* movieRoot;
+	GFxValue ChamberCount_tf;
+	GFxValue ReserveCount_tf;
+	GFxValue ClipCount_tf;
+	GFxValue AmmoType_tf;
+	GFxValue FiringMode_tf;
+	GFxValue Muzzle_tf;
+	GFxValue Scope_tf;
+	GFxValue TextFormatting;
+	std::string formatting;
+	char chamberText[16];
+	UInt32 mag;
+	UInt32 chamber;
+	UInt32 reserve;
+	bool chamberVisible;
+};
 
 class MSFWidgetMenu : public GameMenuBase
 {

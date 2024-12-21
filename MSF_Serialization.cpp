@@ -86,13 +86,27 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(ExtraWeaponState::W
 	this->flags = weaponState->flags;
 	this->ammoCapacity = weaponState->ammoCapacity;
 	this->chamberSize = weaponState->chamberSize;
+	this->chamberedCount = weaponState->chamberedCount;
 	this->shotCount = weaponState->shotCount;
 	this->loadedAmmo = weaponState->loadedAmmo;
-	this->chamberedAmmo = weaponState->chamberedAmmo->formID;
+	if (weaponState->chamberedAmmo)
+		this->chamberedAmmo = weaponState->chamberedAmmo->formID;
+	else
+		this->chamberedAmmo = 0;
+	if (weaponState->equippedAmmo)
+		this->equippedAmmo = weaponState->equippedAmmo->formID;
+	else
+		this->equippedAmmo = 0;
 	for (auto itAmmo = weaponState->BCRammo.begin(); itAmmo != weaponState->BCRammo.end(); itAmmo++)
-		this->BCRammo.push_back((*itAmmo)->formID);
+	{
+		if (*itAmmo)
+			this->BCRammo.push_back((*itAmmo)->formID);
+	}
 	for (auto itMod = weaponState->stateMods.begin(); itMod != weaponState->stateMods.end(); itMod++)
-		this->stateMods.push_back((*itMod)->formID);
+	{
+		if (*itMod)
+			this->stateMods.push_back((*itMod)->formID);
+	}
 }
 
 StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponState)
@@ -126,9 +140,19 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &this->shotCount);
 	Serialization::ReadData(intfc, &this->loadedAmmo);
 	Serialization::ReadData(intfc, &this->chamberedAmmo);
+	if (MAKE_EXE_VERSION_EX(1, 0, 0, 0) <= version)
+	{
+		Serialization::ReadData(intfc, &this->equippedAmmo);
+		Serialization::ReadData(intfc, &this->chamberedCount);
+	}
+	else
+	{
+		this->equippedAmmo = this->chamberedAmmo;
+		this->chamberedCount = this->chamberSize;
+	}
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
-	_DEBUG("Loaded data: %04X %04X %04X %04X %016X %08X %08X", this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, size);
+	_DEBUG("Loaded data: v%08X %04X %04X %04X %04X %016X %08X %08X %08X %08X", version, this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, this->equippedAmmo, this->chamberedCount, size);
 	for (UInt32 dataidx = 0; dataidx < size; dataidx++)
 	{
 		UInt32 ammoFormID = 0;
@@ -155,9 +179,11 @@ bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializatio
 	intfc->WriteRecordData(&this->shotCount, sizeof(this->shotCount));
 	intfc->WriteRecordData(&this->loadedAmmo, sizeof(this->loadedAmmo));
 	intfc->WriteRecordData(&this->chamberedAmmo, sizeof(this->chamberedAmmo));
+	intfc->WriteRecordData(&this->equippedAmmo, sizeof(this->equippedAmmo));
+	intfc->WriteRecordData(&this->chamberedCount, sizeof(this->chamberedCount));
 	UInt32 size = this->BCRammo.size();
 	intfc->WriteRecordData(&size, sizeof(size));
-	_DEBUG("Saved data: %04X %04X %04X %04X %016X %08X %08X", this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, size);
+	_DEBUG("Saved data: v%08X %04X %04X %04X %04X %016X %08X %08X %08X %08X", version, this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, this->equippedAmmo, this->chamberedCount, size);
 	for (auto itAmmo = this->BCRammo.begin(); itAmmo != this->BCRammo.end(); itAmmo++)
 	{
 		UInt32 formId = *itAmmo;
@@ -176,9 +202,12 @@ bool StoredExtraWeaponState::StoredWeaponState::SaveState(const F4SESerializatio
 ExtraWeaponState::WeaponState* StoredExtraWeaponState::StoredWeaponState::Recover(const F4SESerializationInterface* intfc, UInt32 version)
 {
 	UInt32 newFormID = 0;
-	TESAmmo* recoveredAmmo = nullptr;
+	TESAmmo* recoveredChamberedAmmo = nullptr;
 	if (intfc->ResolveFormId(this->chamberedAmmo, &newFormID))
-		recoveredAmmo = (TESAmmo*)LookupFormByID(newFormID);
+		recoveredChamberedAmmo = (TESAmmo*)LookupFormByID(newFormID);
+	TESAmmo* recoveredEquippedAmmo = nullptr;
+	if (intfc->ResolveFormId(this->equippedAmmo, &newFormID))
+		recoveredEquippedAmmo = (TESAmmo*)LookupFormByID(newFormID);
 	std::vector<TESAmmo*> recoveredBCRammoVector;
 	for (auto itAmmo = this->BCRammo.begin(); itAmmo != this->BCRammo.end(); itAmmo++)
 	{
@@ -201,7 +230,7 @@ ExtraWeaponState::WeaponState* StoredExtraWeaponState::StoredWeaponState::Recove
 			continue;
 		recoveredStateMods.push_back(recoveredStateMod);
 	}
-	return new ExtraWeaponState::WeaponState(this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, recoveredAmmo, &recoveredBCRammoVector, &recoveredStateMods);
+	return new ExtraWeaponState::WeaponState(this->flags, this->ammoCapacity, this->chamberSize, this->chamberedCount, this->shotCount, this->loadedAmmo, recoveredChamberedAmmo, recoveredEquippedAmmo, &recoveredBCRammoVector, &recoveredStateMods);
 }
 
 bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, UInt32 version)

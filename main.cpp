@@ -101,6 +101,8 @@ public:
 			//}
 			MSFMenu::RegisterMenu();
 			MSFMenu::OpenMenu();
+			delete MSF_MainData::ammoDisplay;
+			MSF_MainData::ammoDisplay = HUDMenuAmmoDisplay::Init();
 		}
 		return kEvent_Continue;
 	}
@@ -151,7 +153,11 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 
 bool WriteHooks()
 {
+	AttackInputHandler_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_SelfHookTarget.GetUIntPtr(), &AttackInputHandlerReload_Hook);
+	EjectShellCasing_Copied1 = HookUtil::GetFnPtrFromCall5(EjectShellCasing_HookTarget1.GetUIntPtr(), &EjectShellCasing_Hook);
+	EjectShellCasing_Copied2 = HookUtil::GetFnPtrFromCall5(EjectShellCasing_HookTarget2.GetUIntPtr(), &EjectShellCasing_Hook);
 	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
+	CalcClipAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(CalcClipAmmoCounter_HookTarget.GetUIntPtr(), &CalcClipAmmoCounter_Hook);
 	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
 	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
 	AttachModToStack_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromWorkbenchUI_Hook);
@@ -159,7 +165,7 @@ bool WriteHooks()
 	UpdateEquipData_Copied = HookUtil::GetFnPtrFromCall5(UpdateEquipData_HookTarget.GetUIntPtr(), &UpdateEquipData_Hook);
 	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
 
-	if (!HUDShowAmmoCounter_Copied || !EquipHandler_UpdateAnimGraph_Copied || !AttachModToStack_CallFromGameplay_Copied || !AttachModToStack_CallFromWorkbenchUI_Copied || !DeleteExtraData_CallFromWorkbenchUI_Copied || !UpdateEquipData_Copied || !LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
+	if (!HUDShowAmmoCounter_Copied || !EquipHandler_UpdateAnimGraph_Copied || !AttachModToStack_CallFromGameplay_Copied || !AttachModToStack_CallFromWorkbenchUI_Copied || !DeleteExtraData_CallFromWorkbenchUI_Copied || !UpdateEquipData_Copied || !LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr || !AttackInputHandler_Copied)
 		return false;
 
 	if (LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
@@ -199,16 +205,38 @@ bool WriteHooks()
 		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
 	}
 
+	struct AmmoReserveCalcReplace : Xbyak::CodeGenerator {
+		AmmoReserveCalcReplace(uint32_t amount = 0x1) { sub(ebx, amount); }
+	};
+	AmmoReserveCalcReplace newcode(0x0);
+	if (newcode.getSize() == 3)
+		HookUtil::SafeWriteXByak(AmmoReserveCalcAddr.GetUIntPtr(), &newcode);
+	else
+		_MESSAGE("Warning! AmmoReserveCalc replacement code write error.");
+
+	ReloadJumpReplace overwriteCode;
+	if (sizeof(overwriteCode.replacement) == 2)
+		HookUtil::SafeWriteBuf(SkipReloadJumpAddr.GetUIntPtr(), &overwriteCode.replacement, sizeof(overwriteCode.replacement));
+	else
+		_MESSAGE("Warning! ReloadJump replacement code write error.");
+
+
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
+	PipboyMenuInvoke_Copied = HookUtil::SafeWrite64(PipboyMenuInvoke_HookAddress.GetUIntPtr(), &PipboyMenuInvoke_Hook);
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
-	//g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
+	g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
+	g_branchTrampoline.Write5Call(AttackInputHandler_SelfHookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandlerReload_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
+	g_branchTrampoline.Write5Call(CalcClipAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)CalcClipAmmoCounter_Hook);
 	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromGameplay_Hook);
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromWorkbenchUI_Hook);
 	g_branchTrampoline.Write5Call(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)DeleteExtraData_CallFromWorkbenchUI_Hook);
 	g_branchTrampoline.Write5Call(UpdateEquipData_HookTarget.GetUIntPtr(), (uintptr_t)UpdateEquipData_Hook);
+	g_branchTrampoline.Write5Call(EjectShellCasing_HookTarget1.GetUIntPtr(), (uintptr_t)EjectShellCasing_Hook);
+	g_branchTrampoline.Write5Call(EjectShellCasing_HookTarget2.GetUIntPtr(), (uintptr_t)EjectShellCasing_Hook);
+	g_branchTrampoline.Write6Call(RemoveItem_ConsumeAmmo_HookTarget.GetUIntPtr(), (uintptr_t)RemoveItem_ConsumeAmmo_Hook);
 
 	//if (! write success)
 	//	return false;

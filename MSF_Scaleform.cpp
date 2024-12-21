@@ -1,5 +1,6 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Test.h"
+#include "MSF_WeaponState.h"
 
 
 
@@ -97,7 +98,12 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::TestIdle(true);
 				//_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
 
-				MSF_Test::ArmorAttachTest();
+				//MSF_Test::ArmorAttachTest();
+				//EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
+				//if (eqData)
+				//	eqData->loadedAmmoCount = 14;
+				if (MSF_MainData::ammoDisplay)
+					MSF_MainData::ammoDisplay->SetDisplayedAmmo(20, 1, 100, true);
 
 				_DEBUG("test1");
 			}
@@ -116,7 +122,10 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
 				//MSF_Test::TestIdle(false);
-				MSF_Test::DumpActorAnimData();
+				//MSF_Test::DumpActorAnimData();
+				//MSF_Test::InspectTest();
+				if (MSF_MainData::ammoDisplay)
+					MSF_MainData::ammoDisplay->SetDisplayedAmmo(20, 0, 100, false);
 				_DEBUG("test2");
 			}
 		}
@@ -134,7 +143,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::SplitStackTest(13, false);
 				//Utilities::FireWeapon(*g_player, 1);
 				//MSF_Test::DumpActorAnimData();
-				MSF_Test::DumpEquippedWeaponIdx();
+				//MSF_Test::DumpEquippedWeaponIdx();
+				MSF_Test::InjectTextField(nullptr);
 				_DEBUG("test3");
 			}
 		}
@@ -212,6 +222,114 @@ public:
 };
 
 F4SEInputHandlerSink inputHandler;
+
+bool PipboyMenu::CreateItemData(PipboyMenu::ScaleformArgs* args, std::string text, std::string value)
+{
+	if (!args)
+		return false;
+	auto* movieRoot = args->movie->movieRoot;
+	auto& pInfoObj = args->args[1];
+	GFxValue extraData;
+	movieRoot->CreateObject(&extraData);
+	MSF_Scaleform::RegisterString(&extraData, movieRoot, "text", text.c_str());//
+	MSF_Scaleform::RegisterString(&extraData, movieRoot, "value", value.c_str());
+	MSF_Scaleform::RegisterInt(&extraData, movieRoot, "difference", 0);
+	args->args[1].PushBack(&extraData);
+	return true;
+}
+
+void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
+{
+	PipboyMenuInvoke_Copied(menu, args);
+	//(this->*Invoke_Original)(args);
+
+	if (args->optionID == 0xD && args->numArgs == 4 && args->args[0].GetType() == GFxValue::kType_Int && args->args[1].GetType() == GFxValue::kType_Array && args->args[2].GetType() == GFxValue::kType_Array)
+	{
+		SInt32 selectedIndex = args->args[0].GetInt();
+		PipboyObject* pHandlerData = nullptr;
+		if (selectedIndex >= 0 && selectedIndex < (*g_pipboyDataMgr)->itemData.count)
+			pHandlerData = (*g_pipboyDataMgr)->itemData[selectedIndex];
+		if (pHandlerData != nullptr)
+		{
+			//static RelocPtr<BSFixedString>	memberName(0x5AA13C8);//handleID
+			//static RelocPtr<BSFixedString>	memberName(0x5AA23C8);//handleID
+			static BSFixedString handleName("handleID"); //0x2D2A828 xx 
+			static BSFixedString stackName("StackID");
+			
+			auto* pipboyValueHandle = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->table.Find(&handleName)->value);//1B41D40
+			auto* pipboyValueStack = static_cast<PipboyArray*>(pHandlerData->table.Find(&stackName)->value);//1B41D40
+			//auto* pipboyValue = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->GetMemberValue(memberName));
+			if (pipboyValueHandle != nullptr)
+			{
+				UInt32 handleID = pipboyValueHandle->value;
+				auto* pSelectedData = (*g_itemMenuDataMgr)->GetSelectedItem(handleID);
+				UInt32 stackID = 0;
+				if (pipboyValueStack != nullptr && pipboyValueStack->values.entries)
+				{
+					auto* pipboyStackIDholder = static_cast<PipboyPrimitiveValue<UInt32>*>(*pipboyValueStack->values.entries);
+					stackID = pipboyStackIDholder->value;
+				}
+
+				if (pSelectedData != nullptr && pSelectedData->form != nullptr)
+				{
+					//return;
+					//TBO_InstanceData* neededInst = nullptr;
+
+					TESForm* pSelectedForm = pSelectedData->form;
+					BGSInventoryItem::Stack* selectedStack = Utilities::GetStack(pSelectedData, stackID);
+					ExtraDataList* extraDataList = selectedStack->extraData;
+					BSExtraData* BSextraHealth = nullptr;
+					ExtraWeaponState::AmmoStateData* ammoState = nullptr;
+					if (extraDataList)
+					{
+						BSextraHealth = extraDataList->GetByType(ExtraDataType::kExtraData_Health);
+						//BSExtraData* extraData = extraDataList->GetByType(ExtraDataType::kExtraData_InstanceData);
+						//if (extraData)
+						//{
+						//	ExtraInstanceData* objectModData = DYNAMIC_CAST(extraData, BSExtraData, ExtraInstanceData);
+						//	if (objectModData)
+						//		neededInst = objectModData->instanceData;
+						//}
+						ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
+						ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.Get(holder->rank);
+						if (extraState)
+							ammoState = extraState->GetAmmoStateData();
+						//switch (pSelectedForm->formType)
+						//{
+						//case kFormType_WEAP:
+						if (pSelectedForm->formType == kFormType_WEAP)
+						{
+							//auto* pWeapon = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(neededInst, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+							//if (pWeapon)
+							//{
+								if (BSextraHealth && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayConditionInPipboy))
+								{
+									ExtraHealth* extraHealth = DYNAMIC_CAST(BSextraHealth, BSExtraData, ExtraHealth);
+									float health = extraHealth->health;
+									UInt32 rounded = round(health);
+									std::string displayString = std::to_string(rounded) + "/100";
+									menu->CreateItemData(args, "Condition", displayString);
+								}
+								if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayMagInPipboy))
+								{
+									std::string displayString = std::to_string(ammoState->ammoCapacity)+"/"+std::to_string(ammoState->loadedAmmo);
+									menu->CreateItemData(args, "Mag Size/Loaded", displayString);
+								}
+								if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayChamberInPipboy))
+								{
+									std::string displayString = std::to_string(ammoState->chamberSize) + "/" + std::to_string(ammoState->chamberedCount);
+									menu->CreateItemData(args, "Chamber Size/Loaded", displayString);
+								}
+							//}
+							//	break;
+							//}
+						}
+					}
+				}
+			}
+		}
+	}
+}
 
 namespace MSF_Scaleform
 {
@@ -949,12 +1067,12 @@ namespace MSF_Scaleform
 		GFxValue currentSWFPath;
 		const char* currentSWFPathString = nullptr;
 
-		if (movieRoot->GetVariable(&currentSWFPath, "root.loaderInfo.url")) {
+		if (movieRoot->GetVariable(&currentSWFPath, "root.loaderInfo.url"))
 			currentSWFPathString = currentSWFPath.GetString();
-		}
 
 		// Look for the menu that we want to inject into.
-		if (currentSWFPathString && strcmp(currentSWFPathString, "Interface/MSFMenu.swf") == 0) {
+		if (currentSWFPathString && strcmp(currentSWFPathString, "Interface/MSFMenu.swf") == 0) 
+		{
 			GFxValue root; movieRoot->GetVariable(&root, "root");
 			MSF_MainData::MSFMenuRoot = movieRoot;
 
@@ -1016,6 +1134,12 @@ namespace MSF_Scaleform
 			//_DEBUG("UpdateWidgetData: %02X, InterfaceVersion: %02X, MSFwidget: %02X", msf_loader_content.HasMember("UpdateWidgetData"), msf_loader_content.HasMember("InterfaceVersion"), msf_loader_content.HasMember("MSFwidget"));
 			*/
 		}
+		//else if (currentSWFPathString && strcmp(currentSWFPathString, "Interface/HUDMenu.swf") == 0)
+		//{
+		//	delete MSF_MainData::ammoDisplay;
+		//	MSF_MainData::ammoDisplay = HUDMenuAmmoDisplay::Init(movieRoot);
+		//	//fill ammo data
+		//}
 
 		return true;
 	}

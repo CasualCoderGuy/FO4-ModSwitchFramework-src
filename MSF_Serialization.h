@@ -54,9 +54,11 @@ public:
 		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
 		UInt16 chamberSize;
+		UInt16 chamberedCount;
 		UInt16 shotCount;
 		UInt32 loadedAmmo;
 		UInt32 chamberedAmmo;
+		UInt32 equippedAmmo;
 		std::vector<UInt32> BCRammo;
 		std::vector<UInt32> stateMods;
 		//StoredAmmoMod switchToAmmoAfterFire;

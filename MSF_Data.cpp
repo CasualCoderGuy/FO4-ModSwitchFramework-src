@@ -56,10 +56,12 @@ UInt16 MSF_MainData::iReloadAnimEndEventDelayMS = 500;
 UInt16 MSF_MainData::iCustomAnimEndEventDelayMS = 100;
 UInt16 MSF_MainData::iDrawAnimEndEventDelayMS = 500;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
-ModSelectionMenu* MSF_MainData::widgetMenu;
+ModSelectionMenu* MSF_MainData::widgetMenu = nullptr;
+HUDMenuAmmoDisplay* MSF_MainData::ammoDisplay = nullptr;
 
 BurstModeManager* MSF_MainData::activeBurstManager = nullptr;
 
+BCRinterface MSF_MainData::BCRinterfaceHolder;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
@@ -244,7 +246,12 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = 0x7DFF;
+		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch \
+			| MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
+			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods | MSF_MainData::bEnableMetadataSaving \
+			| MSF_MainData::bEnableAmmoSaving | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport | MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
+			| MSF_MainData::bDisplayChamberInPipboy);
+
 		AddFloatSetting("fBaseChanceMultiplier", 1.0);
 
 		AddFloatSetting("fSliderMainX", 950.0);
@@ -638,8 +645,10 @@ namespace MSF_Data
 				flag = MSF_MainData::bRequireAmmoToSwitch;
 			else if (settingName == "bAmmoRequireWeaponToBeDrawn")
 				flag = MSF_MainData::bAmmoRequireWeaponToBeDrawn;
+			else if (settingName == "bDisableAutomaticReload")
+				flag = MSF_MainData::bDisableAutomaticReload;
 			else if (settingName == "bShowUnavailableMods")
-				flag = MSF_MainData::bShowUnavailableMods;
+				flag = MSF_MainData::bShowUnavailableMods; 
 			else if (settingName == "bSpawnRandomAmmo")
 				flag = MSF_MainData::bSpawnRandomAmmo;
 			else if (settingName == "bSpawnRandomMods")
@@ -656,6 +665,14 @@ namespace MSF_Data
 				flag = MSF_MainData::bEnableBCRSupport;
 			else if (settingName == "bReloadCompatibilityMode")
 				flag = MSF_MainData::bReloadCompatibilityMode;
+			else if (settingName == "bDisplayChamberedAmmoOnHUD")
+				flag = MSF_MainData::bDisplayChamberedAmmoOnHUD;
+			else if (settingName == "bDisplayConditionInPipboy")
+				flag = MSF_MainData::bDisplayConditionInPipboy;
+			else if (settingName == "bDisplayMagInPipboy")
+				flag = MSF_MainData::bDisplayMagInPipboy;
+			else if (settingName == "bDisplayChamberInPipboy")
+				flag = MSF_MainData::bDisplayChamberInPipboy;
 			else
 				return false;
 
@@ -1240,7 +1257,7 @@ namespace MSF_Data
 												continue;
 											}
 										
-											UInt16 modflags = switchmod["modFlags"].asInt();
+											UInt32 modflags = switchmod["modFlags"].asInt();
 											float spawnChance = switchmod["spawnChance"].asFloat();
 											KeywordValue animFlavor = 0;
 											str = switchmod["animFlavor"].asString();
@@ -1274,7 +1291,7 @@ namespace MSF_Data
 											modDataMod->spawnChance = spawnChance;
 											if (animIdle_1stP || animIdle_3rdP || animIdle_1stP_PA || animIdle_3rdP_PA)
 											{
-												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA);
+												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA, ((modflags >> 16) & 1) == 0);
 												modDataMod->animData = animData;
 											}
 											cycle->mods.push_back(modDataMod);
@@ -1642,6 +1659,7 @@ namespace MSF_Data
 					return nullptr;
 				SwitchData* switchData = new SwitchData();
 				switchData->ModToRemove = currSwitchedMod;
+				switchData->targetAmmo = baseAmmo;
 				return switchData;
 			}
 			num--;
@@ -1661,6 +1679,7 @@ namespace MSF_Data
 				return nullptr;
 			SwitchData* switchData = new SwitchData();
 			switchData->ModToAttach = ammoMod->mod;
+			switchData->targetAmmo = ammoMod->ammo;
 			_DEBUG("retOK");
 			return switchData;
 		}
@@ -1976,8 +1995,6 @@ namespace MSF_Data
 
 	bool GetChamberData(BGSObjectInstanceExtra* mods, TESObjectWEAP::InstanceData* weapInstance, UInt16* chamberSize, UInt16* flags)
 	{
-		return true;
-
 		if (!mods || !weapInstance || !weapInstance->ammo || !chamberSize || !flags)
 			return false;
 		auto data = mods->data;
@@ -2183,16 +2200,22 @@ namespace MSF_Data
 
 	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance)
 	{
+		if (!instance || !MSF_MainData::BCR_AVIF)
+			return false;
 		return instance->skill == MSF_MainData::BCR_AVIF;
 	}
 
 	bool WeaponHasBCRSupport(TESObjectWEAP* weapon)
 	{
+		if (!weapon || !MSF_MainData::BCR_AVIF)
+			return false;
 		return weapon->weapData.skill == MSF_MainData::BCR_AVIF;
 	}
 
 	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance)
 	{
+		if (!instance || !MSF_MainData::tacticalReloadKW)
+			return false;
 		return Utilities::WeaponInstanceHasKeyword(instance, MSF_MainData::tacticalReloadKW);
 	}
 
