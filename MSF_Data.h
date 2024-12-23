@@ -322,6 +322,7 @@ private:
 	TESObjectWEAP::InstanceData* volatile equippedInstanceData;
 public:
 	SimpleLock menuLock;
+	static volatile UInt16 doReload;
 	ModSwitchManager()
 	{
 		displayedAmmoChoices.reserve(20);

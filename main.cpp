@@ -164,6 +164,8 @@ bool WriteHooks()
 	DeleteExtraData_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &DeleteExtraData_CallFromWorkbenchUI_Hook);
 	UpdateEquipData_Copied = HookUtil::GetFnPtrFromCall5(UpdateEquipData_HookTarget.GetUIntPtr(), &UpdateEquipData_Hook);
 	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
+	GetLoadedAmmoCount_Copied = HookUtil::GetFnPtrFromCall5(GetLoadedAmmoCount_HookTarget.GetUIntPtr(), &GetLoadedAmmoCount_Hook);
+	CheckAmmoForReload_Copied = HookUtil::GetFnPtrFromCall5(CheckAmmoForReload_HookTarget.GetUIntPtr(), &CheckAmmoForReload_Hook);
 
 	if (!HUDShowAmmoCounter_Copied || !EquipHandler_UpdateAnimGraph_Copied || !AttachModToStack_CallFromGameplay_Copied || !AttachModToStack_CallFromWorkbenchUI_Copied || !DeleteExtraData_CallFromWorkbenchUI_Copied || !UpdateEquipData_Copied || !LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr || !AttackInputHandler_Copied)
 		return false;
@@ -205,6 +207,63 @@ bool WriteHooks()
 		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
 	}
 
+	struct CheckAmmoCountForReload_InjectCode : Xbyak::CodeGenerator {
+		CheckAmmoCountForReload_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+		{
+			Xbyak::Label playerLabel, doReloadLabel, retnLabel, hook, setReloadLabel, originalCompare, toRet;
+
+			//	mov(rdx, qword[rsi + 8]);
+			//	mov(rcx, ptr[rip+playerLabel]);
+			//	cmp(qword[rdx], rcx);
+			//	jne(originalCompare);
+			//	mov(r8d, eax);
+			//	mov(rax, 1);
+			//	mov(edx, 0);
+			//	//lock();
+			//	cmpxchg(ptr[rip + doReloadLabel], dx);
+			//	setz(cl);
+			//	jz(setReloadLabel);
+			//	cmp(r14d, r8d); //r14d-chamberSize
+			//	jnb(toRet);
+			//	test(r9d, r9d);
+			//	setnz(cl);
+			//	jmp(setReloadLabel);
+			//L(originalCompare);
+			//	cmp(r14d, eax);
+			//	jnb(toRet);
+			//	cmp(r9d, r14d);
+			//	setnbe(cl);
+			//L(setReloadLabel);
+			//	mov(rax, qword[rsi]);
+			//	mov(byte[rax], cl);
+				mov(rdx, qword[rsi + 8]);
+				mov(rcx, qword[rdx]);
+				mov(edx, r14d);
+				mov(r8d, eax);
+				call(ptr[rip + hook]);
+				mov(rcx, qword[rsi]);
+				mov(byte[rcx], al);
+
+			L(toRet);
+				jmp(ptr[rip + retnLabel]);
+
+			L(retnLabel);
+				dq(CheckAmmoCountForReload_ReturnJumpAddr);
+			L(playerLabel);
+				dq((uintptr_t)*g_player);
+			L(doReloadLabel);
+				dq((uintptr_t)&ModSwitchManager::doReload);
+			L(hook);
+				dq((uintptr_t)CheckAmmoCountForReload_Hook);
+		}
+	};
+	void* codeBuf = g_localTrampoline.StartAlloc();
+	CheckAmmoCountForReload_InjectCode code(codeBuf);
+	g_localTrampoline.EndAlloc(code.getCurr());
+	CheckAmmoCountForReload_BranchCode = (uintptr_t)codeBuf;
+	g_branchTrampoline.Write5Branch(CheckAmmoCountForReload_JumpHookTarget.GetUIntPtr(), CheckAmmoCountForReload_BranchCode);
+	
+
 	struct AmmoReserveCalcReplace : Xbyak::CodeGenerator {
 		AmmoReserveCalcReplace(uint32_t amount = 0x1) { sub(ebx, amount); }
 	};
@@ -237,6 +296,8 @@ bool WriteHooks()
 	g_branchTrampoline.Write5Call(EjectShellCasing_HookTarget1.GetUIntPtr(), (uintptr_t)EjectShellCasing_Hook);
 	g_branchTrampoline.Write5Call(EjectShellCasing_HookTarget2.GetUIntPtr(), (uintptr_t)EjectShellCasing_Hook);
 	g_branchTrampoline.Write6Call(RemoveItem_ConsumeAmmo_HookTarget.GetUIntPtr(), (uintptr_t)RemoveItem_ConsumeAmmo_Hook);
+	g_branchTrampoline.Write5Call(GetLoadedAmmoCount_HookTarget.GetUIntPtr(), (uintptr_t)GetLoadedAmmoCount_Hook);
+	g_branchTrampoline.Write5Call(CheckAmmoForReload_HookTarget.GetUIntPtr(), (uintptr_t)CheckAmmoForReload_Hook);
 
 	//if (! write success)
 	//	return false;

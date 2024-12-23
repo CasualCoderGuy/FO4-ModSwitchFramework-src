@@ -305,7 +305,10 @@ AmmoCountData* CalcClipAmmoCounter_Hook(AmmoCountData* ammoCountData)
 	if (!MSF_MainData::ammoDisplay || !MSF_MainData::ammoDisplay->IsOK())
 		return ammoCountData;
 	UInt32 newclipcount = ammoCountData->ammoCount - MSF_MainData::ammoDisplay->GetDisplayedChamberAmmo();
-	newclipcount > 0 ? ammoCountData->ammoCount = newclipcount : ammoCountData->ammoCount = 0;
+	if (newclipcount > 0)
+		ammoCountData->ammoCount = newclipcount;
+	else
+		ammoCountData->ammoCount = 0;
 	return ammoCountData;
 }
 
@@ -325,6 +328,59 @@ ObjectRefHandle RemoveItem_ConsumeAmmo_Hook(TESObjectREFR* ref, RemoveItemData& 
 	_DEBUG("ConsumeAmmo_hook");
 	RelocVirtualFn <_RemoveItem_Virtual, TESObjectREFR>RemoveItemVirtual(ref, 0x6D);
 	return RemoveItemVirtual(ref, a_data, a_data2);
+}
+
+UInt32 GetLoadedAmmoCount_Hook(Actor* owner, UInt32 edx)
+{
+	//if (owner == *g_player)
+	//{
+	//	ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.GetEquipped(owner);
+	//	if (extraState)
+	//	{
+	//		TESAmmo* equippedAmmo = extraState->GetEquippedAmmo();
+	//		if (equippedAmmo)
+	//			return Utilities::GetInventoryItemCount(owner->inventoryList, equippedAmmo);
+	//	}
+
+	//}
+	return GetLoadedAmmoCount_Copied(owner, edx);
+}
+
+UInt32 CheckAmmoForReload_Hook(Actor* target, TESBoundObject* toCount)
+{
+	if (target == *g_player)
+	{
+		ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.GetEquipped(target);
+		if (extraState)
+		{
+			TESAmmo* equippedAmmo = extraState->GetEquippedAmmo();
+			if (equippedAmmo)
+			{
+				UInt32 count = Utilities::GetInventoryItemCount(target->inventoryList, equippedAmmo);
+				_DEBUG("eqAmmoCountForReload: %i", count);
+				return count;
+			}
+				//return Utilities::GetInventoryItemCount(target->inventoryList, equippedAmmo);
+		}
+
+	}
+	return CheckAmmoForReload_Copied(target, toCount);
+}
+
+bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve)
+{
+	_DEBUG("reloadCheck L: %i, cap: %i, R: %i", loadedAmmo, ammoCap, ammoReserve);
+	if (target == *g_player && InterlockedCompareExchange16((volatile short*)&MSF_MainData::modSwitchManager.doReload, 0, 1))
+		return true;
+	ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.GetEquipped(target);
+	if (extraState)
+	{
+		ExtraWeaponState::AmmoStateData* ammoState = extraState->GetAmmoStateData();
+		_DEBUG("reloadAS: %i, %02X", ammoState->chamberedCount, (loadedAmmo - ammoState->chamberedCount < ammoCap) && ammoReserve);
+		if (ammoState)
+			return ((loadedAmmo - ammoState->chamberedCount < ammoCap) && ammoReserve); //HasTRsupport
+	}
+	return (loadedAmmo < ammoCap && loadedAmmo < ammoReserve);
 }
 
 void EjectShellCasing_Hook(TESObjectREFR* ref, TESObjectWEAP::InstanceData* instanceData, BGSEquipIndex eqIdx)
@@ -617,7 +673,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				{
 					//_DEBUG("reloading");
 					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon);
+					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, true);
 					//if (!MSF_Base::ReloadWeapon())
 					//	MSF_MainData::modSwitchManager.ClearQueue();
 				}

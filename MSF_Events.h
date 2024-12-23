@@ -284,6 +284,18 @@ extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_BranchCode;
 extern uintptr_t ExtraRankCompare_Copied;
 
+typedef UInt32(*_GetLoadedAmmoCount)(Actor* owner, UInt32 edx);
+extern RelocAddr <_GetLoadedAmmoCount> GetLoadedAmmoCount_Original;
+extern RelocAddr <_GetLoadedAmmoCount> GetLoadedAmmoCount_HookTarget;
+extern _GetLoadedAmmoCount GetLoadedAmmoCount_Copied;
+typedef UInt32(*_CheckAmmoForReload)(Actor* target, TESBoundObject* toCount);
+extern RelocAddr <_CheckAmmoForReload> CheckAmmoForReload_Original;
+extern RelocAddr <_CheckAmmoForReload> CheckAmmoForReload_HookTarget;
+extern _CheckAmmoForReload CheckAmmoForReload_Copied;
+extern RelocAddr <uintptr_t> CheckAmmoCountForReload_JumpHookTarget;
+extern RelocAddr <uintptr_t> CheckAmmoCountForReload_ReturnJumpAddr;
+extern uintptr_t CheckAmmoCountForReload_BranchCode;
+
 struct ReloadJumpReplace {
 	uint8_t original[2] = { 0x0F, 0x84 };
 	uint8_t replacement[2] = { 0x90, 0xE9 };
@@ -306,6 +318,9 @@ void UpdateEquippedWeaponData_Hook(EquippedWeaponData* data);
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack);
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
 ObjectRefHandle RemoveItem_ConsumeAmmo_Hook(TESObjectREFR* ref, RemoveItemData& a_data, RemoveItemData2& a_data2);
+UInt32 GetLoadedAmmoCount_Hook(Actor* owner, UInt32 edx);
+UInt32 CheckAmmoForReload_Hook(Actor* target, TESBoundObject* toCount);
+bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

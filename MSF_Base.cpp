@@ -49,8 +49,7 @@ namespace MSF_Base
 				return false;
 			UInt32 loadedAmmoCount = Utilities::GetLoadedAmmoCount(playerActor);
 			ExtraWeaponState* weapState = MSF_MainData::weaponStateStore.GetEquipped(*g_player);
-			weapState->SetEquippedAmmo(switchData->targetAmmo);
-			delete switchData;
+			weapState->SetSwitchData(switchData);
 			return MSF_Base::ReloadWeapon();
 		}
 
@@ -106,8 +105,7 @@ namespace MSF_Base
 				return false;
 			UInt32 loadedAmmoCount = Utilities::GetLoadedAmmoCount(playerActor);
 			ExtraWeaponState* weapState = MSF_MainData::weaponStateStore.GetEquipped(*g_player);
-			weapState->SetEquippedAmmo(switchData->targetAmmo);
-			delete switchData;
+			weapState->SetSwitchData(switchData);
 			return MSF_Base::ReloadWeapon(); 
 		}
 
@@ -847,10 +845,12 @@ namespace MSF_Base
 
 	//========================== Animation Functions ===========================
 
-	bool ReloadWeapon() //doreloadwhenfull
+	bool ReloadWeapon(bool forced)
 	{
 		Actor* playerActor = *g_player;
-		//return Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionReload);
+		if (forced)
+			InterlockedExchange16((volatile short*)&MSF_MainData::modSwitchManager.doReload, 1);
+		return Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionReload);
 
 		TESIdleForm* relIdle = MSF_Data::GetReloadAnimation(playerActor);
 		if (relIdle)

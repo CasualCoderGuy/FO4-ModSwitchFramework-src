@@ -7,6 +7,9 @@
 #include <fstream>
 #include <random>
 
+
+volatile UInt16 ModSwitchManager::doReload;
+
 std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::fireAnimDataMap;
@@ -81,6 +84,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::a
 std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
 std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamberMap;
 std::vector<KeywordValue> MSF_MainData::uniqueStateAPValues;
+std::vector<TESAmmo*> MSF_MainData::dontRemoveAmmoOnReload;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -246,10 +250,10 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch \
+		MSF_MainData::MCMSettingFlags = (MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch \
 			| MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
-			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods | MSF_MainData::bEnableMetadataSaving \
-			| MSF_MainData::bEnableAmmoSaving | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport | MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
+			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods\
+			| MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
 			| MSF_MainData::bDisplayChamberInPipboy);
 
 		AddFloatSetting("fBaseChanceMultiplier", 1.0);
@@ -635,8 +639,8 @@ namespace MSF_Data
 				flag = MSF_MainData::bShowFiringMode;
 			else if (settingName == "bShowZoomData")
 				flag = MSF_MainData::bShowScopeData;
-			else if (settingName == "bReloadEnabled")
-				flag = MSF_MainData::bReloadEnabled;
+			//else if (settingName == "bReloadEnabled")
+			//	flag = MSF_MainData::bReloadEnabled;
 			else if (settingName == "bDrawEnabled")
 				flag = MSF_MainData::bDrawEnabled;
 			else if (settingName == "bCustomAnimEnabled")
@@ -653,18 +657,18 @@ namespace MSF_Data
 				flag = MSF_MainData::bSpawnRandomAmmo;
 			else if (settingName == "bSpawnRandomMods")
 				flag = MSF_MainData::bSpawnRandomMods;
-			else if (settingName == "bEnableMetadataSaving")
-				flag = MSF_MainData::bEnableMetadataSaving;
-			else if (settingName == "bEnableAmmoSaving")
-				flag = MSF_MainData::bEnableAmmoSaving;
-			else if (settingName == "bEnableTacticalReloadAll")
-				flag = MSF_MainData::bEnableTacticalReloadAll;
-			else if (settingName == "bEnableTacticalReloadAnim")
-				flag = MSF_MainData::bEnableTacticalReloadAnim;
-			else if (settingName == "bEnableBCRSupport")
-				flag = MSF_MainData::bEnableBCRSupport;
-			else if (settingName == "bReloadCompatibilityMode")
-				flag = MSF_MainData::bReloadCompatibilityMode;
+			//else if (settingName == "bEnableMetadataSaving")
+			//	flag = MSF_MainData::bEnableMetadataSaving;
+			//else if (settingName == "bEnableAmmoSaving")
+			//	flag = MSF_MainData::bEnableAmmoSaving;
+			//else if (settingName == "bEnableTacticalReloadAll")
+			//	flag = MSF_MainData::bEnableTacticalReloadAll;
+			//else if (settingName == "bEnableTacticalReloadAnim")
+			//	flag = MSF_MainData::bEnableTacticalReloadAnim;
+			//else if (settingName == "bEnableBCRSupport")
+			//	flag = MSF_MainData::bEnableBCRSupport;
+			//else if (settingName == "bReloadCompatibilityMode")
+			//	flag = MSF_MainData::bReloadCompatibilityMode;
 			else if (settingName == "bDisplayChamberedAmmoOnHUD")
 				flag = MSF_MainData::bDisplayChamberedAmmoOnHUD;
 			else if (settingName == "bDisplayConditionInPipboy")

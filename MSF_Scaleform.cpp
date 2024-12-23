@@ -102,8 +102,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
 				//if (eqData)
 				//	eqData->loadedAmmoCount = 14;
-				if (MSF_MainData::ammoDisplay)
-					MSF_MainData::ammoDisplay->SetDisplayedAmmo(20, 1, 100, true);
+				//if (MSF_MainData::ammoDisplay)
+				//	MSF_MainData::ammoDisplay->SetDisplayedAmmo(20, 1, 100, true);
+				MSF_Test::PrintAmmoCount();
 
 				_DEBUG("test1");
 			}
@@ -291,9 +292,12 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 						//		neededInst = objectModData->instanceData;
 						//}
 						ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
-						ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.Get(holder->rank);
-						if (extraState)
-							ammoState = extraState->GetAmmoStateData();
+						if (holder)
+						{
+							ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.Get(holder->rank);
+							if (extraState)
+								ammoState = extraState->GetAmmoStateData();
+						}
 						//switch (pSelectedForm->formType)
 						//{
 						//case kFormType_WEAP:
@@ -312,7 +316,7 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 								}
 								if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayMagInPipboy))
 								{
-									std::string displayString = std::to_string(ammoState->ammoCapacity)+"/"+std::to_string(ammoState->loadedAmmo);
+									std::string displayString = std::to_string(ammoState->ammoCapacity)+"/"+std::to_string(ammoState->loadedAmmo-ammoState->chamberedCount);
 									menu->CreateItemData(args, "Mag Size/Loaded", displayString);
 								}
 								if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayChamberInPipboy))
@@ -702,7 +706,11 @@ namespace MSF_Scaleform
 		menuRoot->CreateArray(dst);
 		if (baseAmmo)
 		{
-			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
+			//TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
+			ExtraWeaponState* weapState = MSF_MainData::weaponStateStore.GetEquipped(*g_player);
+			TESAmmo* equippedAmmo = weapState->GetEquippedAmmo();
+			if (weapState)
+				weapState->GetEquippedAmmo();
 			auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 			if (itAD != MSF_MainData::ammoDataMap.end())
 			{
@@ -715,7 +723,7 @@ namespace MSF_Scaleform
 					menuRoot->CreateObject(&BammoArg);
 					RegisterString(&BammoArg, menuRoot, "ammoName", baseAmmo->fullName.name.c_str());
 					MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(&itAmmoData->baseAmmoData);
-					RegisterBool(&BammoArg, menuRoot, "isEquipped", instanceData->ammo == baseAmmo);
+					RegisterBool(&BammoArg, menuRoot, "isEquipped", equippedAmmo == baseAmmo);
 					RegisterInt(&BammoArg, menuRoot, "ammoCount", ammoCount);
 					dst->PushBack(&BammoArg);
 					_DEBUG("moddataptr: %p, %p", &itAmmoData->baseAmmoData, itAmmoData->baseAmmoData.mod);
@@ -723,13 +731,13 @@ namespace MSF_Scaleform
 				for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
 				{
 					UInt64 ammoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, itAmmoMod->ammo);
-					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0 || instanceData->ammo == itAmmoMod->ammo)
+					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch) || ammoCount != 0 || equippedAmmo == itAmmoMod->ammo)
 					{
 						GFxValue ammoArg;
 						menuRoot->CreateObject(&ammoArg);
 						RegisterString(&ammoArg, menuRoot, "ammoName", itAmmoMod->ammo->fullName.name.c_str());
 						MSF_MainData::modSwitchManager.AddDisplayedAmmoNoLock(itAmmoMod._Ptr);
-						RegisterBool(&ammoArg, menuRoot, "isEquipped", instanceData->ammo == itAmmoMod->ammo); //weapState!
+						RegisterBool(&ammoArg, menuRoot, "isEquipped", equippedAmmo == itAmmoMod->ammo); //weapState!
 						RegisterInt(&ammoArg, menuRoot, "ammoCount", ammoCount);
 						dst->PushBack(&ammoArg);
 						_DEBUG("moddataptr: %p, %p", itAmmoMod._Ptr, itAmmoMod->mod);

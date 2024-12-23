@@ -152,8 +152,9 @@ private:
 		{
 			movieRoot->GetVariable(&ReserveCount_tf, "root.RightMeters_mc.AmmoCount_mc.ReserveCount_tf");
 			movieRoot->GetVariable(&ClipCount_tf, "root.RightMeters_mc.AmmoCount_mc.ClipCount_tf");
-			CopyGFxParameters(&ChamberCount_tf, &ClipCount_tf, { "x", "y", "width", "height", "defaultTextFormat"});
-			//CopyGFxParametersWithOffset(&ChamberCount_tf, &ClipCount_tf, { {"x",5}, {"y",5}, {"width",0}, {"height",0}, {"scaleX",-0.75}, {"scaleY",-0.75} }, false);
+			//CopyGFxParameters(&ChamberCount_tf, &ClipCount_tf, { "x", "y", "width", "height", "defaultTextFormat"});
+			CopyGFxParameters(&ChamberCount_tf, &ClipCount_tf, { "defaultTextFormat" });
+			CopyGFxParametersWithOffset(&ChamberCount_tf, &ClipCount_tf, { {"x",-40}, {"y",50}, {"width",0}, {"height",0}, {"scaleX",-0.3}, {"scaleY",-0.3} }, false);
 			_MESSAGE("HUDMenu TextField injection success");
 			return;
 		}
@@ -196,8 +197,7 @@ private:
 		GFxValue buf;
 		for (auto parameter : floatParameters)
 		{
-			for (auto parameter : floatParameters)
-				source->GetMember(parameter.first.c_str(), &buf);
+			source->GetMember(parameter.first.c_str(), &buf);
 			double par = buf.GetNumber() + parameter.second;
 			target->SetMember(parameter.first.c_str(), &GFxValue(par));
 		}

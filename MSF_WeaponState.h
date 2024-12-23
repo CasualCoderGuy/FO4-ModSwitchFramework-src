@@ -40,6 +40,7 @@ public:
 	bool SetCurrentAmmo(TESAmmo* ammo);
 	bool SetEquippedAmmo(TESAmmo* ammo);
 	TESAmmo* GetEquippedAmmo();
+	bool SetSwitchData(SwitchData* switchData);
 	void PrintStoredData();
 
 	enum
@@ -95,6 +96,7 @@ public:
 		volatile int chamberedCount;
 		TESAmmo* chamberedAmmo;
 		TESAmmo* equippedAmmo;
+		SwitchData* switchData;
 		std::vector<TESAmmo*> BCRammo; //if BCR && TR: size=ammoCap; if !BCR && TR: size=chamber; if BCR && !TR: size=ammoCap
 		std::vector<BGSMod::Attachment::Mod*> stateMods;
 	private:
@@ -297,6 +299,12 @@ public:
 		BCR_ammoCount = RelocModuleAddr<UInt32>(_base, 0x79B24);
 		BCR_ammoCapacity = RelocModuleAddr<UInt32>(_base, 0x79B20);
 	};
+	bool SetBCRammoCap(UInt32 ammoCap)
+	{
+		if (!_base)
+			return false;
+		return (*(UInt32*)BCR_ammoCapacity.GetUIntPtr()) = ammoCap;
+	}
 private:
 	uintptr_t _base;
 	RelocModuleAddr<UInt32> BCR_ammoCount;

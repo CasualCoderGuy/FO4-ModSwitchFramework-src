@@ -13,13 +13,13 @@ namespace MSF_Serialization
 
 	void LoadCallback(const F4SESerializationInterface * intfc)
 	{
-		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
-		{
-			MSF_MainData::weaponStateStore.InvalidateAllIDs();
-			MSF_MainData::weaponStateStore.ClearInvalidWeaponStates();
-			_MESSAGE("MSF serialization data loading disabled.");
-			return;
-		}
+		//if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
+		//{
+		//	MSF_MainData::weaponStateStore.InvalidateAllIDs();
+		//	MSF_MainData::weaponStateStore.ClearInvalidWeaponStates();
+		//	_MESSAGE("MSF serialization data loading disabled.");
+		//	return;
+		//}
 		_MESSAGE("Loading MSF serialization data.");
 		UInt32 type, version, length;
 		while (intfc->GetNextRecordInfo(&type, &version, &length))
@@ -60,11 +60,11 @@ namespace MSF_Serialization
 
 	void SaveCallback(const F4SESerializationInterface * intfc)
 	{
-		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
-		{
-			_MESSAGE("MSF serialization data saving disabled.");
-			return;
-		}
+		//if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableMetadataSaving))
+		//{
+		//	_MESSAGE("MSF serialization data saving disabled.");
+		//	return;
+		//}
 		_MESSAGE("Saving MSF serialization data.");
 		//intfc->OpenRecord(StoredExtraWeaponState::dataType, SERIALIZATION_VERSION);
 		//UInt32 dataCount = MSF_MainData::weaponStateStore.GetCount();
