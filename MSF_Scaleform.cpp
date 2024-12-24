@@ -1,6 +1,6 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Test.h"
-
+#include "MSF_WeaponState.h"
 
 
 
@@ -212,6 +212,97 @@ public:
 };
 
 F4SEInputHandlerSink inputHandler;
+
+
+bool PipboyMenu::CreateItemData(PipboyMenu::ScaleformArgs* args, std::string text, std::string value)
+{
+	if (!args)
+		return false;
+	auto* movieRoot = args->movie->movieRoot;
+	auto& pInfoObj = args->args[1];
+	GFxValue extraData;
+	movieRoot->CreateObject(&extraData);
+	MSF_Scaleform::RegisterString(&extraData, movieRoot, "text", text.c_str());//
+	MSF_Scaleform::RegisterString(&extraData, movieRoot, "value", value.c_str());
+	MSF_Scaleform::RegisterInt(&extraData, movieRoot, "difference", 0);
+	args->args[1].PushBack(&extraData);
+	return true;
+}
+
+void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
+{
+	PipboyMenuInvoke_Copied(menu, args);
+	//(this->*Invoke_Original)(args);
+
+	if (args->optionID == 0xD && args->numArgs == 4 && args->args[0].GetType() == GFxValue::kType_Int && args->args[1].GetType() == GFxValue::kType_Array && args->args[2].GetType() == GFxValue::kType_Array)
+	{
+		SInt32 selectedIndex = args->args[0].GetInt();
+		PipboyObject* pHandlerData = nullptr;
+		if (selectedIndex >= 0 && selectedIndex < (*g_pipboyDataMgr)->itemData.count)
+			pHandlerData = (*g_pipboyDataMgr)->itemData[selectedIndex];
+		if (pHandlerData != nullptr)
+		{
+			static BSFixedString handleName("handleID");
+			static BSFixedString stackName("StackID");
+
+			auto* pipboyValueHandle = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->table.Find(&handleName)->value);
+			auto* pipboyValueStack = static_cast<PipboyArray*>(pHandlerData->table.Find(&stackName)->value);
+			//auto* pipboyValue = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->GetMemberValue(memberName));
+			if (pipboyValueHandle != nullptr)
+			{
+				UInt32 handleID = pipboyValueHandle->value;
+				auto* pSelectedData = (*g_itemMenuDataMgr)->GetSelectedItem(handleID);
+				UInt32 stackID = 0;
+				if (pipboyValueStack != nullptr && pipboyValueStack->values.entries)
+				{
+					auto* pipboyStackIDholder = static_cast<PipboyPrimitiveValue<UInt32>*>(*pipboyValueStack->values.entries);
+					stackID = pipboyStackIDholder->value;
+				}
+
+				if (pSelectedData != nullptr && pSelectedData->form != nullptr)
+				{
+
+					TESForm* pSelectedForm = pSelectedData->form;
+					BGSInventoryItem::Stack* selectedStack = Utilities::GetStack(pSelectedData, stackID);
+					ExtraDataList* extraDataList = selectedStack->extraData;
+					ExtraWeaponState::AmmoStateData* ammoState = nullptr;
+					if (extraDataList)
+					{
+						ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
+						if (holder)
+						{
+							ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.Get(holder->rank);
+							if (extraState)
+								ammoState = extraState->GetAmmoStateData();
+						}
+						//switch (pSelectedForm->formType)
+						//{
+						//case kFormType_WEAP:
+						if (pSelectedForm->formType == kFormType_WEAP)
+						{
+							//auto* pWeapon = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(neededInst, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+							//if (pWeapon)
+							//{
+							if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayMagInPipboy))
+							{
+								std::string displayString = std::to_string(ammoState->ammoCapacity) + "/" + std::to_string(ammoState->loadedAmmo);
+								menu->CreateItemData(args, "Mag Size/Loaded", displayString);
+							}
+							//if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayChamberInPipboy))
+							//{
+							//	std::string displayString = std::to_string(ammoState->chamberSize) + "/" + std::to_string(ammoState->chamberedCount);
+							//	menu->CreateItemData(args, "Chamber Size/Loaded", displayString);
+							//}
+							//}
+							//	break;
+							//}
+						}
+					}
+				}
+			}
+		}
+	}
+}
 
 namespace MSF_Scaleform
 {

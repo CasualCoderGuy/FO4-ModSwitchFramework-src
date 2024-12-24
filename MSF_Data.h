@@ -4,6 +4,8 @@
 class PlayerInventoryListEventSink;
 class ActorEquipManagerEventSink;
 class WeaponStateStore;
+class HUDMenuAmmoDisplay;
+class BCRinterface;
 
 class AmmoData
 {
@@ -22,9 +24,9 @@ public:
 class AnimationData
 {
 public:
-	AnimationData(TESIdleForm* animIdle_1stP_in, TESIdleForm* animIdle_3rdP_in, TESIdleForm* animIdle_1stP_PA_in, TESIdleForm* animIdle_3rdP_PA_in)
+	AnimationData(TESIdleForm* animIdle_1stP_in, TESIdleForm* animIdle_3rdP_in, TESIdleForm* animIdle_1stP_PA_in, TESIdleForm* animIdle_3rdP_PA_in, bool shouldBlend = true)
 	{
-		animIdle_1stP = animIdle_1stP_in; animIdle_3rdP = animIdle_3rdP_in; animIdle_1stP_PA = animIdle_1stP_PA_in; animIdle_3rdP_PA = animIdle_3rdP_PA_in;
+		animIdle_1stP = animIdle_1stP_in; animIdle_3rdP = animIdle_3rdP_in; animIdle_1stP_PA = animIdle_1stP_PA_in; animIdle_3rdP_PA = animIdle_3rdP_PA_in; shouldBlendAnim = shouldBlend;
 	};
 	TESIdleForm* GetAnimation()
 	{
@@ -51,6 +53,7 @@ public:
 	TESIdleForm* animIdle_3rdP;
 	TESIdleForm* animIdle_1stP_PA;
 	TESIdleForm* animIdle_3rdP_PA;
+	bool shouldBlendAnim;
 	//BGSAction* animAction;
 };
 
@@ -70,7 +73,8 @@ public:
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,
-			mBitTransferMask = 0xF000
+			mBitTransferMask = 0xF000,
+			bShouldNotStopIdle = 0x10000
 		};
 		class AttachRequirements
 		{
@@ -249,6 +253,7 @@ public:
 	SwitchData()
 	{
 		SwitchFlags = 0;
+		targetAmmo = nullptr;
 		ModToAttach = nullptr;
 		ModToRemove = nullptr;
 		LooseModToRemove = nullptr;
@@ -259,6 +264,7 @@ public:
 	~SwitchData()
 	{
 		SwitchFlags = 0;
+		targetAmmo = nullptr;
 		ModToAttach = nullptr;
 		ModToRemove = nullptr;
 		LooseModToRemove = nullptr;
@@ -271,12 +277,13 @@ public:
 		bNeedInit = 0x0001,
 		bSwitchingInProgress = 0x0002,
 		bQueuedHUDSelection = 0x0004,
-		bSetChamberedAmmo = 0x0008,
-		bDrawNeeded = 0x0080,
+		//bSetChamberedAmmo = 0x0008,
+		bDrawNeeded = 0x0008,
 		bDrawInProgress = 0x0800,
 		bReloadNeeded = 0x0010,
 		bReloadInProgress = 0x0020,
 		bReloadNotFinished = 0x0040,
+		bReloadFull = 0x0080,
 		bAnimNeeded = 0x0100,
 		bAnimInProgress = 0x0200,
 		bAnimNotFinished = 0x0400,
@@ -287,6 +294,7 @@ public:
 	};
 	UInt16 SwitchFlags;
 	KeywordValue animFlavor;
+	TESAmmo* targetAmmo;
 	BGSMod::Attachment::Mod* ModToAttach;
 	BGSMod::Attachment::Mod* ModToRemove;
 	TESObjectMISC* LooseModToRemove;
@@ -299,9 +307,12 @@ class ModSwitchManager
 private:
 	volatile UInt16 ignoreAnimGraphUpdate;
 	volatile UInt16 ignoreDeleteExtraData;
+	volatile UInt16 shouldBlendAnimation;
 	volatile UInt16 modChangeEvent;
 	volatile UInt16 isInPA;
+	volatile UInt16 isBCRreload;
 	volatile UInt16 switchState;
+	volatile UInt16 forcedReload;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
 
@@ -324,7 +335,10 @@ public:
 		InterlockedExchangePointer((void* volatile*)&openedMenu, nullptr);
 		InterlockedExchange16((volatile short*)&numberOfOpenedMenus, 0);
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
+		InterlockedExchange16((volatile short*)&isBCRreload, 0);
 		InterlockedExchange16((volatile short*)&isInPA, 0);
+		InterlockedExchange16((volatile short*)&shouldBlendAnimation, 0);
+		InterlockedExchange16((volatile short*)&forcedReload, 0);
 	};
 	enum
 	{
@@ -337,8 +351,14 @@ public:
 	bool GetIgnoreAnimGraph() { return ignoreAnimGraphUpdate; };
 	void SetIgnoreDeleteExtraData(bool bIgnore) { InterlockedExchange16((volatile short*)&ignoreDeleteExtraData, bIgnore); };
 	bool GetIgnoreDeleteExtraData() { return ignoreDeleteExtraData; };
+	void SetShouldBlendAnimation(bool bBlend) { InterlockedExchange16((volatile short*)&shouldBlendAnimation, bBlend); };
+	bool GetShouldBlendAnimation() { return shouldBlendAnimation; };
 	void SetModChangeEvent(bool bEquip) { InterlockedExchange16((volatile short*)&modChangeEvent, bEquip); };
 	bool GetModChangeEvent() { return modChangeEvent; };
+	void SetIsBCRreload(UInt16 bBCRreload) { InterlockedExchange16((volatile short*)&isBCRreload, bBCRreload); };
+	bool GetIsBCRreload() { return isBCRreload; };
+	bool GetSetForcedReload() { return InterlockedCompareExchange16((volatile short*)&forcedReload, 0, 1); };
+	bool SetForcedReload(bool bForce) { return InterlockedExchange16((volatile short*)&forcedReload, bForce); };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -461,6 +481,9 @@ public:
 		InterlockedExchangePointer((void* volatile*)&equippedInstanceData, nullptr);
 		UInt16 inPA = IsInPowerArmor(*g_player);
 		InterlockedExchange16((volatile short*)&isInPA, inPA);
+		InterlockedExchange16((volatile short*)&isBCRreload, 0);
+		InterlockedExchange16((volatile short*)&shouldBlendAnimation, 0);
+		InterlockedExchange16((volatile short*)&forcedReload, 0);
 	};
 };
 
@@ -475,7 +498,9 @@ public:
 
 	static GFxMovieRoot* MSFMenuRoot;
 	static ModSelectionMenu* widgetMenu;
+	static HUDMenuAmmoDisplay* ammoDisplay;
 
+	static BCRinterface BCRinterfaceHolder;
 	static ModSwitchManager modSwitchManager;
 	static WeaponStateStore weaponStateStore;
 	static PlayerInventoryListEventSink playerInventoryEventSink;
@@ -506,6 +531,7 @@ public:
 	//static std::unordered_map<BGSMod::Attachment::Mod*, UniqueState> modUniqueStateMap;
 	//static std::unordered_map<TESObjectWEAP*, UniqueState> weapUniqueStateMap;
 	static std::vector<KeywordValue> uniqueStateAPValues;
+	static std::vector<TESAmmo*> dontRemoveAmmoOnReload;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -549,6 +575,7 @@ public:
 		bRequireAmmoToSwitch = 0x00001000,
 		bSpawnRandomAmmo = 0x00002000,
 		bSpawnRandomMods = 0x00004000,
+		bDisableAutomaticReload = 0x00008000,
 		bWidgetAlwaysVisible = 0x00000001,
 		bShowAmmoIcon = 0x00000002,
 		bShowMuzzleIcon = 0x00000004,
@@ -563,6 +590,11 @@ public:
 		bEnableTacticalReloadAnim = 0x00080000,
 		bEnableBCRSupport = 0x00100000,
 		bReloadCompatibilityMode = 0x00200000,
+		bCustomAnimCompatibilityMode = 0x00400000,
+		bDisplayChamberedAmmoOnHUD = 0x01000000,
+		bDisplayConditionInPipboy = 0x02000000,
+		bDisplayMagInPipboy = 0x04000000,
+		bDisplayChamberInPipboy = 0x08000000,
 		mMakeExtraRankMask = bEnableAmmoSaving | bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt32 MCMSettingFlags;

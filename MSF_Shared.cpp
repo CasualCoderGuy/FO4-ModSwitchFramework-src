@@ -224,6 +224,15 @@ namespace Utilities
 		return true;
 	}
 
+	UInt32 GetLoadedAmmoCount(Actor* owner)
+	{
+		if (!owner)
+			return 0;
+		if (owner->middleProcess && owner->middleProcess->unk08->equipData.entries && owner->middleProcess->unk08->equipData[0].equippedData)
+			return (UInt32)owner->middleProcess->unk08->equipData[0].equippedData->unk18;
+		return 0;
+	}
+
 	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot)
 	{
 		if (ownerActor) 
@@ -456,9 +465,9 @@ namespace Utilities
 	BGSInventoryItem::Stack* GetStackFromItem(TESObjectREFR* owner, TESForm* item, UInt32 stackID)
 	{
 		if (!item || !owner)
-			return false;
+			return nullptr;
 		if (!owner->inventoryList)
-			return false;
+			return nullptr;
 		BGSInventoryItem inventoryItem;
 		for (UInt32 i = 0; i < owner->inventoryList->items.count; i++)
 		{
@@ -466,6 +475,7 @@ namespace Utilities
 			if (inventoryItem.form == item && inventoryItem.stack)
 				return GetStack(&inventoryItem, stackID);
 		}
+		return nullptr;
 	}
 
 	UInt64 GetInventoryItemCount(BGSInventoryList* inventory, TESForm* item)

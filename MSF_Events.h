@@ -230,7 +230,23 @@ typedef bool (*AttackInputHandler)(void* PlayerInputHandler, UInt32 inputCode, U
 extern RelocAddr <AttackInputHandler> AttackInputHandler_HookTarget;
 extern RelocAddr <AttackInputHandler> AttackInputHandler_Original;
 
+struct AmmoCountData
+{
+	UInt32 ammoCount;
+	UInt32 pad04;
+	bool unk08;
+	UInt16 pad0A;
+	bool unk0C;
+	UInt16 pad0E;
+	bool unk10;
+	HUDAmmoCounter* ammoCounter;
+};
+STATIC_ASSERT(sizeof(AmmoCountData) == 0x20);
 
+typedef AmmoCountData* (*CalcClipAmmoCounter)(AmmoCountData* ammoCountData);
+extern RelocAddr <CalcClipAmmoCounter> CalcClipAmmoCounter_HookTarget;
+extern RelocAddr <CalcClipAmmoCounter> CalcClipAmmoCounter_Original;
+extern CalcClipAmmoCounter CalcClipAmmoCounter_Copied;
 typedef UInt64(*HUDShowAmmoCounter)(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_HookTarget;
 extern RelocAddr <HUDShowAmmoCounter> HUDShowAmmoCounter_Original;
@@ -241,6 +257,8 @@ extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 extern RelocAddr <_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget;
 extern _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 
+extern RelocAddr <_EjectShellCasing> EjectShellCasing_HookTarget1;
+extern RelocAddr <_EjectShellCasing> EjectShellCasing_HookTarget2;
 extern RelocAddr <_AttachModToStack> AttachModToStack_CallFromGameplay_HookTarget;
 extern RelocAddr <_AttachModToStack> AttachModToStack_CallFromWorkbenchUI_HookTarget;
 extern RelocAddr <_DeleteExtraData> DeleteExtraData_CallFromWorkbenchUI_HookTarget;
@@ -248,6 +266,9 @@ extern RelocAddr <_UpdMidProc> UpdMidProc_HookTarget;
 extern RelocAddr <_UpdateEquipData> UpdateEquipData_HookTarget;
 extern RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData_HookTarget;
 extern RelocAddr <uintptr_t> LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget;
+extern RelocAddr <uintptr_t> SkipReloadJumpAddr;
+extern RelocAddr <AttackInputHandler> AttackInputHandler_SelfHookTarget;
+extern AttackInputHandler AttackInputHandler_Copied;
 extern _AttachModToStack AttachModToStack_CallFromGameplay_Copied;
 extern _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
 extern _DeleteExtraData DeleteExtraData_CallFromWorkbenchUI_Copied;
@@ -257,11 +278,33 @@ extern _UpdateEquippedWeaponData UpdateEquippedWeaponData_Copied;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_BranchCode;
 extern uintptr_t ExtraRankCompare_Copied;
+extern RelocAddr <uintptr_t> AmmoReserveCalcAddr;
+extern RelocAddr <_RemoveItem_Virtual> RemoveItem_ConsumeAmmo_HookTarget;
+extern _EjectShellCasing EjectShellCasing_Copied1;
+extern _EjectShellCasing EjectShellCasing_Copied2;
+
+typedef UInt32(*_GetLoadedAmmoCount)(Actor* owner, UInt32 edx);
+extern RelocAddr <_GetLoadedAmmoCount> GetLoadedAmmoCount_Original;
+extern RelocAddr <_GetLoadedAmmoCount> GetLoadedAmmoCount_HookTarget;
+extern _GetLoadedAmmoCount GetLoadedAmmoCount_Copied;
+typedef UInt32(*_CheckAmmoForReload)(Actor* target, TESBoundObject* toCount);
+extern RelocAddr <_CheckAmmoForReload> CheckAmmoForReload_Original;
+extern RelocAddr <_CheckAmmoForReload> CheckAmmoForReload_HookTarget;
+extern _CheckAmmoForReload CheckAmmoForReload_Copied;
+extern RelocAddr <uintptr_t> CheckAmmoCountForReload_JumpHookTarget;
+extern RelocAddr <uintptr_t> CheckAmmoCountForReload_ReturnJumpAddr;
+extern uintptr_t CheckAmmoCountForReload_BranchCode;
+
+struct ReloadJumpReplace {
+	uint8_t original[2] = { 0x0F, 0x84 };
+	uint8_t replacement[2] = { 0x90, 0xE9 };
+};
 
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);
 bool AttackInputHandler_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d);
+bool AttackInputHandlerReload_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d);
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx);
 bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
 bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* changesFunctor, UInt32 unk_r9d, UInt32* unk_rsp20);
@@ -271,6 +314,7 @@ void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt
 void UpdateEquippedWeaponData_Hook(EquippedWeaponData* data);
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack);
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
+bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

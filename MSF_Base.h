@@ -23,7 +23,7 @@ namespace MSF_Base
 	BGSMod::Attachment::Mod* GetAmmoModIfInvalid(BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap);
 	void SpawnRandomMods(TESObjectCELL* cell);
 
-	bool ReloadWeapon();
+	bool ReloadWeapon(bool full, bool forced = true);
 	bool DrawWeapon();
 	bool PlayAnim(AnimationData* animData);
 }

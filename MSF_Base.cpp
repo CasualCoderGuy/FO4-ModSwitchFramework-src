@@ -17,16 +17,18 @@ namespace MSF_Base
 			if (!MSF_Base::HandlePendingAnimations())
 				return false;
 		}
+		Actor* playerActor = *g_player;
 
 		_DEBUG("checksPassed");
 		SwitchData* switchData = new SwitchData();
 		BGSMod::Attachment::Mod* mod = selectedAmmo->mod;
+		switchData->targetAmmo = selectedAmmo->ammo;
 		_DEBUG("mod: %p", mod);
 		if (mod)
 			switchData->ModToAttach = mod;
 		else
 		{
-			BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41);
+			BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(playerActor, 41);
 			mod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
 			_DEBUG("modatAP: %p", mod);
 			if (mod)
@@ -49,19 +51,25 @@ namespace MSF_Base
 		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
 			return false;
 
+		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
+		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
+		bool isTR = MSF_Data::InstanceHasTRSupport(instance);
+		if (isBCR || isTR)
+			switchData->SwitchFlags |= SwitchData::bReloadFull;
+
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
 			{
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 				MSF_Base::SwitchMod(switchData, true);
-				MSF_Base::ReloadWeapon();
+				MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull);
 				return true;
 			}
 			_DEBUG("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
-			if (!MSF_Base::ReloadWeapon())
+			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull))
 				MSF_MainData::modSwitchManager.ClearQueue();
 				//MSF_Base::SwitchMod(switchData, true);
 			return true;
@@ -109,18 +117,24 @@ namespace MSF_Base
 			return false;
 		_DEBUG("queue/stateOK");
 
+		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
+		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
+		bool isTR = MSF_Data::InstanceHasTRSupport(instance);
+		if (isBCR || isTR)
+			switchData->SwitchFlags |= SwitchData::bReloadFull;
+
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
 			{
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 				MSF_Base::SwitchMod(switchData, true);
-				MSF_Base::ReloadWeapon();
+				MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull);
 				return true;
 			}
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
-			if (!MSF_Base::ReloadWeapon())
+			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull))
 				MSF_MainData::modSwitchManager.ClearQueue();
 			//MSF_Base::SwitchMod(switchData, true);
 			return true;
@@ -210,12 +224,18 @@ namespace MSF_Base
 					}
 					else
 						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress | ~SwitchData::bReloadNeeded); // | SwitchData::bReloadNotFinished
-					if (!MSF_Base::ReloadWeapon())
+					if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull))
 						MSF_MainData::modSwitchManager.ClearQueue();
 				}
 				else if (switchData->SwitchFlags & SwitchData::bAnimNeeded)
 				{
-					switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | ~SwitchData::bAnimNeeded);
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode)
+					{
+						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+						MSF_Base::SwitchMod(switchData, true);
+					}
+					else
+						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | ~SwitchData::bAnimNeeded);
 					if (!MSF_Base::PlayAnim(switchData->animData))
 						MSF_Base::SwitchMod(switchData, true);
 				}
@@ -856,9 +876,14 @@ namespace MSF_Base
 
 	//========================== Animation Functions ===========================
 
-	bool ReloadWeapon()
+	bool ReloadWeapon(bool full, bool forced)
 	{
 		Actor* playerActor = *g_player;
+		if (!full)
+		{
+			MSF_MainData::modSwitchManager.SetForcedReload(forced);
+			return Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionReload);
+		}
 		TESIdleForm* relIdle = MSF_Data::GetReloadAnimation(playerActor);
 		if (relIdle)
 		{
@@ -884,6 +909,7 @@ namespace MSF_Base
 		TESIdleForm* anim = animData->GetAnimation();
 		if (anim)
 		{
+			MSF_MainData::modSwitchManager.SetShouldBlendAnimation(animData->shouldBlendAnim);
 			Utilities::PlayIdle(*g_player, anim);
 			return true;
 		}

@@ -473,7 +473,13 @@ namespace MSF_Papyrus
 		return Utilities::GetEquippedWeapon(ownerActor);
 	}
 
-
+	bool PlayIdleWithBlend(StaticFunctionTag*, TESIdleForm* idle)
+	{
+		if (!idle)
+			return false;
+		MSF_MainData::modSwitchManager.SetShouldBlendAnimation(true);
+		return Utilities::PlayIdle(*g_player, idle);
+	}
 
 	//GetModTarget
 	//getAttachpoints
@@ -559,6 +565,8 @@ void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 		new NativeFunction1 <StaticFunctionTag, BGSKeyword*, BGSMod::Attachment::Mod*>("GetModAttachParent", SCRIPTNAME, GetModAttachParent, vm));
 	vm->RegisterFunction(
 		new NativeFunction1 <StaticFunctionTag, TESObjectWEAP*, Actor*>("GetEquippedWeapon", SCRIPTNAME, GetEquippedWeapon, vm));
+	vm->RegisterFunction(
+		new NativeFunction1 <StaticFunctionTag, bool, TESIdleForm*>("PlayIdleWithBlend", SCRIPTNAME, PlayIdleWithBlend, vm));
 
 	vm->RegisterFunction(
 		new NativeFunction0 <StaticFunctionTag, UInt32>("GetVersion", SCRIPTNAME, GetVersion, vm));

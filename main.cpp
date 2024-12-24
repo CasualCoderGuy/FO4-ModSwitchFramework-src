@@ -101,6 +101,8 @@ public:
 			//}
 			MSFMenu::RegisterMenu();
 			MSFMenu::OpenMenu();
+			delete MSF_MainData::ammoDisplay;
+			MSF_MainData::ammoDisplay = HUDMenuAmmoDisplay::Init();
 		}
 		return kEvent_Continue;
 	}
@@ -121,6 +123,15 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				_FATALERROR("MSF was unable to initialize MCM settings");
 			else
 			{
+				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisableAutomaticReload)
+				{
+					ReloadJumpReplace overwriteCode;
+					if (sizeof(overwriteCode.replacement) == 2)
+						HookUtil::SafeWriteBuf(SkipReloadJumpAddr.GetUIntPtr(), &overwriteCode.replacement, sizeof(overwriteCode.replacement));
+					else
+						_MESSAGE("Warning! ReloadJump replacement code write error.");
+				}
+
 				static auto pLoadGameHandler = new TESLoadGameHandler();
 				GetEventDispatcher<TESLoadGameEvent>()->AddEventSink(pLoadGameHandler);
 				MSF_Scaleform::ReceiveKeyEvents();
@@ -133,6 +144,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
 
 				MSF_Data::InitCompatibility();
+
 			}
 		}
 	}
@@ -151,6 +163,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 
 bool WriteHooks()
 {
+	AttackInputHandler_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_SelfHookTarget.GetUIntPtr(), &AttackInputHandlerReload_Hook);
 	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
 	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
 	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
@@ -199,10 +212,38 @@ bool WriteHooks()
 		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
 	}
 
+	struct CheckAmmoCountForReload_InjectCode : Xbyak::CodeGenerator {
+		CheckAmmoCountForReload_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+		{
+			Xbyak::Label hook, retnLabel;
+
+			mov(rdx, qword[rsi + 8]);
+			mov(rcx, qword[rdx]);
+			mov(edx, r14d);
+			mov(r8d, eax);
+			call(ptr[rip + hook]);
+			mov(rcx, qword[rsi]);
+			mov(byte[rcx], al);
+			jmp(ptr[rip + retnLabel]);
+
+			L(hook);
+			dq((uintptr_t)CheckAmmoCountForReload_Hook);
+			L(retnLabel);
+			dq(CheckAmmoCountForReload_ReturnJumpAddr);
+		}
+	};
+	void* codeBuf = g_localTrampoline.StartAlloc();
+	CheckAmmoCountForReload_InjectCode code(codeBuf);
+	g_localTrampoline.EndAlloc(code.getCurr());
+	CheckAmmoCountForReload_BranchCode = (uintptr_t)codeBuf;
+	g_branchTrampoline.Write5Branch(CheckAmmoCountForReload_JumpHookTarget.GetUIntPtr(), CheckAmmoCountForReload_BranchCode);
+
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
+	PipboyMenuInvoke_Copied = HookUtil::SafeWrite64(PipboyMenuInvoke_HookAddress.GetUIntPtr(), &PipboyMenuInvoke_Hook);
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
-	//g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
+	g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
+	g_branchTrampoline.Write5Call(AttackInputHandler_SelfHookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandlerReload_Hook);
 	g_branchTrampoline.Write5Call(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), (uintptr_t)HUDShowAmmoCounter_Hook);
 	g_branchTrampoline.Write5Call(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), (uintptr_t)EquipHandler_UpdateAnimGraph_Hook);
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromGameplay_Hook);
