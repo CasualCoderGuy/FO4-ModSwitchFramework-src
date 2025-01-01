@@ -7,9 +7,11 @@ namespace MSF_Base
 {
 	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo);//(void* obj)(void* obj);
 	bool SwitchAmmoHotkey(UInt8 key);
+	const char* EquipAmmoPipboy(TESAmmo* ammo, bool bEquip);
 	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove);//(void* modToAttach, void* modToRemove, bool bNeedInit);
 	bool ToggleModHotkey(ModData* modData);
 	bool SwitchModHotkey(UInt8 key, ModData* modData);
+	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip);
 	bool HandlePendingAnimations();
 	void EndSwitch(UInt16 flag);
 	void SwitchFlagsAND(UInt16 flag);
@@ -22,11 +24,17 @@ namespace MSF_Base
 	bool GetAmmoModToModify(BGSObjectInstanceExtra* mods, TESAmmo* targetAmmo, TESObjectWEAP* baseWeap, TESAmmo** finalAmmo, BGSMod::Attachment::Mod** modResult, bool* bAttach);
 	BGSMod::Attachment::Mod* GetAmmoModIfInvalid(BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap);
 	void SpawnRandomMods(TESObjectCELL* cell);
+	bool EquipAmmo(BGSInventoryList* invList, TESAmmo* ammo);
+	UInt8 IsNotSupportedAmmo(TESAmmo* ammo);
 
-	bool ReloadWeapon(bool full, bool forced = true);
+	bool ReloadWeapon(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true);
 	bool DrawWeapon();
 	bool PlayAnim(AnimationData* animData);
 }
+
+extern const char* modText;
+extern const char* itemText;
+extern const char* ammoUnequipText;
 
 struct AttachModMessage
 {

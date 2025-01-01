@@ -165,6 +165,7 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 			for (UInt32 ammoIdx = 0; ammoIdx < this->loadedAmmo; ammoIdx++)
 				this->BCRammo.push_back(this->equippedAmmo);
 		}
+		this->flags |= (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & mAmmoMask);
 	}
 
 	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
@@ -303,6 +304,11 @@ bool ExtraWeaponState::WeaponState::UpdateAmmoState(ExtraDataList* extraDataList
 	TESObjectWEAP* weapon = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
 	if (!weapon || !instanceData || !instanceData->ammo)
 		return false;
+	UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(instanceData->ammo) & WeaponState::mAmmoMask);
+	this->flags |= notSupportedAmmo;
+	if (notSupportedAmmo)
+		return false;
+
 	if (eventType != kEventTypeModdedWorkbench)
 	{
 		MSF_Data::GetChamberData(attachedMods, instanceData, &this->chamberSize, &this->flags);
@@ -323,8 +329,12 @@ bool ExtraWeaponState::WeaponState::UpdateAmmoState(ExtraDataList* extraDataList
 	}
 	else if (this->BCRammo.size() > 0)
 	{
-		UInt32 idx = this->flags & ExtraWeaponState::WeaponState::bChamberLIFO ? this->BCRammo.size() - 1 : 0;
-		targetAmmo = this->BCRammo[idx];
+		//UInt32 idx = this->flags & ExtraWeaponState::WeaponState::bChamberLIFO ? this->BCRammo.size() - 1 : 0;
+		//targetAmmo = this->BCRammo[idx];
+		if (stateChange)
+			targetAmmo = this->chamberedAmmo;
+		else
+			targetAmmo = instanceData->ammo;
 	}
 	else if (stateChange)
 		targetAmmo = this->chamberedAmmo;
@@ -427,6 +437,15 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		if (!currInstanceData->ammo)
 			return true;
 		_DEBUG("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
+		UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & WeaponState::mAmmoMask);
+		this->currentState->flags |= notSupportedAmmo;
+		if (notSupportedAmmo)
+		{
+			this->currentState->loadedAmmo = equipData->loadedAmmoCount;
+			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
+			return true;
+		}
+
 		UInt32 inventoryAmmo = Utilities::GetInventoryItemCount((*g_player)->inventoryList, equipData->ammo);
 		if (inventoryAmmo < this->currentState->loadedAmmo)
 		{
@@ -435,6 +454,11 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		}
 		else
 			equipData->loadedAmmoCount = this->currentState->loadedAmmo;
+		this->currentState->flags |= MSF_Data::InstanceHasBCRSupport(currInstanceData) << 5;
+		this->currentState->flags |= MSF_Data::InstanceHasTRSupport(currInstanceData) << 4;
+		if ((this->currentState->flags & WeaponState::bHasBCR) && (this->currentState->flags & WeaponState::bHasTacticalReload))
+			MSF_MainData::BCRinterfaceHolder.SetBCRammoCap(this->currentState->ammoCapacity + 1);
+		//set BCR ammoCount?
 		_DEBUG("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
 		//if (!Utilities::HasObjectMod(attachedMods, this->currentState->currentSwitchedAmmo->mod))//validate
 		//{
@@ -477,6 +501,12 @@ bool ExtraWeaponState::HandleAmmoChangeEvent(ExtraDataList* extraDataList, Equip
 	this->currentState->loadedAmmo = equipData->loadedAmmoCount;
 	if (this->currentState->loadedAmmo < this->currentState->chamberSize)
 		this->currentState->chamberedCount = this->currentState->loadedAmmo;
+	if ((this->currentState->flags & WeaponState::bHasBCR) && this->currentState->loadedAmmo != this->currentState->BCRammo.size())
+	{
+		this->currentState->BCRammo.clear();
+		for (UInt32 ammoIdx = 0; ammoIdx < this->currentState->loadedAmmo; ammoIdx++)
+			this->currentState->BCRammo.push_back(this->currentState->chamberedAmmo);
+	}
 	_DEBUG("ammoChangeState");
 	//if (equipData->loadedAmmoCount == 0 && this->currentState->switchToAmmoAfterFire)
 	//{
@@ -503,20 +533,54 @@ bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeap
 		return false;
 	if (this->currentState)
 	{
+		if (!currInstanceData->ammo)
+			return true;
+		UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & WeaponState::mAmmoMask);
+		this->currentState->flags |= notSupportedAmmo;
+		if (notSupportedAmmo)
+		{
+			this->currentState->loadedAmmo = equipData->loadedAmmoCount;
+			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
+			return true;
+		}
+		if (eventType == ExtraWeaponState::bEventTypeReloadInventory)
+		{
+			UInt32 ammoToUse = Utilities::GetInventoryItemCount((*g_player)->inventoryList, this->currentState->equippedAmmo);
+			if (ammoToUse > currInstanceData->ammoCapacity)
+				ammoToUse = currInstanceData->ammoCapacity;
+			equipData->loadedAmmoCount = ammoToUse;
+			this->currentState->loadedAmmo = ammoToUse;
+			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
+			if (MSF_Data::InstanceHasBCRSupport(currInstanceData))
+			{
+				this->currentState->BCRammo.clear();
+				for (UInt32 ammoIdx = 0; ammoIdx < this->currentState->loadedAmmo; ammoIdx++)
+					this->currentState->BCRammo.push_back(this->currentState->chamberedAmmo);
+			}
+			return true;
+		}
+
 		UInt16 BCRtype = MSF_MainData::modSwitchManager.GetIsBCRreload();
 		if (BCRtype)
 		{
-			if (MSF_Data::InstanceHasTRSupport(currInstanceData))
-				MSF_MainData::BCRinterfaceHolder.SetBCRammoCap(this->currentState->ammoCapacity + 1);
+			//if (MSF_Data::InstanceHasTRSupport(currInstanceData))
+			//	MSF_MainData::BCRinterfaceHolder.SetBCRammoCap(this->currentState->ammoCapacity + 1);
 			this->currentState->BCRammo.push_back(this->currentState->equippedAmmo);
 			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
+			if (eventType == ExtraWeaponState::bEventTypeReloadAfterSwitch)
+			{
+				equipData->loadedAmmoCount = 1;
+				UInt32 totalAmmoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, this->currentState->equippedAmmo);
+				MSF_MainData::BCRinterfaceHolder.RestoreBCRvariables();
+				MSF_MainData::BCRinterfaceHolder.UpdateBCRvariables(1, currInstanceData->ammoCapacity, totalAmmoCount);
+			}
 		}
 		else
 		{
 			UInt32 ammoToUse = Utilities::GetInventoryItemCount((*g_player)->inventoryList, this->currentState->equippedAmmo);
 			if (ammoToUse > currInstanceData->ammoCapacity)
 				ammoToUse = currInstanceData->ammoCapacity;
-			if (MSF_Data::InstanceHasTRSupport(currInstanceData))
+			if (MSF_Data::InstanceHasTRSupport(currInstanceData) && (eventType != ExtraWeaponState::bEventTypeReloadAfterSwitch))
 				equipData->loadedAmmoCount = ammoToUse + (oldLoadedAmmoCount < this->currentState->chamberedCount ? oldLoadedAmmoCount : this->currentState->chamberedCount); //currInstanceData->ammoCapacity +
 			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
 		}
@@ -675,6 +739,13 @@ ExtraWeaponState::AmmoStateData* ExtraWeaponState::GetAmmoStateData()
 	data.chamberSize = this->currentState->chamberSize;
 	data.loadedAmmo = this->currentState->loadedAmmo;
 	return &data;
+}
+
+UInt8 ExtraWeaponState::HasNotSupportedAmmo()
+{
+	if (!this->currentState)
+		return 0;
+	return this->currentState->flags & WeaponState::mAmmoMask;
 }
 
 void ExtraWeaponState::PrintStoredData()

@@ -40,6 +40,7 @@ public:
 	bool SetCurrentAmmo(TESAmmo* ammo);
 	bool SetEquippedAmmo(TESAmmo* ammo);
 	TESAmmo* GetEquippedAmmo();
+	UInt8 HasNotSupportedAmmo();
 	void PrintStoredData();
 
 	enum
@@ -49,6 +50,8 @@ public:
 		kEventTypeAmmoCount,
 		kEventTypeFireWeapon,
 		kEventTypeReload,
+		kEventTypeEmptyMag,
+		kEventTypeSwitchMag,
 		kEventTypeModded,
 		kEventTypeModdedWorkbench,
 		kEventTypeModdedGameplay,
@@ -58,8 +61,11 @@ public:
 
 		bEventTypeReloadBCR,
 		bEventTypeReloadFullBCR,
+		bEventTypeReloadSwitchBCR,
 		bEventTypeReloadEndBCR,
-		bEventTypeReloadTactical
+		bEventTypeReloadTactical,
+		bEventTypeReloadAfterSwitch,
+		bEventTypeReloadInventory
 	};
 	struct AmmoStateData
 	{
@@ -79,12 +85,15 @@ public:
 		WeaponState* Clone();
 		enum
 		{
-			bHasLevel = 0x0001,
-			bActive = 0x0002,
+			bHasLevel = 0x0100,
+			bActive = 0x0200,
 			bHasTacticalReload = 0x0010,
 			bHasBCR = 0x0020,
 			bChamberLIFO = 0x0040, //otherwise FIFO
-			mChamberMask = 0x00F0
+			mChamberMask = 0x00F0,
+			bNotPlayable = 0x0001,
+			bIsFusionCore = 0x0002,
+			mAmmoMask = 0x000F
 		};
 		UInt16 flags; //state flags
 		UInt16 ammoCapacity;
@@ -190,8 +199,11 @@ public:
 	{
 		if (id == 0)
 			return nullptr;
-		ExtraRank* holder = mapstorage[id];
-		if (holder && holder->rank != id)
+		auto itHolder = mapstorage.find(id);
+		if (itHolder == mapstorage.end() || !itHolder->second)
+			return nullptr;
+		ExtraRank* holder = itHolder->second;
+		if (holder->rank != id)
 		{
 			_DEBUG("IDerror");
 			holder = nullptr;
@@ -291,10 +303,22 @@ public:
 			_MESSAGE("BulletCountedReload.dll found at %p", _base);
 		else
 			_MESSAGE("BulletCountedReload.dll not found");
+		//BulletCountedReload.dll+8785
 		//73004
 		//730B8
 		BCR_ammoCount = RelocModuleAddr<UInt32>(_base, 0x79B24);
 		BCR_ammoCapacity = RelocModuleAddr<UInt32>(_base, 0x79B20);
+		BCR_instanceData = RelocModuleAddr<TESObjectWEAP::InstanceData*>(_base, 0x79B10);
+		BCR_totalAmmo = RelocModuleAddr<UInt32>(_base, 0x79B04);
+		reloadEnded = RelocModuleAddr<bool>(_base, 0x73CA8);
+		reloadStarted = RelocModuleAddr<bool>(_base, 0x79AD2);
+		incrementer = RelocModuleAddr<UInt32>(_base, 0x79AD4);
+		toAdd = RelocModuleAddr<UInt32>(_base, 0x79B00);
+		stopPressed = RelocModuleAddr<bool>(_base, 0x79AD1);
+		animWillPlay = RelocModuleAddr<bool>(_base, 0x73CA9);
+		uncull = RelocModuleAddr<bool>(_base, 0x79AD3);
+		readyToStop = RelocModuleAddr<bool>(_base, 0x79AD0);
+		animDone = RelocModuleAddr<UInt32>(_base, 0x79AE0);
 	};
 	bool SetBCRammoCap(UInt32 ammoCap)
 	{
@@ -302,11 +326,98 @@ public:
 			return false;
 		return (*(UInt32*)BCR_ammoCapacity.GetUIntPtr()) = ammoCap;
 	}
+	bool SetBCRloadedAmmo(UInt32 loadedAmmo)
+	{
+		if (!_base)
+			return false;
+		return (*(UInt32*)BCR_ammoCount.GetUIntPtr()) = loadedAmmo;
+	}
+	bool StoreBCRvariables()
+	{
+		if (!_base)
+			return false;
+		stored_BCR_ammoCount = *(UInt32*)BCR_ammoCount.GetUIntPtr();
+		stored_BCR_ammoCapacity = *(UInt32*)BCR_ammoCapacity.GetUIntPtr();
+		stored_BCR_totalAmmo = *(UInt32*)BCR_totalAmmo.GetUIntPtr();
+		stored_reloadEnded = *(bool*)reloadEnded.GetUIntPtr();
+		stored_reloadStarted = *(bool*)reloadStarted.GetUIntPtr();
+		stored_incrementer = *(UInt32*)incrementer.GetUIntPtr();
+		stored_toAdd = *(UInt32*)toAdd.GetUIntPtr();
+		stored_stopPressed = *(bool*)stopPressed.GetUIntPtr();
+		stored_animWillPlay = *(bool*)animWillPlay.GetUIntPtr();
+		stored_uncull = *(bool*)uncull.GetUIntPtr();
+		stored_readyToStop = *(bool*)readyToStop.GetUIntPtr();
+		stored_animDone = *(UInt32*)animDone.GetUIntPtr();
+		return true;
+	}
+	bool RestoreBCRvariables()
+	{
+		if (!_base)
+			return false;
+		 (*(UInt32*)BCR_ammoCount.GetUIntPtr()) = stored_BCR_ammoCount;
+		 (*(UInt32*)BCR_ammoCapacity.GetUIntPtr()) = stored_BCR_ammoCapacity;
+		 (*(UInt32*)BCR_totalAmmo.GetUIntPtr()) = stored_BCR_totalAmmo;
+		 (*(bool*)reloadEnded.GetUIntPtr()) = stored_reloadEnded; //
+		 (*(bool*)reloadStarted.GetUIntPtr()) = stored_reloadStarted;
+		 (*(UInt32*)incrementer.GetUIntPtr()) = stored_incrementer; //
+		 (*(UInt32*)toAdd.GetUIntPtr()) = stored_toAdd;
+		 (*(bool*)stopPressed.GetUIntPtr()) = stored_stopPressed; //
+		 (*(bool*)animWillPlay.GetUIntPtr()) = stored_animWillPlay; //
+		 (*(bool*)uncull.GetUIntPtr()) = stored_uncull;
+		 (*(bool*)readyToStop.GetUIntPtr()) = stored_readyToStop;
+		 (*(UInt32*)animDone.GetUIntPtr()) = stored_animDone;
+		return true;
+	}
+	bool UpdateBCRvariables(UInt32 ammoCount, UInt32 ammoCapacity, UInt32 totalAmmoCount)
+	{
+		if (!_base)
+			return false;
+		UInt32 ammoCap = *(UInt32*)BCR_ammoCapacity.GetUIntPtr();
+		UInt32 add = ammoCap;
+		if (ammoCap > totalAmmoCount)
+			add = totalAmmoCount;
+		if (add != ammoCap && ammoCount)
+			(*(UInt32*)incrementer.GetUIntPtr()) = ammoCount-1;
+		_DEBUG("ammoCount: %08X, add: %08X, totalAmmoCount: %08X, ammoCap: %08X", ammoCount, add, totalAmmoCount, ammoCap);
+		(*(UInt32*)BCR_ammoCount.GetUIntPtr()) = ammoCount;
+		//*(UInt32*)BCR_ammoCapacity.GetUIntPtr() = stored_BCR_ammoCapacity;
+		(*(UInt32*)BCR_totalAmmo.GetUIntPtr()) = totalAmmoCount-ammoCount;
+		(*(UInt32*)toAdd.GetUIntPtr()) = add;
+		(*(bool*)readyToStop.GetUIntPtr()) = true;
+		(*(UInt32*)animDone.GetUIntPtr()) = 1;
+		return true;
+	}
+	void LogStored()
+	{
+		_MESSAGE("%08X, %08X, %08X, %02X, %02X, %08X, %08X, %02X, %02X, %02X, %02X", stored_BCR_ammoCount, stored_BCR_ammoCapacity, stored_BCR_totalAmmo, stored_reloadEnded, stored_reloadStarted, stored_incrementer, stored_toAdd, stored_stopPressed, stored_animWillPlay, stored_uncull, stored_readyToStop);
+	}
+
+	bool IsLoaded() { return _base ? true : false; }
 private:
 	uintptr_t _base;
+	RelocModuleAddr<TESObjectWEAP::InstanceData*> BCR_instanceData;
 	RelocModuleAddr<UInt32> BCR_ammoCount;
 	RelocModuleAddr<UInt32> BCR_ammoCapacity;
-public:
-
-
+	RelocModuleAddr<UInt32> BCR_totalAmmo;
+	RelocModuleAddr<bool> reloadEnded;
+	RelocModuleAddr<bool> reloadStarted;
+	RelocModuleAddr<UInt32> incrementer;
+	RelocModuleAddr<UInt32> toAdd;
+	RelocModuleAddr<bool> stopPressed;
+	RelocModuleAddr<bool> animWillPlay;
+	RelocModuleAddr<bool> uncull;
+	RelocModuleAddr<bool> readyToStop;
+	RelocModuleAddr<UInt32> animDone;
+	UInt32 stored_BCR_ammoCount;
+	UInt32 stored_BCR_ammoCapacity;
+	UInt32 stored_BCR_totalAmmo;
+	bool stored_reloadEnded;
+	bool stored_reloadStarted;
+	UInt32 stored_incrementer;
+	UInt32 stored_toAdd;
+	bool stored_stopPressed;
+	bool stored_animWillPlay;
+	bool stored_uncull;
+	bool stored_readyToStop;
+	UInt32 stored_animDone;
 };

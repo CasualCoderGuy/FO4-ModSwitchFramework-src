@@ -3,12 +3,20 @@ v1.0.1
 features:
 - BCR and TR support added (loaded bullets remain in the chamber; when switching ammo, the full reload animations should be triggered; added forced reload capability to PlayIdleAction)
 - added the option to display mag size and loaded ammo count for weapons in the Pipboy menu
+- ammo can now be switched through the Pipboy menu
 - option to disable automatic reload added (restart required)
 - chambered and magazine ammo type and count should now be accurately tracked in ExtraWeaponState
+- option to display currently equipped ammo in the Pipboy menu has been added
+- a new reload type is added, when the ammo needs to be emptied from the weapon before reloading (use emptyMag animation event and MSF_AnimsEmptyBeforeReload keyword)
+- added new animation variables (SwitchAmmoTypeReload, ChamberedAmmoCount, ChamberSize, and reserved variables)
 - added custom mod switch animation compatibility setting (for behavior file incompatibilities); if this is turned on in the MCM, the mod change will happen at the end of the animation instead of after the "switchMod" event (Note: this can cause the mod to not be switched even if the custom animation sent the "switchMod" event before it was interrupted)
 fixes:
 - the animations called with PlayIdle will not play WPNEquipFast (if you do need it to be played for a mod switch, specify the bShouldNotStopIdle(0x10000) flag)
 - fixed a CTD that occured during serialization
+- fixed issues occurring with special ammo, fusion core type ammo and not playable ammo are not supported
+- the widget now should not display weapon info after a weapon has been unequipped
+- fixed an issue with weapon state storage
+- fixed an issue with weapon state mods serialization
 ---
 v0.1.1
 features:

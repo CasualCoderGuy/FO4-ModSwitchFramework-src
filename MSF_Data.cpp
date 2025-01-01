@@ -6,6 +6,7 @@
 #include "RNG.h"
 #include <fstream>
 #include <random>
+#include <algorithm>
 
 std::unordered_map<TESAmmo*, AmmoData*> MSF_MainData::ammoDataMap;
 std::unordered_map<TESObjectWEAP*, AnimationData*> MSF_MainData::reloadAnimDataMap;
@@ -24,6 +25,7 @@ BGSKeyword* MSF_MainData::hasSwitchedAmmoKW;
 BGSKeyword* MSF_MainData::hasUniqueStateKW;
 BGSKeyword* MSF_MainData::tacticalReloadKW = nullptr;
 ActorValueInfo* MSF_MainData::BCR_AVIF;
+ActorValueInfo* MSF_MainData::BCR_AVIF2;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
@@ -35,6 +37,9 @@ BGSKeyword* MSF_MainData::GrenadeKW;
 BGSKeyword* MSF_MainData::UnarmedKW;
 BGSKeyword* MSF_MainData::Melee1HKW;
 BGSKeyword* MSF_MainData::Melee2HKW;
+BGSKeyword* MSF_MainData::IsMagKW;
+BGSKeyword* MSF_MainData::AnimsEmptyBeforeReloadKW;
+BGSKeyword* MSF_MainData::FusionCoreKW;
 TESIdleForm* MSF_MainData::reloadIdle1stP;
 TESIdleForm* MSF_MainData::reloadIdle3rdP;
 TESIdleForm* MSF_MainData::fireIdle1stP;
@@ -82,6 +87,7 @@ std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
 std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamberMap;
 std::vector<KeywordValue> MSF_MainData::uniqueStateAPValues;
 std::vector<TESAmmo*> MSF_MainData::dontRemoveAmmoOnReload;
+std::vector<TESObjectWEAP*>  MSF_MainData::BCRweapons;
 Utilities::Timer MSF_MainData::tmr;
 
 RandomNumber MSF_MainData::rng;
@@ -152,6 +158,8 @@ namespace MSF_Data
 		MSF_MainData::FiringModBurstKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000024);
 		MSF_MainData::FiringModeUnderbarrelKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000021);
 		MSF_MainData::hasUniqueStateKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000001);
+		MSF_MainData::IsMagKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000002);
+		MSF_MainData::AnimsEmptyBeforeReloadKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000003);
 		MSF_MainData::fireIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004AE1));
 		MSF_MainData::fireIdle3rdP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0018E1F));
 		MSF_MainData::reloadIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004D33));
@@ -163,6 +171,8 @@ namespace MSF_Data
 		MSF_MainData::ActionGunDown = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0022A35));
 		MSF_MainData::ActionRightRelease = reinterpret_cast<BGSAction*>(LookupFormByID((UInt32)0x0013454));
 		MSF_MainData::BCR_AVIF = reinterpret_cast<ActorValueInfo*>(LookupFormByID((UInt32)0x0000300)); 
+		MSF_MainData::BCR_AVIF2 = reinterpret_cast<ActorValueInfo*>(LookupFormByID((UInt32)0x00002FC));
+		MSF_MainData::FusionCoreKW = reinterpret_cast<BGSKeyword*>(LookupFormByID((UInt32)0x005BDAA)); //1025AE
 
 		UInt8 tacticalReloadModIndex = (*g_dataHandler)->GetLoadedModIndex("TacticalReload.esm");
 		if (tacticalReloadModIndex != 0xFF)
@@ -247,7 +257,7 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch \
+		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch\
 			| MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
 			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods | MSF_MainData::bEnableMetadataSaving \
 			| MSF_MainData::bEnableAmmoSaving | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport | MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
@@ -462,7 +472,7 @@ namespace MSF_Data
 							_MESSAGE("Keybind read warning in %s: keybind with id '%s' has been overwritten", modName.c_str(), id.c_str());
 							KeybindData* kb = kbIt->second;
 							std::string menuName = keybind["menuName"].asString();
-							UInt8 flags = keybind["keyfunction"].asInt();
+							UInt16 flags = keybind["keyfunction"].asInt();
 							if ((menuName == "") && (flags & KeybindData::bHUDselection))
 							{
 								_MESSAGE("Keybind read error in %s: if 'bHUDselection' flag is set 'menuName' can not be an empty string", modName.c_str());
@@ -472,6 +482,8 @@ namespace MSF_Data
 							{
 								UInt8 type = 0;
 								if (flags & KeybindData::bGlobalMenu)
+									type = ModSelectionMenu::kType_Global;
+								else if (flags & KeybindData::bMenuBoth)
 									type = ModSelectionMenu::kType_All;
 								else if (flags & KeybindData::bIsAmmo)
 									type = ModSelectionMenu::kType_AmmoMenu;
@@ -675,6 +687,8 @@ namespace MSF_Data
 				flag = MSF_MainData::bDisplayMagInPipboy;
 			else if (settingName == "bDisplayChamberInPipboy")
 				flag = MSF_MainData::bDisplayChamberInPipboy;
+			else if (settingName == "bShowEquippedAmmo")
+				flag = MSF_MainData::bShowEquippedAmmo;
 			else
 				return false;
 
@@ -1012,6 +1026,8 @@ namespace MSF_Data
 						TESAmmo* baseAmmo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESAmmo);
 						if (!baseAmmo)
 						{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), str.c_str()); continue; }
+						if (MSF_Base::IsNotSupportedAmmo(baseAmmo))
+						{ _MESSAGE("Data error in %s: ammo '%s' is not supported", fileName.c_str(), str.c_str()); continue; }
 						BGSMod::Attachment::Mod* baseMod = nullptr;
 						//str = ammoData["baseMod"].asString();
 						//if (str != "")
@@ -1043,6 +1059,8 @@ namespace MSF_Data
 									TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
 									if (!ammo)
 									{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
+									if (MSF_Base::IsNotSupportedAmmo(ammo))
+									{ _MESSAGE("Data error in %s: ammo '%s' is not supported", fileName.c_str(), str.c_str()); continue; }
 									type = ammoType["mod"].asString();
 									if (type == "")
 									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->mod' can not be an empty string", fileName.c_str()); continue; }
@@ -1100,6 +1118,8 @@ namespace MSF_Data
 									TESAmmo* ammo = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(type), TESForm, TESAmmo);
 									if (!ammo)
 									{ _MESSAGE("Data error in %s: ammo '%s' could not be found in loaded game data", fileName.c_str(), type.c_str()); continue; }
+									if (MSF_Base::IsNotSupportedAmmo(ammo))
+									{ _MESSAGE("Data error in %s: ammo '%s' is not supported", fileName.c_str(), str.c_str()); continue; }
 									type = ammoType["mod"].asString();
 									if (type == "")
 									{ _MESSAGE("Data error in %s: 'ammoData->ammoTypes->mod' can not be an empty string", fileName.c_str()); continue; }
@@ -1169,6 +1189,12 @@ namespace MSF_Data
 						{
 							_MESSAGE("Data error in %s: keybind with keyID '%s' is flagged as ammo, skipping all of its data in 'hotkeys' section", fileName.c_str(), keyID.c_str()); continue;
 						}
+						if (itKb->type & KeybindData::bGlobalMenu)
+						{
+							//get attach points
+							continue;
+						}
+						//getmenuanim
 						const Json::Value& modStruct = key["modData"];
 						if (!modStruct.isArray()) /////!!!!!!
 						{
@@ -1688,6 +1714,49 @@ namespace MSF_Data
 		return nullptr;
 	}
 
+	SwitchData* GetModForAmmo(TESAmmo* targetAmmo)
+	{
+		if (!targetAmmo)
+			return nullptr;
+		BGSObjectInstanceExtra* moddata = Utilities::GetEquippedModData(*g_player, 41);
+		TESObjectWEAP* baseWeapon = Utilities::GetEquippedGun(*g_player);
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(moddata, baseWeapon);
+		if (!baseAmmo)
+			return nullptr;
+		_DEBUG("baseOK");
+		auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
+		if (itAD != MSF_MainData::ammoDataMap.end())
+		{
+			_DEBUG("ammofound");
+			AmmoData* itAmmoData = itAD->second;
+			if (targetAmmo == baseAmmo)
+			{
+				BGSMod::Attachment::Mod* currSwitchedMod = Utilities::GetModAtAttachPoint(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::ammoAP);
+				if (!currSwitchedMod)
+					return nullptr;
+				SwitchData* switchData = new SwitchData();
+				switchData->ModToRemove = currSwitchedMod;
+				switchData->targetAmmo = baseAmmo;
+				return switchData;
+			}
+			for (auto itAmmoMod : itAmmoData->ammoMods)
+			{
+				if (itAmmoMod.ammo == targetAmmo)
+				{
+					BGSMod::Attachment::Mod* currSwitchedMod = Utilities::GetModAtAttachPoint(Utilities::GetEquippedModData(*g_player, 41), MSF_MainData::ammoAP);
+					if (currSwitchedMod == itAmmoMod.mod)
+						return nullptr;
+					SwitchData* switchData = new SwitchData();
+					switchData->ModToAttach = itAmmoMod.mod;
+					switchData->targetAmmo = itAmmoMod.ammo;
+					_DEBUG("retOK");
+					return switchData;
+				}
+			}
+		}
+		return nullptr;
+	}
+
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData)
 	{
 		if (num < 0)
@@ -2202,16 +2271,16 @@ namespace MSF_Data
 
 	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance)
 	{
-		if (!instance || !MSF_MainData::BCR_AVIF)
+		if (!instance || !MSF_MainData::BCR_AVIF || !MSF_MainData::BCR_AVIF2)
 			return false;
-		return instance->skill == MSF_MainData::BCR_AVIF;
+		return instance->skill == MSF_MainData::BCR_AVIF || instance->skill == MSF_MainData::BCR_AVIF2;
 	}
 
 	bool WeaponHasBCRSupport(TESObjectWEAP* weapon)
 	{
-		if (!weapon || !MSF_MainData::BCR_AVIF)
+		if (!weapon || !MSF_MainData::BCR_AVIF || !MSF_MainData::BCR_AVIF2)
 			return false;
-		return weapon->weapData.skill == MSF_MainData::BCR_AVIF;
+		return weapon->weapData.skill == MSF_MainData::BCR_AVIF || weapon->weapData.skill == MSF_MainData::BCR_AVIF2;
 	}
 
 	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance)
@@ -2282,3 +2351,278 @@ namespace MSF_Data
 	}
 }
 
+BGSProjectile* CustomProjectileFormManager::Clone(BGSProjectile* proj)
+{
+	BGSProjectile* result = nullptr;
+	if (!proj)
+		return result;
+	void* memory = Heap_Allocate(sizeof(Projectile));
+	errno_t error = memcpy_s(memory, sizeof(Projectile), proj, sizeof(Projectile));
+	if (error)
+		Heap_Free(memory);
+	else
+	{
+		result = (BGSProjectile*)memory;
+		result->formID = 0;
+		//result->formType = 0x92;
+		result->unk08 = nullptr;
+		result->flags = 0x00004008;
+		result->unk18 = 0;
+	}
+	return result;
+}
+
+bool CustomProjectileFormManager::ClearData()
+{
+	for (auto entry : projectileParentMap)
+		Heap_Free(entry.second.first);
+	projectileParentMap.clear();
+}
+
+bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
+{
+	if (!extraDataList)
+		return false;
+	auto itOldProj = projectileParentMap.find(extraDataList);
+	TESObjectWEAP::InstanceData* instanceData = nullptr;
+	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	if (!extraInstanceData)
+		return ReturnCleanup(itOldProj, instanceData);
+	instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	if (!instanceData || !instanceData->firingData)
+		return ReturnCleanup(itOldProj, instanceData);
+	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
+	if (!baseWeap)
+		return ReturnCleanup(itOldProj, instanceData);
+	BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+	if (!attachedMods)
+		return ReturnCleanup(itOldProj, instanceData);
+	auto data = attachedMods->data;
+	if (!data || !data->forms)
+		return ReturnCleanup(itOldProj, instanceData);
+	std::vector<BGSMod::Attachment::Mod*> objMods;
+	for (UInt32 idx = 0; idx < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); idx++)
+	{
+		BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[idx].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+		objMods.push_back(mod);
+	}
+	std::sort(objMods.begin(), objMods.end(),
+		[](BGSMod::Attachment::Mod* a, BGSMod::Attachment::Mod* b){
+			return a->priority < b->priority;
+		});
+	std::vector<std::vector<BGSMod::Container::Data>*> toModify;
+	for (auto mod : objMods)
+	{
+		auto itData = projectileModMap.find(mod);
+		if (itData != projectileModMap.end())
+			toModify.push_back(&itData->second);
+	}
+	if (toModify.size() == 0)
+	{
+
+	}
+	BGSProjectile* baseProj = instanceData->firingData->projectileOverride; //priority order?
+	if (!baseProj && baseWeap->weapData.ammo)
+	{
+		Ammo* ammo = (Ammo*)baseWeap->weapData.ammo;
+		baseProj = ammo->data.projectile;
+	}
+	else
+		return ReturnCleanup(itOldProj, instanceData);
+	if (!baseProj)
+		return ReturnCleanup(itOldProj, instanceData);
+	Projectile* newProj = (Projectile*)Clone(baseProj);
+	if (!newProj)
+		return ReturnCleanup(itOldProj, instanceData);
+	float fv1 = 0.0;
+	UInt32 iv1 = 0;
+	for (auto vec : toModify)
+	{
+		for (auto data : *vec)
+		{
+			switch (data.op)
+			{
+			case BGSMod::Container::Data::kOpFlag_Set_Bool:
+			{
+				iv1 = data.value.i.v1;
+				//iv2 = data->value.i.v2;
+				if (data.target == kWeaponTarget_TracerFreq)
+					newProj->data.tracerFrequency = iv1;
+
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Add_Int:
+			{
+				iv1 = data.value.i.v1;
+				//iv2 = data->value.i.v2;
+				if (data.target == kWeaponTarget_TracerFreq)
+					newProj->data.tracerFrequency += iv1;
+
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Set_Float:
+			{
+				fv1 = data.value.f.v1;
+				//fv2 = data->value.f.v2;
+				switch (data.target)
+				{
+				case kWeaponTarget_Gravity: newProj->data.gravity = fv1; break;
+				case kWeaponTarget_Speed: newProj->data.speed = fv1; break;
+				case kWeaponTarget_Range: newProj->data.range = fv1; break;
+				case kWeaponTarget_ExpProximity: newProj->data.explosionProximity = fv1; break;
+				case kWeaponTarget_ExpTimer: newProj->data.explosionTimer = fv1; break;
+				case kWeaponTarget_MuzzleFlashDur: newProj->data.muzzleFlashDuration = fv1; break;
+				case kWeaponTarget_FadeOutTime: newProj->data.fadeOutTime = fv1; break;
+				case kWeaponTarget_Force: newProj->data.force = fv1; break;
+				case kWeaponTarget_ConeSpread: newProj->data.coneSpread = fv1; break;
+				case kWeaponTarget_CollRadius: newProj->data.collisionRadius = fv1; break;
+				case kWeaponTarget_Lifetime: newProj->data.lifetime = fv1; break;
+				case kWeaponTarget_RelaunchInt: newProj->data.relaunchInterval = fv1; break;
+				}
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Mul_Add_Float:
+			{
+				fv1 = data.value.f.v1;
+				//fv2 = data->value.f.v2;
+				switch (data.target)
+				{
+				case kWeaponTarget_TracerFreq: newProj->data.tracerFrequency = roundp(newProj->data.tracerFrequency * fv1); break;
+				case kWeaponTarget_Gravity: newProj->data.gravity = newProj->data.gravity * fv1; break;
+				case kWeaponTarget_Speed: newProj->data.speed = newProj->data.speed * fv1; break;
+				case kWeaponTarget_Range: newProj->data.range = newProj->data.range * fv1; break;
+				case kWeaponTarget_ExpProximity: newProj->data.explosionProximity = newProj->data.explosionProximity * fv1; break;
+				case kWeaponTarget_ExpTimer: newProj->data.explosionTimer = newProj->data.explosionTimer * fv1; break;
+				case kWeaponTarget_MuzzleFlashDur: newProj->data.muzzleFlashDuration = newProj->data.muzzleFlashDuration * fv1; break;
+				case kWeaponTarget_FadeOutTime: newProj->data.fadeOutTime = newProj->data.fadeOutTime * fv1; break;
+				case kWeaponTarget_Force: newProj->data.force = newProj->data.force * fv1; break;
+				case kWeaponTarget_ConeSpread: newProj->data.coneSpread = newProj->data.coneSpread * fv1; break;
+				case kWeaponTarget_CollRadius: newProj->data.collisionRadius = newProj->data.collisionRadius * fv1; break;
+				case kWeaponTarget_Lifetime: newProj->data.lifetime = newProj->data.lifetime * fv1; break;
+				case kWeaponTarget_RelaunchInt: newProj->data.relaunchInterval = newProj->data.relaunchInterval * fv1; break;
+				}
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Add_Float:
+			{
+				fv1 = data.value.f.v1;
+				//fv2 = data->value.f.v2;
+				switch (data.target)
+				{
+				case kWeaponTarget_Gravity: newProj->data.gravity += fv1; break;
+				case kWeaponTarget_Speed: newProj->data.speed += fv1; break;
+				case kWeaponTarget_Range: newProj->data.range += fv1; break;
+				case kWeaponTarget_ExpProximity: newProj->data.explosionProximity += fv1; break;
+				case kWeaponTarget_ExpTimer: newProj->data.explosionTimer += fv1; break;
+				case kWeaponTarget_MuzzleFlashDur: newProj->data.muzzleFlashDuration += fv1; break;
+				case kWeaponTarget_FadeOutTime: newProj->data.fadeOutTime += fv1; break;
+				case kWeaponTarget_Force: newProj->data.force += fv1; break;
+				case kWeaponTarget_ConeSpread: newProj->data.coneSpread += fv1; break;
+				case kWeaponTarget_CollRadius: newProj->data.collisionRadius += fv1; break;
+				case kWeaponTarget_Lifetime: newProj->data.lifetime += fv1; break;
+				case kWeaponTarget_RelaunchInt: newProj->data.relaunchInterval += fv1; break;
+				}
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Set_Enum:
+			{
+				iv1 = data.value.i.v1;
+				//iv2 = data->value.i.v2;
+				if (data.target == kWeaponTarget_SoundLevel)
+					newProj->soundLevel = iv1;
+
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Set_Form:
+			case BGSMod::Container::Data::kOpFlag_Add_Form:
+			{
+				switch (data.target)
+				{
+				case kWeaponTarget_Light: newProj->data.light = (TESObjectLIGH*)data.value.form; break;
+				case kWeaponTarget_MuzzleFlashLight: newProj->data.muzzleFlashLight = (TESObjectLIGH*)data.value.form; break;
+				case kWeaponTarget_ExpType: newProj->data.explosionType = (BGSExplosion*)data.value.form; break;
+				case kWeaponTarget_ActSoundLoop: newProj->data.activeSoundLoop = (BGSSoundDescriptorForm*)data.value.form; break;
+				case kWeaponTarget_CountdownSound: newProj->data.countdownSound = (BGSSoundDescriptorForm*)data.value.form; break;
+				case kWeaponTarget_DeactivateSound: newProj->data.deactivateSound = (BGSSoundDescriptorForm*)data.value.form; break;
+				case kWeaponTarget_DecalData: newProj->data.decalData = (BGSTextureSet*)data.value.form; break;
+				case kWeaponTarget_CollisionLayer: newProj->data.collisionLayer = data.value.form; break;
+				case kWeaponTarget_VATSprojectile: newProj->data.vatsProjectile = (BGSProjectile*)data.value.form; break;
+				case kWeaponTarget_Model: newProj->model = *(TESModel*)data.value.form; break;
+				case kWeaponTarget_MuzzleFlashModel: newProj->muzzleFlashModel = *(TESModel*)data.value.form; break;
+					//dest
+				}
+			}
+			break;
+			case BGSMod::Container::Data::kOpFlag_Set_Int:
+			case BGSMod::Container::Data::kOpFlag_Or_Bool:
+			case BGSMod::Container::Data::kOpFlag_And_Bool:
+			{
+				UInt8 op = data.op;
+				switch (data.target)
+				{
+				case kWeaponTarget_Supersonic: instanceData->flags = Utilities::AddRemFlag(newProj->flags, 0x0008000, data.value.i.v1, op); break; //-
+				}
+			}
+			break;
+
+			}
+		}
+	}
+
+	if (itOldProj != projectileParentMap.end())
+	{
+		Heap_Free(itOldProj->second.first); //delay heapfree
+		itOldProj->second.second = instanceData->firingData->projectileOverride;
+		itOldProj->second.first = (BGSProjectile*)newProj;
+		instanceData->firingData->projectileOverride = (BGSProjectile*)newProj;
+		return true;
+	}
+	projectileParentMap[extraDataList] = { (BGSProjectile*)newProj, instanceData->firingData->projectileOverride };
+	instanceData->firingData->projectileOverride = (BGSProjectile*)newProj;
+	return true;
+}
+
+bool CustomProjectileFormManager::ReturnCleanup(std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>>::iterator foundData, TESObjectWEAP::InstanceData* instance) //delay heapfree
+{
+	if (foundData == projectileParentMap.end())
+	{
+		if (!instance || !instance->firingData || !instance->firingData->projectileOverride || instance->firingData->projectileOverride->formID)
+			return true;
+		Heap_Free(instance->firingData->projectileOverride);
+		instance->firingData->projectileOverride = nullptr;
+		return true;
+	}
+	if (instance && instance->firingData && instance->firingData->projectileOverride && !instance->firingData->projectileOverride->formID)
+	{
+		if (instance->firingData->projectileOverride != foundData->second.first)
+		{
+			Heap_Free(foundData->second.first);
+			projectileParentMap.erase(foundData);
+		}
+		Heap_Free(instance->firingData->projectileOverride);
+		instance->firingData->projectileOverride = foundData->second.second;
+		projectileParentMap.erase(foundData);
+		return true;
+	}
+	Heap_Free(foundData->second.first);
+	projectileParentMap.erase(foundData);
+	return true;
+}
+
+bool CustomProjectileFormManager::AddModData(BGSMod::Attachment::Mod* mod, BGSMod::Container::Data data, bool overwrite)
+{
+	auto entries = projectileModMap[mod];
+	for (auto entry : entries)
+	{
+		if (entry.target == data.target)
+		{
+			if (!overwrite)
+				return false;
+			entry.op = data.op;
+			entry.value = data.value;
+			return true;
+		}
+	}
+	entries.push_back(data);
+	return true;
+}

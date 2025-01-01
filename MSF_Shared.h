@@ -557,6 +557,7 @@ namespace Utilities
 	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
 	bool AddAttachValue(AttachParentArray* attachPoints, KeywordValue attachValue);
 	bool WeaponInstanceHasKeyword(TESObjectWEAP::InstanceData* instanceData, BGSKeyword* checkKW);
+	bool HasKeyword(BGSKeywordForm* keywordForm, BGSKeyword* checkKW);
 	bool UpdateAimModel(MSFAimModel* oldModel, MSFAimModel* newModel);
 	bool UpdateZoomData(MSFZoomData* oldData, MSFZoomData* newData);
 	bool PlayIdle(Actor* actor, TESIdleForm* idle);
@@ -565,6 +566,11 @@ namespace Utilities
 	void FireWeapon(Actor* actor, UInt32 shots);
 	void ReloadWeapon(Actor* actor);
 	void SetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
+	void SetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName, SInt32 newVal);
+	void SetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName, float newVal);
+	bool GetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName);
+	SInt32 GetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName);
+	float GetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName);
 	void SendNotification(std::string asNotificationText);
 	//void ShowMessagebox(std::string asText);
 	void AddItem(TESObjectREFR* target, TESForm* form, SInt32 count, bool bSilent);
@@ -687,12 +693,18 @@ typedef void(*_AddItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR
 typedef void(*_RemoveItem_Native)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* target, unkItemStruct itemStruct, SInt32 count, bool bSilent, TESObjectREFR* toContainer);
 typedef ObjectRefHandle(*_RemoveItem_Virtual)(TESObjectREFR* ref, RemoveItemData& a_data, RemoveItemData2& a_data2);    // 6D, ObjREF
 typedef void(*_SetAnimationVariableBool)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
+typedef void(*_SetAnimationVariableInt)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName, SInt32 newVal);
+typedef void(*_SetAnimationVariableFloat)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName, float newVal);
+typedef bool(*_GetAnimationVariableBool)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName);
+typedef SInt32(*_GetAnimationVariableInt)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName);
+typedef float(*_GetAnimationVariableFloat)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* ref, BSFixedString asVariableName);
 typedef bool(*_PlayIdle)(VirtualMachine* vm, UInt32 stackId, Actor* actor, TESIdleForm* idle);
 typedef bool(*_PlayIdle2)(Actor* actor, TESIdleForm* idle, UInt64 unk, VirtualMachine* vm, UInt32 stackId);
 typedef bool(*_PlayIdleAction)(Actor* actor, BGSAction* action, TESObjectREFR* target, VirtualMachine* vm, UInt32 stackId);
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
 typedef bool(*_InitializeActorInstant)(Actor* actor, UInt32 edx);
 typedef void(*_UpdateAnimation)(PlayerCharacter* player, float delta);
+typedef void (*_PlayEquipSound)(Actor* target, TESBoundObject* a_boundObj, bool a_pickUp, bool a_use);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ChangeAnimArchetype)(Actor* target, BGSKeyword* archetypeKW);
 typedef void(*_ChangeAnimFlavor)(Actor* target, BGSKeyword* flavorKW);
@@ -727,13 +739,19 @@ extern RelocAddr <_UnEquipItem> UnequipItemInternal;
 extern RelocAddr <_HasPerkInternal> HasPerkInternal;
 extern RelocAddr <_AddItem_Native> AddItemNative;
 extern RelocAddr <_RemoveItem_Native> RemoveItemNative;
-extern RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal; //0x140EA10
+extern RelocAddr <_SetAnimationVariableBool> SetAnimationVariableBoolInternal;
+extern RelocAddr <_SetAnimationVariableInt> SetAnimationVariableIntInternal;
+extern RelocAddr <_SetAnimationVariableFloat> SetAnimationVariableFloatInternal;
+extern RelocAddr <_GetAnimationVariableBool> GetAnimationVariableBoolInternal;
+extern RelocAddr <_GetAnimationVariableInt> GetAnimationVariableIntInternal;
+extern RelocAddr <_GetAnimationVariableFloat> GetAnimationVariableFloatInternal;
 extern RelocAddr <_PlayIdle> PlayIdleInternal; //0x13863A0
 extern RelocAddr <_PlayIdle2> PlayIdleInternal2;
 extern RelocAddr <_PlayIdleAction> PlayIdleActionInternal; //0x13864A0 
 extern RelocAddr <_PlaySubgraphAnimation> PlaySubgraphAnimationInternal; //0x138A130
 extern RelocAddr <_InitializeActorInstant> InitializeActorInstant;
 extern RelocAddr <_UpdateAnimation> UpdateAnimation;
+extern RelocAddr <_PlayEquipSound> PlayEquipSound;
 extern RelocAddr <_ChangeAnimArchetype> ChangeAnimArchetype; //1387C10(vm*,0,actor*,kw*)
 extern RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor; //1387CA0(vm*,0,actor*,kw*)
 extern RelocAddr <_CheckKeywordType> CheckKeywordType;
@@ -960,38 +978,42 @@ public:
 	enum { kTypeID = kFormType_AMMO };
 
 	// parents
-	TESFullName			fullName;		// 20
-	BGSModelMaterialSwap	mat;		// 28
-	TESIcon				icon;			// 44
-	BGSMessageIcon		messageIcon;	// 4C
-	TESValueForm		value;			// 58
-	BGSDestructibleObjectForm	destructible;	// 50
-	BGSPickupPutdownSounds		sounds;			// 68
-	TESDescription		description;	// 74
-	BGSKeywordForm		keyword;		// 80
+	TESFullName					fullName;		
+	BGSModelMaterialSwap		mat;		
+	TESIcon						icon;			
+	BGSMessageIcon				messageIcon;	
+	TESValueForm				value;			
+	BGSDestructibleObjectForm	destructible;	
+	BGSPickupPutdownSounds		sounds;			
+	TESDescription				description;	
+	BGSKeywordForm				keywords;
+	TESWeightForm				weight;
 
-	// members
-
-	// 0C
-	struct AmmoSettings
+	struct AMMO_DATA
 	{
-		BGSProjectile	* projectile;
-		UInt32			flags;
-		float			damage;
+	public:
+		// members
+		BGSProjectile* projectile;  // 00
+		std::uint32_t health;       // 08
+		std::int8_t flags;          // 0C
+		float damage;               // 10
 	};
 
-	enum {
+	enum 
+	{
 		kIgnoreNormalResist = (1 << 0),
 		kNotPlayable = (1 << 1),
 		kNotBolt = (1 << 2)
 	};
 
-	bool isBolt() { return (settings.flags & kNotBolt) != kNotBolt; }
-	bool isPlayable() { return (settings.flags & kNotPlayable) != kNotPlayable; }
+	bool isBolt() { return (data.flags & kNotBolt) != kNotBolt; }
+	bool isPlayable() { return (data.flags & kNotPlayable) != kNotPlayable; }
 
-	AmmoSettings		settings;	// 8C
-	StringCache::Ref	unk98;	// 98
+	AMMO_DATA data;                // 160
+	StringCache::Ref shortDesc;  // 178
+	TESModel shellCasing;          // 180
 };
+STATIC_ASSERT(sizeof(Ammo) == 0x1B0);
 
 class MagicalItem : public TESBoundObject
 {
@@ -1116,12 +1138,7 @@ public:
 };
 STATIC_ASSERT(sizeof(BGSProjectileData) == 0x90);
 
-class Projectile :
-	public TESBoundObject,            // 000
-	public TESFullName,               // 068
-	public TESModel,                  // 078
-	public BGSPreloadable,            // 0A8
-	public BGSDestructibleObjectForm  // 0B0
+class Projectile : public TESBoundObject            // 000
 {
 public:
 	//static constexpr auto RTTI{ RTTI::BGSProjectile };
@@ -1129,9 +1146,15 @@ public:
 	//static constexpr auto FORM_ID{ ENUM_FORM_ID::kPROJ };
 
 	// members
+	TESFullName name;             // 068
+	TESModel model;             // 078
+	BGSPreloadable preload;            // 0A8
+	BGSDestructibleObjectForm dest;  // 0B0
 	BGSProjectileData data;                                  // 0C0
 	TESModel muzzleFlashModel;                               // 150
 	UInt64 soundLevel;  // 180
+private:
+	Projectile();
 };
 STATIC_ASSERT(sizeof(Projectile) == 0x188);
 

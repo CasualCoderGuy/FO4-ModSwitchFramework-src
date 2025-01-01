@@ -163,11 +163,12 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &modsize);
 	for (UInt32 dataidx = 0; dataidx < modsize; dataidx++)
 	{
-		UInt32 formIdKW = 0;
+		//UInt32 formIdKW = 0;
 		UInt32 formIdMod = 0;
-		Serialization::ReadData(intfc, &formIdKW);
+		//Serialization::ReadData(intfc, &formIdKW);
 		Serialization::ReadData(intfc, &formIdMod);
-		this->stateMods[formIdKW] = formIdMod;
+		//this->stateMods[formIdKW] = formIdMod;
+		this->stateMods.push_back(formIdMod);
 	}
 }
 

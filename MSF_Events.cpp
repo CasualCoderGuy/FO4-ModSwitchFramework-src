@@ -64,7 +64,8 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	}
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	//TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
-	MSF_Scaleform::UpdateWidgetData(eventInstanceData);
+	//MSF_Scaleform::UpdateWidgetData(eventInstanceData);
+	delayTask delayUpd(250, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
 	if (!eventInstanceData)// || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
 		return kEvent_Continue;
 	//EquipWeaponData* equipData = evn->data->equippedWeaponData;
@@ -267,10 +268,21 @@ void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt
 		_DEBUG("eq r8d: %i", *r8d);
 	if (equipData == (*g_player)->biped.get())
 	{
+		_DEBUG("UpdateEquipData_Hook");
 		TESObjectWEAP* eqWeap = DYNAMIC_CAST(instance.object, TESBoundObject, TESObjectWEAP);
 		if (eqWeap)
-			MSF_MainData::modSwitchManager.SetIsBCRreload(0);
+		{
+			if (MSF_MainData::modSwitchManager.GetIsBCRreload() != ExtraWeaponState::bEventTypeReloadSwitchBCR)
+				MSF_MainData::modSwitchManager.SetIsBCRreload(0);
+			else
+				MSF_MainData::modSwitchManager.SetIsBCRreload(ExtraWeaponState::bEventTypeReloadFullBCR);
+		}
+		TESAmmo* ammo = nullptr;
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
+		EquipWeaponData* eqWeapData = Utilities::GetEquippedWeaponData(*g_player);
+		if (eqWeapData)
+			ammo = eqWeapData->ammo;
+		MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
 	}
 	else
 	{
@@ -319,6 +331,17 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	//		return ((loadedAmmo - ammoState->chamberedCount < ammoCap) && ammoReserve); //HasTRsupport
 	//}
 	return (loadedAmmo < ammoCap && loadedAmmo < ammoReserve);
+}
+
+const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 unequip, UInt32 type)
+{
+	if (!item || target != *g_player)
+		return type == 2 ? modText : itemText;
+	if (item->formType == kFormType_AMMO)
+		return MSF_Base::EquipAmmoPipboy((TESAmmo*)item, !unequip);
+	if (item->formType == kFormType_MISC)
+		return MSF_Base::EquipModPipboy((TESObjectMISC*)item, !unequip);
+	return type == 2 ? modText : itemText;
 }
 
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
@@ -557,6 +580,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 {
 	const char* name = arg2->eventName.c_str();
 	bool reload = false;
+	UInt8 didSwitch = 0;
 	UInt32 oldLoadedAmmoCount = 0;
 	if (!_strcmpi("reloadComplete", name))
 	{
@@ -570,20 +594,26 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData)
 		{
-			//_DEBUG("reloadCOMP %02X", switchData->SwitchFlags);
+			_DEBUG("swDatOK");
 			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
 			{
 				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
 				if ((*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState) == 0)
 					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
+				if (MSF_MainData::modSwitchManager.GetIsBCRreload())
+				{
+					MSF_MainData::BCRinterfaceHolder.StoreBCRvariables();
+					MSF_MainData::modSwitchManager.SetIsBCRreload(ExtraWeaponState::bEventTypeReloadSwitchBCR);
+				}
 				MSF_Base::SwitchMod(switchData, true);
+				didSwitch = ExtraWeaponState::bEventTypeReloadAfterSwitch;
 				//_DEBUG("switchOK");
 			}
 		}
 		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload); //BCR!!
 
 	}
-	if (!_strcmpi("reloadEnd", name))
+	else if (!_strcmpi("reloadEnd", name))
 	{
 		_DEBUG("reloadEnd");
 		MSF_MainData::modSwitchManager.SetIsBCRreload(0);
@@ -612,7 +642,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 					}
 					else
 						switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, switchData->SwitchFlags & SwitchData::bReloadFull, true);
+					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
 					//if (!MSF_Base::ReloadWeapon())
 					//	MSF_MainData::modSwitchManager.ClearQueue();
 				}
@@ -689,18 +719,45 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		UInt16 BCRtype = oldLoadedAmmoCount ? ExtraWeaponState::bEventTypeReloadBCR : ExtraWeaponState::bEventTypeReloadFullBCR;
 		MSF_MainData::modSwitchManager.SetIsBCRreload(BCRtype);
 	}
-	else if (!_strcmpi("toggleMenu", name))
+	else if (!_strcmpi("emptyMag", name))
 	{
+		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEmptyMag);
+		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
+		eqData->loadedAmmoCount = 0;
 	}
 	else if (!_strcmpi("switchMag", name))
 	{
+		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeSwitchMag);
 	}
+	else if (!_strcmpi("toggleMenu", name))
+	{
+		//get menu to open
+		//open menu
+	}
+	//else if (!_strcmpi("uncullBone", name))
+	//{
+	//	_DEBUG("uncullBone");
+	//	MSF_MainData::BCRinterfaceHolder.StoreBCRvariables();
+	//	MSF_MainData::BCRinterfaceHolder.LogStored();
+	//}
+	//else if (!_strcmpi("cullBone", name))
+	//{
+	//	_DEBUG("cullBone");
+	//	MSF_MainData::BCRinterfaceHolder.StoreBCRvariables();
+	//	MSF_MainData::BCRinterfaceHolder.LogStored();
+	//}
+
 	UInt8 ret = PlayerAnimationEvent_Original(arg1, arg2, arg3);
 
 	if (reload == true)
 	{
+		if (Utilities::GetAnimationVariableInt(*g_player, "SwitchAmmoTypeReload"))
+		{
+			_DEBUG("animVar: 1");
+			Utilities::SetAnimationVariableInt(*g_player, "SwitchAmmoTypeReload", 0);
+		}
 		_DEBUG("reloadCOMP2: %i", Utilities::GetEquippedWeaponData(*g_player)->loadedAmmoCount);
-		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload, *g_player, 0, oldLoadedAmmoCount); //BCR!!
+		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload, *g_player, didSwitch, oldLoadedAmmoCount); //BCR!!
 	}
 
 	return ret;

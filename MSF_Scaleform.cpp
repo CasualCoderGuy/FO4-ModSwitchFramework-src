@@ -97,7 +97,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::TestIdle(true);
 				//_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
 
-				MSF_Test::ArmorAttachTest();
+				//MSF_Test::ArmorAttachTest();
+				//MSF_Test::PrintAmmoCount();
+				MSF_Test::AIM_ZM_MA_testDump();
 
 				_DEBUG("test1");
 			}
@@ -116,7 +118,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::CallAttachModToInvItem();
 				//Utilities::ReloadWeapon(*g_player);
 				//MSF_Test::TestIdle(false);
-				MSF_Test::DumpActorAnimData();
+				//MSF_Test::DumpActorAnimData();
+				MSF_Test::TestEquipAmmo();
 				_DEBUG("test2");
 			}
 		}
@@ -134,7 +137,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::SplitStackTest(13, false);
 				//Utilities::FireWeapon(*g_player, 1);
 				//MSF_Test::DumpActorAnimData();
-				MSF_Test::DumpEquippedWeaponIdx();
+				//MSF_Test::DumpEquippedWeaponIdx();
+				MSF_Test::ProjectileTest();
 				_DEBUG("test3");
 			}
 		}
@@ -159,7 +163,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				if (!keyFn)
 					break;
 				_DEBUG("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
-				if (keyFn->type & KeybindData::bHUDselection)
+				if (keyFn->type & KeybindData::bGlobalMenu)
+					MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu, &keyFn->menuAttachPoints);
+				else if (keyFn->type & KeybindData::bHUDselection)
 					MSF_Scaleform::ToggleSelectionMenu(keyFn->selectMenu, keyFn->modData);
 				else if (keyFn->type & KeybindData::bIsAmmo)
 					MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
@@ -233,13 +239,15 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 {
 	PipboyMenuInvoke_Copied(menu, args);
 	//(this->*Invoke_Original)(args);
-
+	//_DEBUG("pipboyei");
 	if (args->optionID == 0xD && args->numArgs == 4 && args->args[0].GetType() == GFxValue::kType_Int && args->args[1].GetType() == GFxValue::kType_Array && args->args[2].GetType() == GFxValue::kType_Array)
 	{
+		//_DEBUG("args ok");
 		SInt32 selectedIndex = args->args[0].GetInt();
 		PipboyObject* pHandlerData = nullptr;
 		if (selectedIndex >= 0 && selectedIndex < (*g_pipboyDataMgr)->itemData.count)
 			pHandlerData = (*g_pipboyDataMgr)->itemData[selectedIndex];
+		//_DEBUG("handler ok");
 		if (pHandlerData != nullptr)
 		{
 			static BSFixedString handleName("handleID");
@@ -247,25 +255,29 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 
 			auto* pipboyValueHandle = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->table.Find(&handleName)->value);
 			auto* pipboyValueStack = static_cast<PipboyArray*>(pHandlerData->table.Find(&stackName)->value);
+			//_DEBUG("values ok");
 			//auto* pipboyValue = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->GetMemberValue(memberName));
 			if (pipboyValueHandle != nullptr)
 			{
 				UInt32 handleID = pipboyValueHandle->value;
 				auto* pSelectedData = (*g_itemMenuDataMgr)->GetSelectedItem(handleID);
 				UInt32 stackID = 0;
+				//_DEBUG("selected ok: %p", pSelectedData);
 				if (pipboyValueStack != nullptr && pipboyValueStack->values.entries)
 				{
 					auto* pipboyStackIDholder = static_cast<PipboyPrimitiveValue<UInt32>*>(*pipboyValueStack->values.entries);
 					stackID = pipboyStackIDholder->value;
+					//_DEBUG("stack ok");
 				}
 
 				if (pSelectedData != nullptr && pSelectedData->form != nullptr)
 				{
-
+					//_DEBUG("adding items");
 					TESForm* pSelectedForm = pSelectedData->form;
 					BGSInventoryItem::Stack* selectedStack = Utilities::GetStack(pSelectedData, stackID);
 					ExtraDataList* extraDataList = selectedStack->extraData;
 					ExtraWeaponState::AmmoStateData* ammoState = nullptr;
+					UInt8 notSupportedAmmo = 0;
 					if (extraDataList)
 					{
 						ExtraRank* holder = (ExtraRank*)extraDataList->GetByType(kExtraData_Rank);
@@ -273,7 +285,10 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 						{
 							ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.Get(holder->rank);
 							if (extraState)
+							{
 								ammoState = extraState->GetAmmoStateData();
+								notSupportedAmmo = extraState->HasNotSupportedAmmo();
+							}
 						}
 						//switch (pSelectedForm->formType)
 						//{
@@ -283,8 +298,9 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 							//auto* pWeapon = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(neededInst, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 							//if (pWeapon)
 							//{
-							if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayMagInPipboy))
+							if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayMagInPipboy) && !notSupportedAmmo)
 							{
+								//_DEBUG("creating items");
 								std::string displayString = std::to_string(ammoState->ammoCapacity) + "/" + std::to_string(ammoState->loadedAmmo);
 								menu->CreateItemData(args, "Mag Size/Loaded", displayString);
 							}
@@ -302,6 +318,7 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 			}
 		}
 	}
+	//_DEBUG("return");
 }
 
 namespace MSF_Scaleform
@@ -642,6 +659,7 @@ namespace MSF_Scaleform
 		if (!selectMenu)
 			return nullptr;
 		//check conditions
+		//cross check custom and MSFMenu
 		static BSFixedString menuName("MSFMenu");
 		IMenu* MSFmenu = (*g_ui)->GetMenu(menuName);
 		if (!MSFmenu)
@@ -797,6 +815,7 @@ namespace MSF_Scaleform
 
 	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, ModData* mods)
 	{
+		//if anim, play anim, set menu to open
 		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
 		if (!menuRoot)
 			return false;
@@ -811,6 +830,7 @@ namespace MSF_Scaleform
 			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
 			if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
 				return true;
+			break;
 		}
 		case ModSelectionMenu::kType_ModMenu:
 		{
@@ -821,6 +841,7 @@ namespace MSF_Scaleform
 			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
 			if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
 				return true;
+			break;
 		}
 		case ModSelectionMenu::kType_All:
 		{
@@ -835,12 +856,26 @@ namespace MSF_Scaleform
 			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
 			if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 4))
 				return true;
+			break;
 		}
 		default: return false;
 		}
 		MSF_MainData::modSwitchManager.SetOpenedMenu(nullptr);
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();
 		return false;
+	}
+
+	bool ToggleGlobalMenu(ModSelectionMenu* menu, std::vector<KeywordValue>* attachPoints)
+	{
+		//if anim, play anim, set menu to open
+		return false;
+		GFxMovieRoot* menuRoot = HandleToggleMenu(menu);
+		if (!menuRoot)
+			return false;
+		//getmodassociations
+		//send data to menu
+		
+		//receive selected mod
 	}
 
 	//bool ToggleAmmoMenu(ModSelectionMenu* selectMenu)
@@ -1059,6 +1094,9 @@ namespace MSF_Scaleform
 			{
 				if (it->second->selectMenu)
 				{
+					if (it->second->selectMenu->type == ModSelectionMenu::kType_Global)
+						continue;
+
 					// Inject swf
 					GFxValue loader, urlRequest;
 					movieRoot->CreateObject(&loader, "flash.display.Loader");

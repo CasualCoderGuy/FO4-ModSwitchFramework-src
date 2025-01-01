@@ -799,6 +799,16 @@ namespace Utilities
 		return false;
 	}
 
+	bool HasKeyword(BGSKeywordForm* keywordForm, BGSKeyword* checkKW)
+	{
+		if (!keywordForm || !checkKW)
+			return false;
+		auto HasKeyword_Internal = GetVirtualFunction<_IKeywordFormBase_HasKeyword>(&keywordForm->keywordBase, 1);
+		if (HasKeyword_Internal(&keywordForm->keywordBase, checkKW, 0))
+			return true;
+		return false;
+	}
+
 	bool UpdateAimModel(MSFAimModel* oldModel, MSFAimModel* newModel)
 	{
 		if (!oldModel || !newModel)
@@ -845,6 +855,31 @@ namespace Utilities
 	void SetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName, bool newVal) 
 	{
 		SetAnimationVariableBoolInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName, newVal);
+	}
+
+	void SetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName, SInt32 newVal)
+	{
+		SetAnimationVariableIntInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName, newVal);
+	}
+
+	void SetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName, float newVal)
+	{
+		SetAnimationVariableFloatInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName, newVal);
+	}
+
+	bool GetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName)
+	{
+		return GetAnimationVariableBoolInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName);
+	}
+
+	SInt32 GetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName)
+	{
+		return GetAnimationVariableIntInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName);
+	}
+
+	float GetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName)
+	{
+		return GetAnimationVariableFloatInternal((*g_gameVM)->m_virtualMachine, 1, ref, asVariableName);
 	}
 
 	bool PlayIdle(Actor* actor, TESIdleForm* idle)

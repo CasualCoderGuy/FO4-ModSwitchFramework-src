@@ -103,6 +103,13 @@ public:
 			MSFMenu::OpenMenu();
 			delete MSF_MainData::ammoDisplay;
 			MSF_MainData::ammoDisplay = HUDMenuAmmoDisplay::Init();
+
+			TESAmmo* ammo = nullptr;
+			ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
+			EquipWeaponData* eqWeapData = Utilities::GetEquippedWeaponData(*g_player);
+			if (eqWeapData)
+				ammo = eqWeapData->ammo;
+			MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
 		}
 		return kEvent_Continue;
 	}
@@ -144,7 +151,6 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
 
 				MSF_Data::InitCompatibility();
-
 			}
 		}
 	}
@@ -217,12 +223,21 @@ bool WriteHooks()
 		{
 			Xbyak::Label hook, retnLabel;
 
+#ifndef NEXTGEN
 			mov(rdx, qword[rsi + 8]);
 			mov(rcx, qword[rdx]);
 			mov(edx, r14d);
 			mov(r8d, eax);
 			call(ptr[rip + hook]);
 			mov(rcx, qword[rsi]);
+#else
+			mov(rdx, qword[r14 + 8]);
+			mov(rcx, qword[rdx]);
+			mov(edx, ebx);
+			mov(r8d, eax);
+			call(ptr[rip + hook]);
+			mov(rcx, qword[r14]);
+#endif
 			mov(byte[rcx], al);
 			jmp(ptr[rip + retnLabel]);
 
@@ -232,11 +247,76 @@ bool WriteHooks()
 			dq(CheckAmmoCountForReload_ReturnJumpAddr);
 		}
 	};
-	void* codeBuf = g_localTrampoline.StartAlloc();
-	CheckAmmoCountForReload_InjectCode code(codeBuf);
-	g_localTrampoline.EndAlloc(code.getCurr());
-	CheckAmmoCountForReload_BranchCode = (uintptr_t)codeBuf;
+	void* CheckAmmoCount_codeBuf = g_localTrampoline.StartAlloc();
+	CheckAmmoCountForReload_InjectCode CheckAmmoCount_code(CheckAmmoCount_codeBuf);
+	g_localTrampoline.EndAlloc(CheckAmmoCount_code.getCurr());
+	CheckAmmoCountForReload_BranchCode = (uintptr_t)CheckAmmoCount_codeBuf;
 	g_branchTrampoline.Write5Branch(CheckAmmoCountForReload_JumpHookTarget.GetUIntPtr(), CheckAmmoCountForReload_BranchCode);
+
+	struct CannotEquipItem_InjectCode : Xbyak::CodeGenerator {
+		CannotEquipItem_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+		{
+			Xbyak::Label hook, cantTextToLoad, modTextToLoad, toReturn, toMod, retnGenLabel, retnModLabel, skipLabel;
+				// r13, r15, rbx, rdi, rsi
+				// r12, r14, rbx, rdi, rsi
+
+			mov(edi, eax);
+			mov(sil, r9b);
+#ifndef NEXTGEN
+			mov(r13, rdx);
+			mov(r15d, r8d);
+			mov(rdx, qword[rbp - 0x41]);
+			mov(rcx, qword[rbp + 0x57]);
+#else
+			mov(rcx, r14);
+			mov(r12, rdx);
+			mov(rdx, qword[rbp - 0x19]);
+			mov(r14d, r8d);
+#endif
+			mov(r9d, edi);
+			mov(r8d, ebx);
+			call(ptr[rip + hook]);
+			test(rax, rax);
+			jnz(toReturn);
+			jmp(ptr[rip + skipLabel]);
+			L(toReturn);
+#ifndef NEXTGEN
+			mov(rdx, r13);
+			mov(r8d, r15d);
+#else
+			mov(rdx, r12);
+			mov(r8d, r14d);
+#endif
+			mov(r9b, sil);
+			mov(rcx, rax);
+			cmp(edi, 2);
+			je(toMod);
+			//mov(rcx, qword[rip + cantTextToLoad]);
+			jmp(ptr[rip + retnGenLabel]);
+			L(toMod);
+			//mov(rcx, ptr[rip + modTextToLoad]);
+			jmp(ptr[rip + retnModLabel]);
+
+			L(hook);
+			dq((uintptr_t)CannotEquipItem_Hook);
+			L(cantTextToLoad);
+			dq(CannotEquipItem_TextAddr);
+			L(modTextToLoad);
+			dq((uintptr_t)modText);
+			L(retnGenLabel);
+			dq(CannotEquipItemGen_ReturnJumpAddr);
+			L(retnModLabel);
+			dq(CannotEquipItemMod_ReturnJumpAddr);
+			L(skipLabel);
+			dq(CannotEquipItem_SkipJumpAddr);
+		}
+	};
+	void* CannotEquipItem_codeBuf = g_localTrampoline.StartAlloc();
+	CannotEquipItem_InjectCode CannotEquipItem_code(CannotEquipItem_codeBuf);
+	g_localTrampoline.EndAlloc(CannotEquipItem_code.getCurr());
+	CannotEquipItem_BranchCode = (uintptr_t)CannotEquipItem_codeBuf;
+	g_branchTrampoline.Write5Branch(CannotEquipItemGen_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
+	g_branchTrampoline.Write5Branch(CannotEquipItemMod_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
 
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);

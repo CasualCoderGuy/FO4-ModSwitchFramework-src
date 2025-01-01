@@ -206,13 +206,15 @@ public:
 	UInt8 type;
 	UInt16 flags;
 	UInt32 version;
+	//CustomMenu* customMenu;
 	AnimationData* menuAnimation;
 	enum
 	{
 		kType_Widget = 0,
 		kType_AmmoMenu = 1,
 		kType_ModMenu = 2,
-		kType_All = 3
+		kType_All = 3,
+		kType_Global = 4
 	};
 	ModSelectionMenu(std::string name, UInt8 menuType){
 		scaleformName = name; type = menuType; version = 0; flags = 0; menuAnimation = nullptr;
@@ -230,7 +232,8 @@ public:
 		bToggle = 0x20,
 		bHUDselection = 0x40,
 		bIsAmmo = 0x80,
-		mNumMask = 0x0F
+		mNumMask = 0x0F,
+		bMenuBoth = 0x100
 	};
 	std::string functionID;
 	UInt8 type;
@@ -238,6 +241,7 @@ public:
 	UInt8 modifiers;
 	ModSelectionMenu* selectMenu;
 	ModData* modData;
+	std::vector<KeywordValue> menuAttachPoints;
 };
 
 class MCMfloatData
@@ -245,6 +249,66 @@ class MCMfloatData
 public:
 	std::string name;
 	float value;
+};
+
+class CustomProjectileFormManager
+{
+public:
+	bool ApplyMods(ExtraDataList* extraDataList);
+	bool AddModData(BGSMod::Attachment::Mod* mod, BGSMod::Container::Data data, bool overwrite = true);
+	bool ClearData();
+	enum WeaponFormProperty
+	{
+		//flags
+		kWeaponTarget_Supersonic = 101,
+		kWeaponTarget_MuzzleFlash,
+		kWeaponTarget_Explosion,
+		kWeaponTarget_TriggerOnImpact, //Alt.Trigger
+		kWeaponTarget_Hitscan,
+		kWeaponTarget_CanBeDisabled,
+		kWeaponTarget_CanBePickedUp,
+		kWeaponTarget_PinsLimbs,
+		kWeaponTarget_PassThroughObjects,
+		kWeaponTarget_DisableAimCorr,
+		kWeaponTarget_PenetratesGeom,
+		kWeaponTarget_ContinuousUpdate,
+		kWeaponTarget_SeeksTarget,
+		//float
+		kWeaponTarget_Gravity,
+		kWeaponTarget_Speed,
+		kWeaponTarget_Range,
+		kWeaponTarget_ExpProximity,
+		kWeaponTarget_ExpTimer,
+		kWeaponTarget_MuzzleFlashDur,
+		kWeaponTarget_FadeOutTime,
+		kWeaponTarget_Force,
+		kWeaponTarget_ConeSpread,
+		kWeaponTarget_CollRadius,
+		kWeaponTarget_Lifetime,
+		kWeaponTarget_RelaunchInt,
+		//int
+		kWeaponTarget_TracerFreq,
+		kWeaponTarget_SoundLevel,
+		//Form
+		kWeaponTarget_Light,
+		kWeaponTarget_MuzzleFlashLight,
+		kWeaponTarget_ExpType,
+		kWeaponTarget_ActSoundLoop,
+		kWeaponTarget_CountdownSound,
+		kWeaponTarget_DeactivateSound,
+		kWeaponTarget_DecalData,
+		kWeaponTarget_CollisionLayer,
+		kWeaponTarget_VATSprojectile,
+		kWeaponTarget_Model,
+		kWeaponTarget_MuzzleFlashModel,
+		kWeaponTarget_Destruction
+
+	};
+private:
+	BGSProjectile* Clone(BGSProjectile* proj);
+	bool ReturnCleanup(std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>>::iterator foundData, TESObjectWEAP::InstanceData* instance);
+	std::unordered_map<BGSMod::Attachment::Mod*, std::vector<BGSMod::Container::Data>> projectileModMap;
+	std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>> projectileParentMap;
 };
 
 class SwitchData
@@ -274,16 +338,17 @@ public:
 	}
 	enum
 	{
-		bNeedInit = 0x0001,
-		bSwitchingInProgress = 0x0002,
-		bQueuedHUDSelection = 0x0004,
+		//bNeedInit = 0x0001,
+		//bQueuedHUDSelection = 0x0004,
 		//bSetChamberedAmmo = 0x0008,
-		bDrawNeeded = 0x0008,
-		bDrawInProgress = 0x0800,
+		bSwitchingInProgress = 0x0001,
+		bDrawNeeded = 0x0002,
+		bDrawInProgress = 0x0004,
 		bReloadNeeded = 0x0010,
 		bReloadInProgress = 0x0020,
 		bReloadNotFinished = 0x0040,
 		bReloadFull = 0x0080,
+		bReloadZeroCount = 0x0800,
 		bAnimNeeded = 0x0100,
 		bAnimInProgress = 0x0200,
 		bAnimNotFinished = 0x0400,
@@ -356,7 +421,7 @@ public:
 	void SetModChangeEvent(bool bEquip) { InterlockedExchange16((volatile short*)&modChangeEvent, bEquip); };
 	bool GetModChangeEvent() { return modChangeEvent; };
 	void SetIsBCRreload(UInt16 bBCRreload) { InterlockedExchange16((volatile short*)&isBCRreload, bBCRreload); };
-	bool GetIsBCRreload() { return isBCRreload; };
+	UInt16 GetIsBCRreload() { return isBCRreload; };
 	bool GetSetForcedReload() { return InterlockedCompareExchange16((volatile short*)&forcedReload, 0, 1); };
 	bool SetForcedReload(bool bForce) { return InterlockedExchange16((volatile short*)&forcedReload, bForce); };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
@@ -532,6 +597,7 @@ public:
 	//static std::unordered_map<TESObjectWEAP*, UniqueState> weapUniqueStateMap;
 	static std::vector<KeywordValue> uniqueStateAPValues;
 	static std::vector<TESAmmo*> dontRemoveAmmoOnReload;
+	static std::vector<TESObjectWEAP*> BCRweapons;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -543,6 +609,7 @@ public:
 	static BGSKeyword* hasUniqueStateKW;
 	static BGSKeyword* tacticalReloadKW;
 	static ActorValueInfo* BCR_AVIF;
+	static ActorValueInfo* BCR_AVIF2;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
 	static BGSKeyword* CanHaveNullMuzzleKW;
@@ -554,6 +621,9 @@ public:
 	static BGSKeyword* UnarmedKW;
 	static BGSKeyword* Melee1HKW;
 	static BGSKeyword* Melee2HKW;
+	static BGSKeyword* IsMagKW;
+	static BGSKeyword* AnimsEmptyBeforeReloadKW;
+	static BGSKeyword* FusionCoreKW;
 	static TESIdleForm* reloadIdle1stP;
 	static TESIdleForm* reloadIdle3rdP;
 	static TESIdleForm* fireIdle1stP; //single
@@ -591,7 +661,8 @@ public:
 		bEnableBCRSupport = 0x00100000,
 		bReloadCompatibilityMode = 0x00200000,
 		bCustomAnimCompatibilityMode = 0x00400000,
-		bDisplayChamberedAmmoOnHUD = 0x01000000,
+		bShowEquippedAmmo = 0x00800000,
+		bDisplayChamberedAmmoOnHUD = 0x00100000,
 		bDisplayConditionInPipboy = 0x02000000,
 		bDisplayMagInPipboy = 0x04000000,
 		bDisplayChamberInPipboy = 0x08000000,
@@ -625,6 +696,7 @@ namespace MSF_Data
 	bool ReadDataFromJSON(std::string fileName, std::string location);
 	void PrintStoredData();
 	SwitchData* GetNthAmmoMod(UInt32 num);
+	SwitchData* GetModForAmmo(TESAmmo* targetAmmo);
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);

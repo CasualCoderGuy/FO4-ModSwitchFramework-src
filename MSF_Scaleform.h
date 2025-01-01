@@ -23,7 +23,7 @@ namespace MSF_Scaleform
 	UInt32 GetInterfaceVersion(); 
 	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);
 	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, ModData* mods);
-	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu);
+	bool ToggleGlobalMenu(ModSelectionMenu* selectMenu, std::vector<KeywordValue>* attachPoints);
 	bool ToggleAmmoMenu(ModSelectionMenu* selectMenu);
 	bool ToggleModMenu(ModSelectionMenu* selectMenu, ModData* mods);
 	void RegisterString(GFxValue* dst, GFxMovieRoot* root, const char* name, const char* str);
@@ -64,9 +64,16 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args);
 class ItemMenuDataManager
 {
 public:
-
+#ifndef NEXTGEN
 	DEFINE_MEMBER_FN_1(GetSelectedForm, TESForm*, 0x1A3740, UInt32& handleID);
 	DEFINE_MEMBER_FN_1(GetSelectedItem, BGSInventoryItem*, 0x1A3650, UInt32& handleID);
+#else
+	//DEFINE_MEMBER_FN_1(GetSelectedForm, TESForm*, 0x2F36B0, UInt32& handleID); 2194011
+	//DEFINE_MEMBER_FN_1(GetSelectedItem, BGSInventoryItem*, 0x2F34F0, UInt32& handleID); 2194009
+
+	DEFINE_MEMBER_FN_1(GetSelectedForm, TESForm*, 0x2F36E0, UInt32& handleID);
+	DEFINE_MEMBER_FN_1(GetSelectedItem, BGSInventoryItem*, 0x2F3520, UInt32& handleID);
+#endif
 	//BGSInventoryItem
 };
 extern RelocPtr<ItemMenuDataManager*> g_itemMenuDataMgr;
@@ -413,6 +420,27 @@ public:
 		}
 		_MESSAGE("MSFMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 	}
+};
+
+struct MSFCustomMenuData
+{
+	BSFixedString	menuPath;
+	BSFixedString	rootPath;
+	UInt32			menuFlags;
+	UInt32			movieFlags;
+	UInt32			extFlags;
+	UInt32			depth;
+
+	enum ExtendedFlags
+	{
+		kExtFlag_InheritColors = 1,
+		kExtFlag_CheckForGamepad = 2
+	};
+};
+
+class MSFCustomMenu : CustomMenu
+{
+
 };
 
 
