@@ -13,10 +13,11 @@ features:
 fixes:
 - the animations called with PlayIdle will not play WPNEquipFast (if you do need it to be played for a mod switch, specify the bShouldNotStopIdle(0x10000) flag)
 - fixed a CTD that occured during serialization
-- fixed issues occurring with special ammo, fusion core type ammo and not playable ammo are not supported
+- fixed issues occurring with special ammo; fusion core type ammo and not playable ammo are not supported
 - the widget now should not display weapon info after a weapon has been unequipped
 - fixed an issue with weapon state storage
 - fixed an issue with weapon state mods serialization
+- safer task delay
 ---
 v0.1.1
 features:
