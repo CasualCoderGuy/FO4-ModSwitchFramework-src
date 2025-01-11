@@ -30,6 +30,7 @@ F4SEPapyrusInterface*		g_papyrus		=	NULL;
 F4SEMessagingInterface*		g_messaging		=	NULL;
 F4SEScaleformInterface*		g_scaleform		=	NULL;
 F4SESerializationInterface* g_serialization =	NULL;
+F4SETaskInterface*			g_threading		=	NULL;
 
 bool RegisterAfterLoadEvents()
 {
@@ -93,7 +94,9 @@ public:
 			//MSFAmmoMenu::RegisterMenu();
 			//MSFModMenu::RegisterMenu();
 			MSFWidgetMenu::OpenMenu();
-			delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
+			//delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
+			WidgetUpdateTask* updTask = new WidgetUpdateTask();
+			delayTask delayUpd(500, true, g_threading->AddUITask, updTask);
 
 			//BSScaleformTranslator * translator = (BSScaleformTranslator*)(*g_scaleformManager)->stateBag->GetStateAddRef(GFxState::kInterface_Translator);
 			//if (translator) {
@@ -130,15 +133,6 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				_FATALERROR("MSF was unable to initialize MCM settings");
 			else
 			{
-				if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisableAutomaticReload)
-				{
-					ReloadJumpReplace overwriteCode;
-					if (sizeof(overwriteCode.replacement) == 2)
-						HookUtil::SafeWriteBuf(SkipReloadJumpAddr.GetUIntPtr(), &overwriteCode.replacement, sizeof(overwriteCode.replacement));
-					else
-						_MESSAGE("Warning! ReloadJump replacement code write error.");
-				}
-
 				static auto pLoadGameHandler = new TESLoadGameHandler();
 				GetEventDispatcher<TESLoadGameEvent>()->AddEventSink(pLoadGameHandler);
 				MSF_Scaleform::ReceiveKeyEvents();
@@ -451,6 +445,12 @@ bool InitPlugin(const F4SEInterface* f4se)
 	if (!g_serialization)
 	{
 		_FATALERROR("Fatal Error - Serialization query failed");
+		return false;
+	}
+	g_threading = (F4SETaskInterface*)f4se->QueryInterface(kInterface_Task);
+	if (!g_serialization)
+	{
+		_FATALERROR("Fatal Error - Task query failed");
 		return false;
 	}
 	

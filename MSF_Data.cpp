@@ -2,6 +2,7 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
+#include "rva/Hook/HookUtil.h"
 #include "json/json.h"
 #include "RNG.h"
 #include <fstream>
@@ -660,7 +661,13 @@ namespace MSF_Data
 			else if (settingName == "bAmmoRequireWeaponToBeDrawn")
 				flag = MSF_MainData::bAmmoRequireWeaponToBeDrawn;
 			else if (settingName == "bDisableAutomaticReload")
+			{
 				flag = MSF_MainData::bDisableAutomaticReload;
+				if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bDisableAutomaticReload) && flagValue)
+					HookUtil::SafeWriteBuf(SkipReloadJumpAddr.GetUIntPtr(), &ReloadJumpOverwriteCode.replacement, sizeof(ReloadJumpOverwriteCode.replacement));
+				else if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bDisableAutomaticReload) && !flagValue)
+					HookUtil::SafeWriteBuf(SkipReloadJumpAddr.GetUIntPtr(), &ReloadJumpOverwriteCode.original, sizeof(ReloadJumpOverwriteCode.original));
+			}
 			else if (settingName == "bShowUnavailableMods")
 				flag = MSF_MainData::bShowUnavailableMods;
 			else if (settingName == "bSpawnRandomAmmo")

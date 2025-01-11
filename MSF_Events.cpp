@@ -65,7 +65,9 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	//TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
 	//MSF_Scaleform::UpdateWidgetData(eventInstanceData);
-	delayTask delayUpd(250, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
+	//delayTask delayUpd(250, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
+	WidgetUpdateTask* updTask = new WidgetUpdateTask();
+	delayTask delayUpd(250, true, g_threading->AddUITask, updTask);
 	if (!eventInstanceData)// || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
 		return kEvent_Continue;
 	//EquipWeaponData* equipData = evn->data->equippedWeaponData;
@@ -620,7 +622,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_ReloadNotFinished;
-			delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
+			EndSwitchTask* endTask = new EndSwitchTask(endFlag);
+			delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, g_threading->AddTask, endTask);
+			//delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -642,7 +646,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 					}
 					else
 						switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
+					ReloadTask* reloadTask = new ReloadTask(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
+					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, g_threading->AddTask, reloadTask);
+					//delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
 					//if (!MSF_Base::ReloadWeapon())
 					//	MSF_MainData::modSwitchManager.ClearQueue();
 				}
@@ -707,7 +713,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_AnimNotFinished && !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode))
 		{
 			UInt16 endFlag = ~ModSwitchManager::bState_AnimNotFinished;
-			delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
+			EndSwitchTask* endTask = new EndSwitchTask(endFlag);
+			delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, g_threading->AddTask, endTask);
+			//delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
 		}
 	}
 	else if (!_strcmpi("Event00", name))

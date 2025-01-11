@@ -1,6 +1,7 @@
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
 #include "MSF_Base.h"
+#include "f4se\GameThreads.h"
 
 //Anim Event
 class BSAnimationGraphEvent
@@ -306,6 +307,55 @@ extern uintptr_t CannotEquipItem_BranchCode;
 struct ReloadJumpReplace {
 	uint8_t original[2] = { 0x0F, 0x84 };
 	uint8_t replacement[2] = { 0x90, 0xE9 };
+};
+extern ReloadJumpReplace ReloadJumpOverwriteCode;
+
+class WidgetUpdateTask : public ITaskDelegate
+{
+public:
+	virtual void Run() final
+	{
+		_DEBUG("widget update thread");
+		MSF_Scaleform::UpdateWidgetData();
+	}
+};
+
+class EndSwitchTask : public ITaskDelegate
+{
+public:
+	EndSwitchTask(UInt16 endFlags)
+	{
+		flags = endFlags;
+	};
+	virtual void Run() final
+	{
+		_DEBUG("end switch thread");
+		MSF_Base::EndSwitch(flags);
+	}
+private:
+	UInt16 flags;
+};
+
+class ReloadTask : public ITaskDelegate
+{
+public:
+	ReloadTask(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true)
+	{
+		bFull = full;
+		bClearAmmoCount = clearAmmoCount;
+		bForced = forced;
+		bIsSwitch = isSwitch;
+	};
+	virtual void Run() final
+	{
+		_DEBUG("end switch thread");
+		MSF_Base::ReloadWeapon(bFull, bClearAmmoCount, bForced, bIsSwitch);
+	}
+private:
+	bool bFull;
+	bool bClearAmmoCount;
+	bool bForced;
+	bool bIsSwitch;
 };
 
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);

@@ -21,6 +21,14 @@
 #include <algorithm>
 
 
+extern IDebugLog gLog;
+extern PluginHandle g_pluginHandle;
+extern F4SEPapyrusInterface* g_papyrus;
+extern F4SEMessagingInterface* g_messaging;
+extern F4SEScaleformInterface* g_scaleform;
+extern F4SESerializationInterface* g_serialization;
+extern F4SETaskInterface* g_threading;
+
 UInt32 roundp(float a);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);

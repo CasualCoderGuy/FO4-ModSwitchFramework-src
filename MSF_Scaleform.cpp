@@ -1,6 +1,7 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Test.h"
 #include "MSF_WeaponState.h"
+#include "MSF_BurstMode.h"
 
 
 

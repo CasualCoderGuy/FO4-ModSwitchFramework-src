@@ -1,3 +1,4 @@
+#include "MSF_BurstMode.h"
 #include "MSF_Data.h"
 
 bool BurstModeManager::SetState(UInt8 bActive)
@@ -12,7 +13,11 @@ bool BurstModeManager::HandleFireEvent()
 	if (numOfShotsFired < numOfTotalShots)
 	{
 		if (!(flags & BurstModeData::bTypeAuto))
-			delayTask delayNextShot(delayTime, true, &BurstModeManager::FireWeapon, this);
+		{
+			FireBurstTask* burstTask = new FireBurstTask(this);
+			delayTask delayBurst(delayTime, true, g_threading->AddTask, burstTask);
+			//delayTask delayNextShot(delayTime, true, &BurstModeManager::FireWeapon, this);
+		}
 	}
 	else
 	{
