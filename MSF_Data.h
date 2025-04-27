@@ -535,7 +535,8 @@ public:
 	static UInt64 cancelSwitchHotkey;
 	static UInt64 lowerWeaponHotkey;
 	static UInt64 DEBUGprintStoredDataHotkey;
-	static Utilities::Timer tmr;
+	static Utilities::Timer lowerTmr;
+	static long long lowerDelay;
 
 	static BurstModeManager* activeBurstManager;
 

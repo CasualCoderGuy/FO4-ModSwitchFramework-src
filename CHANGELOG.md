@@ -4,7 +4,7 @@ features:
 - BCR and TR support added (loaded bullets remain in the chamber; when switching ammo, the full reload animations should be triggered; added forced reload capability to PlayIdleAction)
 - added the option to display mag size and loaded ammo count for weapons in the Pipboy menu
 - ammo can now be switched through the Pipboy menu
-- option to disable automatic reload added (restart required)
+- option to disable automatic reload added
 - chambered and magazine ammo type and count should now be accurately tracked in ExtraWeaponState
 - option to display currently equipped ammo in the Pipboy menu has been added
 - a new reload type is added, when the ammo needs to be emptied from the weapon before reloading (use emptyMag animation event and MSF_AnimsEmptyBeforeReload keyword)

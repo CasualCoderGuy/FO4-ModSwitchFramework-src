@@ -358,6 +358,21 @@ private:
 	bool bIsSwitch;
 };
 
+class LowerWeaponTask : public ITaskDelegate
+{
+public:
+	virtual void Run() final
+	{
+		if (MSF_MainData::lowerTmr.IsRunning() && MSF_MainData::lowerTmr.getElapsed() > MSF_MainData::lowerDelay) //game time!
+		{
+			MSF_MainData::lowerTmr.stop();
+			Actor* playerActor = *g_player;
+			if (!(playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)))
+				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
+		}
+	}
+};
+
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
 void* AttackBlockHandler_Hook(void* handler);

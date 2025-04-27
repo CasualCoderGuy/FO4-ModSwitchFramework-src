@@ -332,6 +332,14 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	//	if (ammoState)
 	//		return ((loadedAmmo - ammoState->chamberedCount < ammoCap) && ammoReserve); //HasTRsupport
 	//}
+	TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(target);
+	if (MSF_Data::InstanceHasTRSupport(instanceData))
+	{
+		UInt16 chamberSize = 0;
+		UInt16 flags = 0;
+		MSF_Data::GetChamberData(Utilities::GetEquippedModData(target), instanceData, &chamberSize, &flags);
+		return (loadedAmmo < (ammoCap+chamberSize) && loadedAmmo < ammoReserve);
+	}
 	return (loadedAmmo < ammoCap && loadedAmmo < ammoReserve);
 }
 

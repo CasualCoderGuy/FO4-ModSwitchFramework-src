@@ -89,7 +89,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamb
 std::vector<KeywordValue> MSF_MainData::uniqueStateAPValues;
 std::vector<TESAmmo*> MSF_MainData::dontRemoveAmmoOnReload;
 std::vector<TESObjectWEAP*>  MSF_MainData::BCRweapons;
-Utilities::Timer MSF_MainData::tmr;
+Utilities::Timer MSF_MainData::lowerTmr;
 
 RandomNumber MSF_MainData::rng;
 
@@ -523,6 +523,8 @@ namespace MSF_Data
 							{
 								UInt8 type = 0;
 								if (flags & KeybindData::bGlobalMenu)
+									type = ModSelectionMenu::kType_Global;
+								else if (flags & KeybindData::bMenuBoth)
 									type = ModSelectionMenu::kType_All;
 								else if (flags & KeybindData::bIsAmmo)
 									type = ModSelectionMenu::kType_AmmoMenu;
@@ -1775,9 +1777,7 @@ namespace MSF_Data
 			return false;
 		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
 		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!attachedMods || !instanceData)
+		if (!attachedMods)
 			return false;
 
 		std::vector<KeywordValue> instantiationValues;
@@ -1830,9 +1830,7 @@ namespace MSF_Data
 			return false;
 		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
 		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
-		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
-		if (!attachedMods || !instanceData)
+		if (!attachedMods)
 			return false;
 
 		_DEBUG("check OK");
