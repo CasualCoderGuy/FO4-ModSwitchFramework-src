@@ -18,6 +18,7 @@ fixes:
 - fixed an issue with weapon state storage
 - fixed an issue with weapon state mods serialization
 - safer task delay
+- fixed a bug where bNotRequireWeaponToBeDrawn was not taken into account
 ---
 v0.1.1
 features:

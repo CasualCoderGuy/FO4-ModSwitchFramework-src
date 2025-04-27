@@ -1944,7 +1944,7 @@ namespace MSF_Data
 			{
 				switchAttach->ModToRemove = modToRemove->mod;
 				switchAttach->LooseModToAdd = (modToRemove->flags & ModData::Mod::bRequireLooseMod) ? Utilities::GetLooseMod(modToRemove->mod) : nullptr;
-				switchAttach->SwitchFlags &= (modToRemove->flags & ModData::Mod::bRequireWeaponToBeDrawn) | ModData::Mod::bRequireLooseMod | ModData::Mod::bUpdateAnimGraph | ModData::Mod::bIgnoreAnimations;
+				switchAttach->SwitchFlags &= ~(modToRemove->flags & ModData::Mod::bNotRequireWeaponToBeDrawn);
 				switchAttach->SwitchFlags |= modToRemove->flags & ModData::Mod::bUpdateAnimGraph;
 			}
 			if (modToAttach->animData)
@@ -1991,7 +1991,7 @@ namespace MSF_Data
 			switchAttach->SwitchFlags |= SwitchData::bAnimNeeded;
 		}
 
-		if ((*g_player)->actorState.IsWeaponDrawn())
+		if ((*g_player)->actorState.IsWeaponDrawn() || (switchData->SwitchFlags & ModData::Mod::bNotRequireWeaponToBeDrawn))
 		{
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);

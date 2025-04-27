@@ -71,7 +71,7 @@ public:
 			bStandaloneRemove = 0x0002,
 			bHasSecondaryAmmo = 0x0004,
 			bHasUniqueState = 0x0008,
-			bRequireWeaponToBeDrawn = 0x1000,
+			bNotRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,

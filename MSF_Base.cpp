@@ -287,7 +287,7 @@ namespace MSF_Base
 		{
 			if (switchData->SwitchFlags & SwitchData::bIgnoreAnimations)
 				MSF_Base::SwitchMod(switchData, true);
-			else if ((*g_player)->actorState.IsWeaponDrawn())
+			else if ((*g_player)->actorState.IsWeaponDrawn() || (switchData->SwitchFlags & ModData::Mod::bNotRequireWeaponToBeDrawn))
 			{
 				if (switchData->SwitchFlags & SwitchData::bReloadNeeded)
 				{
