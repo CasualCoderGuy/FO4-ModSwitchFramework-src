@@ -296,6 +296,11 @@ extern RelocAddr <uintptr_t> CheckAmmoCountForReload_JumpHookTarget;
 extern RelocAddr <uintptr_t> CheckAmmoCountForReload_ReturnJumpAddr;
 extern uintptr_t CheckAmmoCountForReload_BranchCode;
 
+extern RelocAddr <uintptr_t> ActorEquipManagerPre_JumpHookTarget; 
+extern RelocAddr <uintptr_t> ActorEquipManagerPre_ReturnJumpAddr;
+extern RelocAddr <uintptr_t> ActorEquipManagerEnd_ReturnJumpAddr;
+extern uintptr_t ActorEquipManagerPre_BranchCode;
+
 extern RelocAddr <uintptr_t> CannotEquipItemGen_JumpHookTarget;
 extern RelocAddr <uintptr_t> CannotEquipItemMod_JumpHookTarget;
 extern RelocAddr <uintptr_t> CannotEquipItemGen_ReturnJumpAddr;
@@ -389,6 +394,7 @@ ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
 bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve);
 const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 unequip, UInt32 type);
+void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

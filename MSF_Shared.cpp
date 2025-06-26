@@ -116,6 +116,121 @@ ExtraAmmo* ExtraAmmo::Create(UInt32 ammo)
 	return extraAmmo;
 }
 
+void FreeLeveledList(LEVELED_OBJECT* levo, uint32_t arg = 0x3)
+{
+	if (!levo)
+		return;
+	//using func_t = decltype(&FreeLeveledList);
+	//const REL::Relocation<func_t> func{ REL::ID(296092) };  //140042CA0
+	//return func(levo, arg);
+	Heap_Free(levo);
+}
+
+struct_ll* reserveNewLevL(uint32_t count)
+{
+	//RE::MemoryManager mm = RE::MemoryManager::GetSingleton();
+	//return (struct_ll*)mm.Allocate(sizeof(LEVELED_OBJECT) * count + sizeof(size_t), 0, 0);
+	void* memory = Heap_Allocate(sizeof(LEVELED_OBJECT) * count + sizeof(size_t));
+	memset(memory, 0, sizeof(LEVELED_OBJECT) * count + sizeof(size_t));
+	return (struct_ll*)memory;
+}
+
+std::vector<LEVELED_OBJECT> LeveledList::getListAsVector()
+{
+	std::vector<LEVELED_OBJECT> loVec;
+	if (!this->leveledLists || this->baseListCount == 0)
+		return loVec;
+	for (uint32_t i = 0; i < static_cast<uint32_t>(this->baseListCount); i++)
+		loVec.push_back(this->leveledLists[i]);
+	return loVec;
+}
+
+bool LeveledList::CreateList(const std::vector<LEVELED_OBJECT>& levo)
+{
+	if (this->leveledLists) 
+	{
+		memset(this->leveledLists, 0, this->baseListCount * sizeof(LEVELED_OBJECT));
+		FreeLeveledList(this->leveledLists);
+
+		this->leveledLists = nullptr;
+		this->baseListCount = 0;
+	}
+
+	if (levo.empty())
+		return false;
+
+	uint32_t size = static_cast<uint32_t>(levo.size());
+	struct_ll* newLL = reserveNewLevL(size);
+	if (!newLL)
+		return false;
+
+	newLL->size = size;
+	for (uint32_t i = 0; i < size; i++)
+		newLL->ll[i] = levo[i];
+
+	this->leveledLists = newLL->ll;
+	this->baseListCount = static_cast<int8_t>(size);
+	return true;
+}
+
+bool LeveledList::CopyData(LeveledList* originalll, bool doMiscData, bool copyList)
+{
+	if (doMiscData)
+	{
+		if (!this->leveledLists && !copyList)
+		{
+			this->baseListCount = originalll->baseListCount;
+			this->leveledLists = originalll->leveledLists;
+		}
+		this->chanceGlobal = originalll->chanceGlobal;
+		this->chanceNone = originalll->chanceNone;
+		this->keywordChances = originalll->keywordChances;
+		this->llFlags = originalll->llFlags;
+		this->maxUseAllCount = originalll->maxUseAllCount;
+		if (!this->scriptAddedLists && !copyList)
+		{
+			this->scriptAddedLists = originalll->scriptAddedLists;
+			this->scriptListCount = originalll->scriptListCount;
+		}
+	}
+	if (copyList)
+	{
+		if (this->leveledLists)
+		{
+			memset(this->leveledLists, 0, this->baseListCount * sizeof(LEVELED_OBJECT));
+			FreeLeveledList(this->leveledLists);
+			this->leveledLists = nullptr;
+			this->baseListCount = 0;
+		}
+		if (originalll->baseListCount > 0)
+		{
+			struct_ll* newLL = reserveNewLevL(originalll->baseListCount);
+			if (newLL)
+			{
+				newLL->size = originalll->baseListCount;
+				for (uint32_t i = 0; i < originalll->baseListCount; i++)
+					newLL->ll[i] = originalll->leveledLists[i];
+				this->leveledLists = newLL->ll;
+				this->baseListCount = originalll->baseListCount;
+			}
+		}
+	}
+
+	return true;
+}
+
+void LeveledList::ClearList()
+{
+	if (this->leveledLists) 
+	{
+		memset(this->leveledLists, 0, this->baseListCount * sizeof(LEVELED_OBJECT));
+		FreeLeveledList(this->leveledLists);
+
+		this->leveledLists = nullptr;
+		this->baseListCount = 0;
+	}
+}
+
 namespace Utilities
 {
 

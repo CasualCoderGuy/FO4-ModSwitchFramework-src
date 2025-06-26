@@ -142,6 +142,8 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				MSF_Data::LoadPluginData();
 				_MESSAGE("Plugin Data Loading Time: %llu ms.", tmr.stop());
 
+				MSF_Data::InjectLeveledLists();
+
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
 
 				MSF_Data::InitCompatibility();
@@ -311,6 +313,48 @@ bool WriteHooks()
 	CannotEquipItem_BranchCode = (uintptr_t)CannotEquipItem_codeBuf;
 	g_branchTrampoline.Write5Branch(CannotEquipItemGen_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
 	g_branchTrampoline.Write5Branch(CannotEquipItemMod_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
+
+	/////////////////////////
+	struct ActorEquipManagerPre_InjectCode : Xbyak::CodeGenerator {
+		ActorEquipManagerPre_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+		{
+			Xbyak::Label hook, retnLabel, toEnd;
+			jz(toEnd);
+
+			push(r10);
+			push(r11);
+			push(rdx);
+			push(rax);
+			sub(rsp, 0x100);
+#ifndef NEXTGEN
+			mov(rdx, rsi);
+#else
+			mov(rdx, rdi);
+#endif
+			mov(rcx, rax);
+			call(ptr[rip + hook]);
+
+			add(rsp, 0x100);
+			pop(rax);
+			pop(rdx);
+			pop(r11);
+			pop(r10);
+			jmp(ptr[rip + retnLabel]);
+
+			L(hook);
+			dq((uintptr_t)ActorEquipManagerPre_Hook);
+			L(retnLabel);
+			dq(ActorEquipManagerPre_ReturnJumpAddr);
+			L(toEnd);
+			dq(ActorEquipManagerEnd_ReturnJumpAddr);
+		}
+	};
+	void* ActorEquipManagerPre_codeBuf = g_localTrampoline.StartAlloc();
+	ActorEquipManagerPre_InjectCode ActorEquipManagerPre_code(ActorEquipManagerPre_codeBuf);
+	g_localTrampoline.EndAlloc(ActorEquipManagerPre_code.getCurr());
+	ActorEquipManagerPre_BranchCode = (uintptr_t)ActorEquipManagerPre_codeBuf;
+	g_branchTrampoline.Write6Branch(ActorEquipManagerPre_JumpHookTarget.GetUIntPtr(), ActorEquipManagerPre_BranchCode);
+	/////////////////////
 
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);

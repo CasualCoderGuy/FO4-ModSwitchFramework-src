@@ -416,7 +416,7 @@ bool ExtraWeaponState::UpdateWeaponStates(ExtraDataList* extraDataList, EquipWea
 		this->currentState->chamberedAmmo = instanceData->ammo;*/
 		_DEBUG("AMMOstate");
 	}
-	return false;
+	return true;
 }
 
 

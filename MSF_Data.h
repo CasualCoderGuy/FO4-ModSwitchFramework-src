@@ -21,6 +21,7 @@ public:
 	};
 	AmmoMod baseAmmoData;
 	std::vector<AmmoMod> ammoMods;
+	LevItem* baseAmmoLL;
 };
 
 class AnimationData
@@ -216,16 +217,19 @@ public:
 class CustomProjectileFormManager
 {
 public:
+	BGSProjectile* Clone(BGSProjectile* proj);
 	bool ApplyMods(ExtraDataList* extraDataList);
 	bool AddModData(BGSMod::Attachment::Mod* mod, BGSMod::Container::Data data, bool overwrite = true);
+	void Cleanup(BGSProjectile* proj);
 	bool ClearData();
 	enum WeaponFormProperty
 	{
 		//flags
-		kWeaponTarget_Supersonic = 101,
+		kNull = 150,
+		kWeaponTarget_Supersonic,
 		kWeaponTarget_MuzzleFlash,
 		kWeaponTarget_Explosion,
-		kWeaponTarget_TriggerOnImpact, //Alt.Trigger
+		kWeaponTarget_AltTrigger,
 		kWeaponTarget_Hitscan,
 		kWeaponTarget_CanBeDisabled,
 		kWeaponTarget_CanBePickedUp,
@@ -235,6 +239,9 @@ public:
 		kWeaponTarget_PenetratesGeom,
 		kWeaponTarget_ContinuousUpdate,
 		kWeaponTarget_SeeksTarget,
+		//int
+		kWeaponTarget_TracerFreq,
+		kWeaponTarget_SoundLevel,
 		//float
 		kWeaponTarget_Gravity,
 		kWeaponTarget_Speed,
@@ -248,9 +255,6 @@ public:
 		kWeaponTarget_CollRadius,
 		kWeaponTarget_Lifetime,
 		kWeaponTarget_RelaunchInt,
-		//int
-		kWeaponTarget_TracerFreq,
-		kWeaponTarget_SoundLevel,
 		//Form
 		kWeaponTarget_Light,
 		kWeaponTarget_MuzzleFlashLight,
@@ -263,14 +267,14 @@ public:
 		kWeaponTarget_VATSprojectile,
 		kWeaponTarget_Model,
 		kWeaponTarget_MuzzleFlashModel,
-		kWeaponTarget_Destruction
+		kWeaponTarget_Destruction,
+		kMax
 
 	};
-private:
-	BGSProjectile* Clone(BGSProjectile* proj);
-	bool ReturnCleanup(std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>>::iterator foundData, TESObjectWEAP::InstanceData* instance);
 	std::unordered_map<BGSMod::Attachment::Mod*, std::vector<BGSMod::Container::Data>> projectileModMap;
 	std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>> projectileParentMap;
+private:
+	bool ReturnCleanup(std::unordered_map<ExtraDataList*, std::pair<BGSProjectile*, BGSProjectile*>>::iterator foundData, TESObjectWEAP::InstanceData* instance);
 };
 
 class SwitchData
@@ -530,6 +534,7 @@ public:
 	static BCRinterface BCRinterfaceHolder;
 	static ModSwitchManager modSwitchManager;
 	static WeaponStateStore weaponStateStore;
+	static CustomProjectileFormManager projectileManager;
 	static PlayerInventoryListEventSink playerInventoryEventSink;
 	static ActorEquipManagerEventSink actorEquipManagerEventSink;
 	static UInt64 cancelSwitchHotkey;
@@ -575,6 +580,7 @@ public:
 	static ActorValueInfo* BCR_AVIF2;
 	static BGSMod::Attachment::Mod* APbaseMod;
 	static BGSMod::Attachment::Mod* NullMuzzleMod;
+	static BGSProjectile* ProjectileDummy;
 	static BGSKeyword* CanHaveNullMuzzleKW;
 	static BGSKeyword* FiringModBurstKW;
 	static BGSKeyword* FiringModeUnderbarrelKW;
@@ -608,7 +614,7 @@ public:
 		bRequireAmmoToSwitch = 0x00001000,
 		bSpawnRandomAmmo = 0x00002000,
 		bSpawnRandomMods = 0x00004000,
-		bDisableAutomaticReload = 0x00008000,
+		bInjectLeveledLists = 0x00008000,
 		bWidgetAlwaysVisible = 0x00000001,
 		bShowAmmoIcon = 0x00000002,
 		bShowMuzzleIcon = 0x00000004,
@@ -625,10 +631,11 @@ public:
 		bReloadCompatibilityMode = 0x00200000,
 		bCustomAnimCompatibilityMode = 0x00400000,
 		bShowEquippedAmmo = 0x00800000,
-		bDisplayChamberedAmmoOnHUD = 0x00100000,
+		bDisplayChamberedAmmoOnHUD = 0x01000000,
 		bDisplayConditionInPipboy = 0x02000000,
 		bDisplayMagInPipboy = 0x04000000,
 		bDisplayChamberInPipboy = 0x08000000,
+		bDisableAutomaticReload = 0x10000000,
 		mMakeExtraRankMask = bEnableAmmoSaving | bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt32 MCMSettingFlags;
@@ -644,6 +651,7 @@ public:
 namespace MSF_Data
 {
 	bool InitData();
+	bool InjectLeveledLists();
 	bool FillQuickAccessData();
 	bool InitCompatibility();
 	bool InitMCMSettings();

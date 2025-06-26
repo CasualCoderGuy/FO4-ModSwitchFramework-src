@@ -121,6 +121,55 @@ public:
 };
 STATIC_ASSERT(sizeof(TESIdleForm) == 0x70);
 
+class TESImageSpaceModifiableForm :
+	public BaseFormComponent  // 00
+{
+public:
+	// members
+	TESImageSpaceModifier* formImageSpaceModifying;  // 08
+};
+STATIC_ASSERT(sizeof(TESImageSpaceModifiableForm) == 0x10);
+
+struct BGSExplosionData
+{
+public:
+	// members
+	TESObjectLIGH* light;                                                // 00
+	BGSSoundDescriptorForm* sound1;                                      // 08
+	BGSSoundDescriptorForm* sound2;                                      // 10
+	BGSImpactDataSet* impactDataSet;                                     // 18
+	TESBoundObject* impactPlacedObject;                                  // 20
+	BGSProjectile* spawnProjectile;                                      // 28
+	NiPoint3 projectileVector;                                           // 30
+	float projectileSpread;                                              // 3C
+	std::uint32_t projectileCount;                                       // 40
+	float force;                                                         // 44
+	float damage;                                                        // 48
+	float innerRadius;                                                   // 4C
+	float outerRadius;                                                   // 50
+	float imageSpaceRadius;                                              // 54
+	float verticalOffsetMult;                                            // 58
+	UInt32 flags;                                                 // 5C
+	UInt32 soundLevel;              // 60
+	float placedObjectFadeDelay;                                         // 64
+	UInt32 staggerMagnitude;  // 68
+};
+STATIC_ASSERT(sizeof(BGSExplosionData) == 0x70);
+
+class BGSExplosion : 
+	public TESBoundObject,              // 000
+	public TESFullName,                 // 068
+	public TESModel,                    // 078
+	public TESEnchantableForm,          // 0A8
+	public BGSPreloadable,              // 0C0
+	public TESImageSpaceModifiableForm  // 0C8
+{
+public:
+	// members
+	BGSExplosionData data;  // 0D8
+};
+STATIC_ASSERT(sizeof(BGSExplosion) == 0x148);
+
 class MSFAimModel : public TESForm //https://github.com/isathar/F4SE_AmmoTweaksExtension cast AimModel as MSFAimModel, edit result
 {
 public:
@@ -693,7 +742,8 @@ typedef void(*_UnkSub_DFE930)(Actor* actor, bool rdx);
 // //virtual void AttachWeapon(const BGSObjectInstanceT<TESObjectWEAP>& a_weapon, BGSEquipIndex a_equipIndex);																							// A5
 //virtual void DoReparentWeapon(const TESObjectWEAP* a_weapon, BGSEquipIndex a_equipIndex, bool a_weaponDrawn);                                                                                    // 118
 
-
+typedef void(*_SetDelete)(TESForm* form, bool a_deleted);
+typedef TESForm* (*_CreateDuplicateForm)(TESForm* original, bool a_createEditorID, tHashSet<TESForm*, TESForm*>* a_copyMap);
 typedef BGSKeyword*(*_GetKeywordFromValueArray)(UInt32 valueArrayBase, KeywordValue value);
 typedef bool(*_HasPerkInternal)(Actor* actor, BGSPerk* perk);
 typedef bool(*_IKeywordFormBase_HasKeyword)(IKeywordFormBase* keywordFormBase, BGSKeyword* keyword, UInt32 unk3); //https://github.com/shavkacagarikia/ExtraItemInfo
@@ -736,6 +786,8 @@ typedef bool(*_GetSmartPointer)(ObjectRefHandle* a_handle, TESObjectREFR** a_sma
 extern RelocAddr <_GetSmartPointer> GetSmartPointer;
 typedef BGSInventoryItem*(*_RequestInventoryItem)(BGSInventoryInterface* itfc, UInt32* a_handleID);
 extern RelocAddr <_RequestInventoryItem> RequestInventoryItem;
+extern RelocAddr <_CreateDuplicateForm> CreateDuplicateForm;
+extern RelocAddr <_SetDelete> SetDeleteForm;
 
 extern RelocAddr <uintptr_t> s_BGSObjectInstanceExtraVtbl;
 extern RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl;
@@ -1118,6 +1170,22 @@ public:
 struct BGSProjectileData
 {
 public:
+	enum
+	{
+		bSupersonic = 0x0080,
+		bMuzzleFlash = 0x0008,
+		bExplosion = 0x0002,
+		bAltTrigger = 0x0004,
+		bHitscan = 0x0001,
+		bCanBeDisabled = 0x0020,
+		bCanBePickedUp = 0x0040,
+		bPinsLimbs = 0x0100,
+		bPassThroughObjects = 0x0200,
+		bDisableAimCorr = 0x0400,
+		bPenetratesGeom = 0x0800,
+		bContinuousUpdate = 0x1000,
+		bSeeksTarget = 0x2000
+	};
 	// members
 	UInt32 flags;                      // 00
 	float gravity;                            // 04
@@ -1165,6 +1233,70 @@ private:
 	Projectile();
 };
 STATIC_ASSERT(sizeof(Projectile) == 0x188);
+
+struct LEVELED_OBJECT
+{
+public:
+	LEVELED_OBJECT(TESForm* a_form)
+	{
+		form = a_form;
+		containerItemExtra = nullptr;
+		count = 1;
+		level = 1;
+		chanceNone = 0;
+	};
+	// members
+	TESForm* form;                  // 00
+	BSExtraData* containerItemExtra;  // 08
+	UInt16 count;            // 10
+	UInt16 level;            // 12
+	UInt8 chanceNone;         // 14
+};
+STATIC_ASSERT(sizeof(LEVELED_OBJECT) == 0x18);
+
+struct struct_ll
+{
+	uint32_t size;
+	LEVELED_OBJECT ll[];
+};
+
+class LeveledList : public BaseFormComponent  // 00
+{
+public:
+	virtual ~LeveledList();
+
+	// add
+	virtual UInt8 GetChanceNone();											// 07
+	virtual bool GetMultCalc();                                             // 08
+	virtual UInt32 GetMaxLevelDifference() { return 0; }					// 09
+	virtual const char* GetOverrideName() { return nullptr; }               // 0A
+	virtual bool GetCanContainFormsOfType(UInt8 a_type) const = 0;			// 0B
+
+	std::vector<LEVELED_OBJECT> getListAsVector();
+	bool CreateList(const std::vector<LEVELED_OBJECT>& levo);
+	bool CopyData(LeveledList* llist, bool doMiscData, bool copyList);
+	void ClearList();
+
+	// members
+	TESGlobal* chanceGlobal;                                                        // 08
+	void* keywordChances;															// 10
+	LEVELED_OBJECT* leveledLists;                                                   // 18
+	LEVELED_OBJECT** scriptAddedLists;                                              // 20
+	UInt8 scriptListCount;															// 28
+	UInt8 baseListCount;															// 29
+	UInt8 chanceNone;																// 2A
+	UInt8 llFlags;	//calcForLevel: 0x1, calcEachItem: 0x2, calcUseAll: 0x4			// 2B
+	UInt8 maxUseAllCount;															// 2C
+};
+STATIC_ASSERT(sizeof(LeveledList) == 0x30);
+
+class LevItem :
+	public TESBoundObject,  // 00
+	public LeveledList   // 68
+{
+public:
+};
+STATIC_ASSERT(sizeof(TESLevItem) == 0x98);
 
 struct SubgraphIdentifier
 {

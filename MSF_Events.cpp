@@ -85,6 +85,36 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	return kEvent_Continue;
 }
 
+void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object)
+{
+
+	ExtraDataList* dataList = nullptr;
+	if (!owner->inventoryList || !object || !object->object || !object->instanceData)
+		return;
+	if (object->object->formType != kFormType_WEAP)
+		return;
+	for (UInt32 i = 0; i < owner->inventoryList->items.count; i++)
+	{
+		if (owner->inventoryList->items.entries[i].form == object->object)
+		{
+			for (auto stack = owner->inventoryList->items.entries[i].stack; stack; stack = stack->next)
+			{
+				if (!stack->extraData)
+					continue;
+				ExtraInstanceData* eidata = (ExtraInstanceData*)stack->extraData->GetByType(ExtraDataType::kExtraData_InstanceData);
+				if (eidata && eidata->instanceData == object->instanceData)
+				{
+					dataList = stack->extraData;
+					break;
+				}
+			}
+		}
+	}
+	if (!dataList)
+		return;
+	MSF_MainData::projectileManager.ApplyMods(dataList);
+}
+
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
 {
 	//_DEBUG("ammoCount: %i, totAmmo: %i, instance: %p", evn->ammoCount, evn->totalAmmoCount, evn->weaponInstance);
@@ -266,8 +296,8 @@ void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt
 	//{
 	//	_DEBUG("eq: %i", eqdata->loadedAmmoCount);
 	//}
-	if (r8d)
-		_DEBUG("eq r8d: %i", *r8d);
+	//if (r8d)
+	//	_DEBUG("eq r8d: %i", *r8d);
 	if (equipData == (*g_player)->biped.get())
 	{
 		_DEBUG("UpdateEquipData_Hook");

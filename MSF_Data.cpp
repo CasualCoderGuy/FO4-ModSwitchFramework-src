@@ -29,6 +29,7 @@ ActorValueInfo* MSF_MainData::BCR_AVIF;
 ActorValueInfo* MSF_MainData::BCR_AVIF2;
 BGSMod::Attachment::Mod* MSF_MainData::APbaseMod;
 BGSMod::Attachment::Mod* MSF_MainData::NullMuzzleMod;
+BGSProjectile* MSF_MainData::ProjectileDummy;
 BGSKeyword* MSF_MainData::CanHaveNullMuzzleKW;
 BGSKeyword* MSF_MainData::FiringModBurstKW;
 BGSKeyword* MSF_MainData::FiringModeUnderbarrelKW;
@@ -71,6 +72,7 @@ BCRinterface MSF_MainData::BCRinterfaceHolder;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
 std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
+CustomProjectileFormManager MSF_MainData::projectileManager;
 PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
 ActorEquipManagerEventSink MSF_MainData::actorEquipManagerEventSink;
 WeaponStateStore MSF_MainData::weaponStateStore;
@@ -103,8 +105,6 @@ void ModSwitchManager::HandlePAEvent()
 
 namespace MSF_Data
 {
-
-
 	bool InjectAttachPoints()
 	{
 		if (!MSF_MainData::ammoAP)
@@ -116,6 +116,107 @@ namespace MSF_Data
 			weaps->GetNthItem(idx, weapForm);
 			AttachParentArray* aps = (AttachParentArray*)&weapForm->attachParentArray;
 			aps->kewordValueArray.Push(MSF_MainData::ammoAP);
+		}
+		return true;
+	}
+
+	bool InjectLeveledLists()
+	{
+		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bInjectLeveledLists))
+			return false;
+		for (std::unordered_map<TESAmmo*, AmmoData*>::iterator it = MSF_MainData::ammoDataMap.begin(); it != MSF_MainData::ammoDataMap.end(); it++)
+		{
+			AmmoData* itAmmoData = it->second;
+			if (!itAmmoData || !itAmmoData->baseAmmoLL)
+				continue;
+			LevItem* llForm = itAmmoData->baseAmmoLL;
+			_DEBUG("llForm: %p, formID: %08X; flags: %08X; llfalgs: %02X; formType: %02X; baseListCount: %i", llForm, llForm->formID, llForm->flags, llForm->llFlags, llForm->formType, llForm->baseListCount);
+			std::vector<double> chances;
+			double totalChance = itAmmoData->baseAmmoData.spawnChance;
+			chances.push_back(itAmmoData->baseAmmoData.spawnChance);
+			for (std::vector<AmmoData::AmmoMod>::iterator itAmmoMod = itAmmoData->ammoMods.begin(); itAmmoMod != itAmmoData->ammoMods.end(); itAmmoMod++)
+			{
+				chances.push_back(itAmmoMod->spawnChance);
+				totalChance += itAmmoMod->spawnChance;
+			}
+			if (totalChance == itAmmoData->baseAmmoData.spawnChance)
+				continue;
+			if (itAmmoData->baseAmmoData.spawnChance == 0)
+			{
+				llForm->baseListCount = 0;
+				llForm->leveledLists = nullptr;
+				llForm->scriptListCount = 0;
+				llForm->scriptAddedLists = nullptr;
+				llForm->chanceNone = 0;
+				llForm->chanceGlobal = nullptr;
+				llForm->llFlags = 3;
+				std::vector<LEVELED_OBJECT> typeLLObjs;
+				//std::string typedNumStr = "";
+				for (auto itAmmoMod : itAmmoData->ammoMods)
+				{
+					if (itAmmoMod.spawnChance == 0)
+					{
+						//typedNumStr += ", 0";
+						continue;
+					}
+					LevItem* copiedForType = (LevItem*)CreateDuplicateForm(llForm, true, nullptr);
+					copiedForType->CopyData(llForm, true, true);
+					for (uint32_t i = 0; i < static_cast<uint32_t>(copiedForType->baseListCount); i++)
+						copiedForType->leveledLists[i].form = itAmmoMod.ammo;
+					float typeChance = itAmmoMod.spawnChance / (totalChance - itAmmoData->baseAmmoData.spawnChance) * 40;
+					UInt8 chanceNum = round(typeChance);
+					typeLLObjs.insert(typeLLObjs.end(), chanceNum, LEVELED_OBJECT(copiedForType));
+					//typedNumStr += ", "+ std::to_string(chanceNum);
+				}
+				llForm->CreateList(typeLLObjs);
+				continue;
+			}
+			for (UInt8 typepcs = 1; typepcs < 42; typepcs++)
+			{
+				float totPcs = typepcs / (1 - (itAmmoData->baseAmmoData.spawnChance / totalChance));
+				UInt32 totPcsR = round(totPcs);
+				float distErr = abs(1 - typepcs / totPcsR - itAmmoData->baseAmmoData.spawnChance / totalChance);
+				if (distErr <= 0.01 || totPcsR > 40)
+				{
+					if (totPcsR > 40)
+						totPcsR = 40;
+					LevItem* copiedBase = (LevItem*)CreateDuplicateForm(llForm, true, nullptr);
+					copiedBase->CopyData(llForm, true, false);
+					llForm->baseListCount = 0;
+					llForm->leveledLists = nullptr;
+					llForm->scriptListCount = 0;
+					llForm->scriptAddedLists = nullptr;
+					llForm->chanceNone = 0;
+					llForm->chanceGlobal = nullptr;
+					llForm->llFlags = 3;
+					std::vector<LEVELED_OBJECT> typeLLObjs;
+					//std::string typedNumStr = "";
+					for (auto itAmmoMod : itAmmoData->ammoMods)
+					{
+						if (itAmmoMod.spawnChance == 0)
+						{
+							//typedNumStr += ", 0";
+							continue;
+						}
+						LevItem* copiedForType = (LevItem*)CreateDuplicateForm(copiedBase, true, nullptr);
+						copiedForType->CopyData(copiedBase, true, true);
+						for (uint32_t i = 0; i < static_cast<uint32_t>(copiedForType->baseListCount); i++)
+							copiedForType->leveledLists[i].form = itAmmoMod.ammo;
+						float typeChance = itAmmoMod.spawnChance / (totalChance - itAmmoData->baseAmmoData.spawnChance) * 40;
+						UInt8 chanceNum = round(typeChance);
+						typeLLObjs.insert(typeLLObjs.end(), chanceNum, LEVELED_OBJECT(copiedForType));
+						//typedNumStr += ", "+ std::to_string(chanceNum);
+					}
+					LevItem* copiedForCollective = (LevItem*)CreateDuplicateForm(llForm, true, nullptr);
+					copiedForCollective->CreateList(typeLLObjs);
+					std::vector<LEVELED_OBJECT> finalLLObjs;
+					finalLLObjs.insert(finalLLObjs.end(), totPcsR-typepcs, LEVELED_OBJECT(copiedBase));
+					finalLLObjs.insert(finalLLObjs.end(), typepcs, LEVELED_OBJECT(copiedForCollective));
+					llForm->CreateList(finalLLObjs);
+					//_DEBUG("replaced w/ %i original and %i typed; type dist: %s", totPcsR - typepcs, typepcs, typedNumStr.c_str());
+					break;
+				}
+			}
 		}
 		return true;
 	}
@@ -161,6 +262,7 @@ namespace MSF_Data
 		MSF_MainData::hasUniqueStateKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000001);
 		MSF_MainData::IsMagKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000002);
 		MSF_MainData::AnimsEmptyBeforeReloadKW = (BGSKeyword*)LookupFormByID(formIDbase | (UInt32)0x0000003);
+		MSF_MainData::ProjectileDummy = (BGSProjectile*)LookupFormByID(formIDbase | (UInt32)0x0000004);
 		MSF_MainData::fireIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004AE1));
 		MSF_MainData::fireIdle3rdP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0018E1F));
 		MSF_MainData::reloadIdle1stP = reinterpret_cast<TESIdleForm*>(LookupFormByID((UInt32)0x0004D33));
@@ -259,7 +361,7 @@ namespace MSF_Data
 			return false;
 
 		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch\
-			| MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
+			| MSF_MainData::bSpawnRandomAmmo | MSF_MainData::bSpawnRandomMods | MSF_MainData::bInjectLeveledLists | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
 			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods | MSF_MainData::bEnableMetadataSaving \
 			| MSF_MainData::bEnableAmmoSaving | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport | MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
 			| MSF_MainData::bDisplayChamberInPipboy);
@@ -676,6 +778,8 @@ namespace MSF_Data
 				flag = MSF_MainData::bSpawnRandomAmmo;
 			else if (settingName == "bSpawnRandomMods")
 				flag = MSF_MainData::bSpawnRandomMods;
+			else if (settingName == "bInjectLeveledLists")
+				flag = MSF_MainData::bInjectLeveledLists;
 			else if (settingName == "bEnableMetadataSaving")
 				flag = MSF_MainData::bEnableMetadataSaving;
 			else if (settingName == "bEnableAmmoSaving")
@@ -820,6 +924,173 @@ namespace MSF_Data
 					}
 				}
 
+				data1 = json["projectileMod"];
+				_DEBUG("projmod");
+				if (data1.isArray())
+				{
+					_DEBUG("projmodArr");
+					for (int i = 0; i < data1.size(); i++)
+					{
+						const Json::Value& proj = data1[i];
+						std::string str = proj["mod"].asString();
+						_DEBUG("modOK");
+						if (str == "")
+						{
+							_MESSAGE("Data error in %s: 'projectileMod->mod' can not be an empty string", fileName.c_str());
+							continue;
+						}
+						BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+						if (!mod)
+						{
+							_MESSAGE("Data error in %s: mod '%s' could not be found in loaded game data", fileName.c_str(), str.c_str());
+							continue;
+						}
+						if (mod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
+						{
+							_MESSAGE("Data error in %s: target type of mod '%s' is not weapon", fileName.c_str(), str.c_str());
+							continue;
+						}
+						UInt16 flags = proj["flags"].asInt();
+						_DEBUG("FlagsOK");
+						
+						data2 = proj["BGSModContainerData"];
+						if (data2.isArray())
+						{
+							for (int ii = 0; ii < data2.size(); ii++)
+							{
+								const Json::Value& cont = data2[ii];
+								BGSMod::Container::Data data;
+								_DEBUG("arr");
+								data.target = cont["target"].asInt();
+								if (data.target <= CustomProjectileFormManager::WeaponFormProperty::kNull || data.target >= CustomProjectileFormManager::WeaponFormProperty::kMax)
+								{
+									_MESSAGE("Data error in %s: 'projectileMod->BGSModContainerData->target' target type out of range", fileName.c_str());
+									continue;
+								}
+								_DEBUG("targetOK");
+								bool success = false;
+								data.op = cont["op"].asInt();
+								_DEBUG("opOK");
+								switch (data.op)
+								{
+								case BGSMod::Container::Data::kOpFlag_Set_Bool:
+								case BGSMod::Container::Data::kOpFlag_Add_Int:
+								case BGSMod::Container::Data::kOpFlag_Set_Enum:
+								case BGSMod::Container::Data::kOpFlag_Set_Int:
+								case BGSMod::Container::Data::kOpFlag_Or_Bool:
+								case BGSMod::Container::Data::kOpFlag_And_Bool:
+								{
+									_DEBUG("switchedInt");
+									data.value.i.v1 = cont["value"].asInt();
+									_DEBUG("switchedIntOK");
+									success = true;
+								}
+								break;
+								case BGSMod::Container::Data::kOpFlag_Set_Float:
+								case BGSMod::Container::Data::kOpFlag_Mul_Add_Float:
+								case BGSMod::Container::Data::kOpFlag_Add_Float:
+								{
+									data.value.f.v1 = cont["value"].asFloat();
+									success = true;
+								}
+								break;
+								case BGSMod::Container::Data::kOpFlag_Set_Form:
+								case BGSMod::Container::Data::kOpFlag_Add_Form:
+								{
+									_DEBUG("switchedForm");
+									str = cont["value"].asString();
+									_DEBUG("switchedFormOK");
+									if (str == "")
+									{
+										_MESSAGE("Data error in %s: 'projectileMod->BGSModContainerData->value(TESForm)' can not be an empty string", fileName.c_str());
+										break;
+									}
+									data.value.form = Utilities::GetFormFromIdentifier(str);
+									if (!data.value.form)
+									{
+										_MESSAGE("Data error in %s 'projectileMod->BGSModContainerData->value(TESForm)': '%s' could not be found in loaded game data", fileName.c_str(), str.c_str());
+										break;
+									}
+									switch (data.target)
+									{
+									case CustomProjectileFormManager::kWeaponTarget_Light:
+									case CustomProjectileFormManager::kWeaponTarget_MuzzleFlashLight:
+									{
+										TESObjectLIGH* form = DYNAMIC_CAST(data.value.form, TESForm, TESObjectLIGH);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_ExpType:
+									{
+										_DEBUG("switchedExp");
+										BGSExplosion* form = DYNAMIC_CAST(data.value.form, TESForm, BGSExplosion);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_ActSoundLoop:
+									case CustomProjectileFormManager::kWeaponTarget_CountdownSound:
+									case CustomProjectileFormManager::kWeaponTarget_DeactivateSound:
+									{
+										BGSSoundDescriptorForm* form = DYNAMIC_CAST(data.value.form, TESForm, BGSSoundDescriptorForm);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_DecalData:
+									{
+										BGSTextureSet* form = DYNAMIC_CAST(data.value.form, TESForm, BGSTextureSet);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_CollisionLayer:
+									{
+										TESForm* form = (TESForm*)Runtime_DynamicCast(data.value.form, RTTI_TESForm, RTTI_BGSCollisionLayer);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_VATSprojectile:
+									{
+										BGSProjectile* form = DYNAMIC_CAST(data.value.form, TESForm, BGSProjectile);
+										if (form)
+											success = true;
+									}
+									break;
+									case CustomProjectileFormManager::kWeaponTarget_Model:
+									case CustomProjectileFormManager::kWeaponTarget_MuzzleFlashModel:
+									{
+										TESModel* form = DYNAMIC_CAST(data.value.form, TESForm, TESModel);
+										if (form)
+											success = true;
+									}
+									break;
+									default:
+									{
+										_MESSAGE("Data error in %s 'projectileMod->BGSModContainerData->value(TESForm)': invalid target specified for form '%s'", fileName.c_str(), str.c_str());
+									}
+									break;
+									}
+								}
+								break;
+								default:
+								{
+									_MESSAGE("Data error in %s 'projectileMod->BGSModContainerData->op': no valid operator found", fileName.c_str());
+								}
+								break;
+								}
+								if (success)
+								{
+									MSF_MainData::projectileManager.AddModData(mod, data, flags & 1);
+									_DEBUG("added");
+								}
+							}
+						}
+					}
+				}
+
 				data1 = json["compatibility"];
 				if (data1.isObject())
 				{
@@ -891,6 +1162,8 @@ namespace MSF_Data
 							}
 						}
 					}
+
+
 
 					data2 = data1["attachChildren"];
 					if (data2.isArray())
@@ -1047,6 +1320,10 @@ namespace MSF_Data
 						//	continue;
 						UInt16 ammoIDbase = ammoData["baseAmmoID"].asInt();
 						float spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
+						LevItem* baseAmmoLL = nullptr;
+						str = ammoData["baseLeveledList"].asString();
+						if (str != "")
+							baseAmmoLL = (LevItem*)DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESLevItem);
 
 						auto itAD = MSF_MainData::ammoDataMap.find(baseAmmo);
 						if (itAD != MSF_MainData::ammoDataMap.end())
@@ -1056,6 +1333,7 @@ namespace MSF_Data
 							itAmmoData->baseAmmoData.mod = baseMod;
 							itAmmoData->baseAmmoData.ammoID = ammoIDbase;
 							itAmmoData->baseAmmoData.spawnChance = spawnChanceBase;
+							itAmmoData->baseAmmoLL = baseAmmoLL;
 							data2 = ammoData["ammoTypes"];
 							if (data2.isArray())
 							{
@@ -1115,6 +1393,7 @@ namespace MSF_Data
 							ammoDataStruct->baseAmmoData.mod = baseMod;
 							ammoDataStruct->baseAmmoData.ammoID = ammoIDbase;
 							ammoDataStruct->baseAmmoData.spawnChance = spawnChanceBase;
+							ammoDataStruct->baseAmmoLL = baseAmmoLL;
 							data2 = ammoData["ammoTypes"];
 							if (data2.isArray())
 							{
@@ -1610,7 +1889,9 @@ namespace MSF_Data
 			AmmoData* itAmmoData = it->second;
 			if (!itAmmoData)
 				continue;
-			_MESSAGE("baseAmmo: %08X; size: %i", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size());
+			_MESSAGE("baseAmmo: %08X; size: %i, baseID: %i, baseChance: %f, leveledList: %08X", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size(), itAmmoData->baseAmmoData.ammoID, itAmmoData->baseAmmoData.spawnChance, itAmmoData->baseAmmoLL ? itAmmoData->baseAmmoLL->formID : 0);
+			for (auto itAmmoMod : itAmmoData->ammoMods)
+				_MESSAGE("----Ammo: %08X; AmmoMod: %08X, ammoID: %i, spawnChance: %f", itAmmoMod.ammo->formID, itAmmoMod.mod->formID, itAmmoMod.ammoID, itAmmoMod.spawnChance);
 		}
 		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
 		{
@@ -1643,6 +1924,19 @@ namespace MSF_Data
 			}
 		}
 
+		for (auto itMod : MSF_MainData::projectileManager.projectileModMap)
+		{
+			_MESSAGE("projMod: %08X; size: %i", itMod.first->formID, itMod.second.size());
+			for (auto itData : itMod.second)
+			{
+				if (itData.target <= CustomProjectileFormManager::WeaponFormProperty::kWeaponTarget_SoundLevel)
+					_MESSAGE("----target: %i; op: %i, value: %i", itData.target, itData.op, itData.value.i.v1);
+				else if (itData.target >= CustomProjectileFormManager::WeaponFormProperty::kWeaponTarget_Light)
+					_MESSAGE("----target: %i; op: %i, value: %08X", itData.target, itData.op, itData.value.form->formID);
+				else
+					_MESSAGE("----target: %i; op: %i, value: f", itData.target, itData.op, itData.value.f.v1);
+			}
+		}
 
 		_MESSAGE("MCM float Settings:");
 		for (std::unordered_map<std::string, float>::iterator itSettings = MSF_MainData::MCMfloatSettingMap.begin(); itSettings != MSF_MainData::MCMfloatSettingMap.end(); itSettings++)
@@ -2359,7 +2653,7 @@ namespace MSF_Data
 BGSProjectile* CustomProjectileFormManager::Clone(BGSProjectile* proj)
 {
 	BGSProjectile* result = nullptr;
-	if (!proj)
+	/*if (!proj)
 		return result;
 	void* memory = Heap_Allocate(sizeof(Projectile));
 	errno_t error = memcpy_s(memory, sizeof(Projectile), proj, sizeof(Projectile));
@@ -2373,14 +2667,28 @@ BGSProjectile* CustomProjectileFormManager::Clone(BGSProjectile* proj)
 		result->unk08 = nullptr;
 		result->flags = 0x00004008;
 		result->unk18 = 0;
+	}*/
+	result = (BGSProjectile*)CreateDuplicateForm(proj, true, nullptr);
+	errno_t error = memcpy_s(&result->bounds1, sizeof(Projectile)-offsetof(Projectile, bounds1), &proj->bounds1, sizeof(Projectile)-offsetof(Projectile, bounds1));
+	if (error)
+	{
+		Cleanup(result);
+		return nullptr;
 	}
 	return result;
+}
+
+void CustomProjectileFormManager::Cleanup(BGSProjectile* proj)
+{
+	//Heap_Free(proj);
+	SetDeleteForm(proj, true);
+	//2C727C8                 dq offset sub_140153D20
 }
 
 bool CustomProjectileFormManager::ClearData()
 {
 	for (auto entry : projectileParentMap)
-		Heap_Free(entry.second.first);
+		Cleanup(entry.second.first);
 	projectileParentMap.clear();
 }
 
@@ -2420,11 +2728,15 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 	{
 		auto itData = projectileModMap.find(mod);
 		if (itData != projectileModMap.end())
+		{
 			toModify.push_back(&itData->second);
+			_DEBUG("projModFound: %08X", itData->first->formID);
+		}
 	}
 	if (toModify.size() == 0)
 	{
-
+		_DEBUG("size0");
+		return ReturnCleanup(itOldProj, instanceData);
 	}
 	BGSProjectile* baseProj = instanceData->firingData->projectileOverride; //priority order?
 	if (!baseProj && baseWeap->weapData.ammo)
@@ -2432,19 +2744,29 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 		Ammo* ammo = (Ammo*)baseWeap->weapData.ammo;
 		baseProj = ammo->data.projectile;
 	}
-	else
-		return ReturnCleanup(itOldProj, instanceData);
+	//else
+	//	return ReturnCleanup(itOldProj, instanceData);
 	if (!baseProj)
+	{
 		return ReturnCleanup(itOldProj, instanceData);
-	Projectile* newProj = (Projectile*)Clone(baseProj);
+		_DEBUG("nobase");
+	}
+	Projectile* newProj = (Projectile*)baseProj;
+	if (newProj->formID >> 0x18 != 0xFF)
+		newProj = (Projectile*)Clone(baseProj);
 	if (!newProj)
+	{
 		return ReturnCleanup(itOldProj, instanceData);
+		_DEBUG("nonewproj");
+	}
 	float fv1 = 0.0;
 	UInt32 iv1 = 0;
 	for (auto vec : toModify)
 	{
+		_DEBUG("vec");
 		for (auto data : *vec)
 		{
+			_DEBUG("data   target: %i, op: %i, value: %p", data.target, data.op, data.value.form);
 			switch (data.op)
 			{
 			case BGSMod::Container::Data::kOpFlag_Set_Bool:
@@ -2565,7 +2887,19 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 				UInt8 op = data.op;
 				switch (data.target)
 				{
-				case kWeaponTarget_Supersonic: instanceData->flags = Utilities::AddRemFlag(newProj->flags, 0x0008000, data.value.i.v1, op); break; //-
+				case kWeaponTarget_Supersonic: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bSupersonic, data.value.i.v1, op); break;
+				case kWeaponTarget_MuzzleFlash: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bMuzzleFlash, data.value.i.v1, op); break;
+				case kWeaponTarget_Explosion: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bExplosion, data.value.i.v1, op); break;
+				case kWeaponTarget_AltTrigger: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bAltTrigger, data.value.i.v1, op); break;
+				case kWeaponTarget_Hitscan: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bHitscan, data.value.i.v1, op); break;
+				case kWeaponTarget_CanBeDisabled: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bCanBeDisabled, data.value.i.v1, op); break;
+				case kWeaponTarget_CanBePickedUp: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bCanBePickedUp, data.value.i.v1, op); break;
+				case kWeaponTarget_PinsLimbs: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bPinsLimbs, data.value.i.v1, op); break;
+				case kWeaponTarget_PassThroughObjects: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bPassThroughObjects, data.value.i.v1, op); break;
+				case kWeaponTarget_DisableAimCorr: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bDisableAimCorr, data.value.i.v1, op); break;
+				case kWeaponTarget_PenetratesGeom: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bPenetratesGeom, data.value.i.v1, op); break;
+				case kWeaponTarget_ContinuousUpdate: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bContinuousUpdate, data.value.i.v1, op); break;
+				case kWeaponTarget_SeeksTarget: newProj->data.flags = Utilities::AddRemFlag(newProj->data.flags, BGSProjectileData::bSeeksTarget, data.value.i.v1, op); break;
 				}
 			}
 			break;
@@ -2576,7 +2910,7 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 
 	if (itOldProj != projectileParentMap.end())
 	{
-		Heap_Free(itOldProj->second.first); //delay heapfree
+		Cleanup(itOldProj->second.first); //delay heapfree, oncellunload / onmenuclosed(loadingscreen)
 		itOldProj->second.second = instanceData->firingData->projectileOverride;
 		itOldProj->second.first = (BGSProjectile*)newProj;
 		instanceData->firingData->projectileOverride = (BGSProjectile*)newProj;
@@ -2591,33 +2925,33 @@ bool CustomProjectileFormManager::ReturnCleanup(std::unordered_map<ExtraDataList
 {
 	if (foundData == projectileParentMap.end())
 	{
-		if (!instance || !instance->firingData || !instance->firingData->projectileOverride || instance->firingData->projectileOverride->formID)
+		if (!instance || !instance->firingData || !instance->firingData->projectileOverride || (instance->firingData->projectileOverride->formID >> 0x18) != 0xFF)
 			return true;
-		Heap_Free(instance->firingData->projectileOverride);
+		Cleanup(instance->firingData->projectileOverride);
 		instance->firingData->projectileOverride = nullptr;
 		return true;
 	}
-	if (instance && instance->firingData && instance->firingData->projectileOverride && !instance->firingData->projectileOverride->formID)
+	if (instance && instance->firingData && instance->firingData->projectileOverride && (instance->firingData->projectileOverride->formID >> 0x18) == 0xFF)
 	{
 		if (instance->firingData->projectileOverride != foundData->second.first)
 		{
-			Heap_Free(foundData->second.first);
+			Cleanup(foundData->second.first);
 			projectileParentMap.erase(foundData);
 		}
-		Heap_Free(instance->firingData->projectileOverride);
+		Cleanup(instance->firingData->projectileOverride);
 		instance->firingData->projectileOverride = foundData->second.second;
 		projectileParentMap.erase(foundData);
 		return true;
 	}
-	Heap_Free(foundData->second.first);
+	Cleanup(foundData->second.first);
 	projectileParentMap.erase(foundData);
 	return true;
 }
 
 bool CustomProjectileFormManager::AddModData(BGSMod::Attachment::Mod* mod, BGSMod::Container::Data data, bool overwrite)
 {
-	auto entries = projectileModMap[mod];
-	for (auto entry : entries)
+	auto entries = &projectileModMap[mod];
+	for (auto entry : *entries)
 	{
 		if (entry.target == data.target)
 		{
@@ -2628,6 +2962,6 @@ bool CustomProjectileFormManager::AddModData(BGSMod::Attachment::Mod* mod, BGSMo
 			return true;
 		}
 	}
-	entries.push_back(data);
+	entries->push_back(data);
 	return true;
 }

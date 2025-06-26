@@ -100,7 +100,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 
 				//MSF_Test::ArmorAttachTest();
 				//MSF_Test::PrintAmmoCount();
-				MSF_Test::AIM_ZM_MA_testDump();
+				//MSF_Test::AIM_ZM_MA_testDump();
+				MSF_Test::ProjectileTest();
 
 				_DEBUG("test1");
 			}

@@ -1,4 +1,10 @@
 ---
+v1.1.0
+features:
+- integrated automatic leveled list injection and chances
+- *Experimental* - implemented BGSProjectile properties for OMODs (with external json inputs)
+- more detailed stored data printing
+---
 v1.0.1
 features:
 - BCR and TR support added (loaded bullets remain in the chamber; when switching ammo, the full reload animations should be triggered; added forced reload capability to PlayIdleAction)
