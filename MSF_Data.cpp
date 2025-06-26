@@ -925,15 +925,12 @@ namespace MSF_Data
 				}
 
 				data1 = json["projectileMod"];
-				_DEBUG("projmod");
 				if (data1.isArray())
 				{
-					_DEBUG("projmodArr");
 					for (int i = 0; i < data1.size(); i++)
 					{
 						const Json::Value& proj = data1[i];
 						std::string str = proj["mod"].asString();
-						_DEBUG("modOK");
 						if (str == "")
 						{
 							_MESSAGE("Data error in %s: 'projectileMod->mod' can not be an empty string", fileName.c_str());
@@ -951,7 +948,6 @@ namespace MSF_Data
 							continue;
 						}
 						UInt16 flags = proj["flags"].asInt();
-						_DEBUG("FlagsOK");
 						
 						data2 = proj["BGSModContainerData"];
 						if (data2.isArray())
@@ -960,46 +956,66 @@ namespace MSF_Data
 							{
 								const Json::Value& cont = data2[ii];
 								BGSMod::Container::Data data;
-								_DEBUG("arr");
 								data.target = cont["target"].asInt();
 								if (data.target <= CustomProjectileFormManager::WeaponFormProperty::kNull || data.target >= CustomProjectileFormManager::WeaponFormProperty::kMax)
 								{
 									_MESSAGE("Data error in %s: 'projectileMod->BGSModContainerData->target' target type out of range", fileName.c_str());
 									continue;
 								}
-								_DEBUG("targetOK");
 								bool success = false;
 								data.op = cont["op"].asInt();
-								_DEBUG("opOK");
 								switch (data.op)
 								{
 								case BGSMod::Container::Data::kOpFlag_Set_Bool:
 								case BGSMod::Container::Data::kOpFlag_Add_Int:
-								case BGSMod::Container::Data::kOpFlag_Set_Enum:
 								case BGSMod::Container::Data::kOpFlag_Set_Int:
 								case BGSMod::Container::Data::kOpFlag_Or_Bool:
 								case BGSMod::Container::Data::kOpFlag_And_Bool:
 								{
-									_DEBUG("switchedInt");
+									if (data.target > CustomProjectileFormManager::kWeaponTarget_TracerFreq)
+										break;
 									data.value.i.v1 = cont["value"].asInt();
-									_DEBUG("switchedIntOK");
+									if (data.value.i.v1 > 255)
+										break;
 									success = true;
 								}
 								break;
+								case BGSMod::Container::Data::kOpFlag_Set_Enum:
+								{
+									data.value.i.v1 = cont["value"].asInt();
+									if (data.target == CustomProjectileFormManager::kWeaponTarget_SoundLevel && data.value.i.v1 >= 0 && data.value.i.v1 <= 4)
+										success = true;
+									else if (data.target == CustomProjectileFormManager::kWeaponTarget_Type && data.value.i.v1 >= 0 && data.value.i.v1 <= 6)
+									{
+										data.value.i.v1 = 1 << data.value.i.v1;
+										success = true;
+									}
+								}
 								case BGSMod::Container::Data::kOpFlag_Set_Float:
 								case BGSMod::Container::Data::kOpFlag_Mul_Add_Float:
 								case BGSMod::Container::Data::kOpFlag_Add_Float:
 								{
+									if (data.target > CustomProjectileFormManager::kWeaponTarget_RelaunchInt || (data.target < CustomProjectileFormManager::kWeaponTarget_Gravity && data.target != CustomProjectileFormManager::kWeaponTarget_TracerFreq))
+										break;
 									data.value.f.v1 = cont["value"].asFloat();
+									if (data.op == BGSMod::Container::Data::kOpFlag_Set_Float)
+									{
+										if (data.value.f.v1 < 0 && (data.target == CustomProjectileFormManager::kWeaponTarget_Speed || data.target == CustomProjectileFormManager::kWeaponTarget_Range || data.target == CustomProjectileFormManager::kWeaponTarget_ExpTimer || data.target == CustomProjectileFormManager::kWeaponTarget_MuzzleFlashDur))
+											break;
+										if (data.target == CustomProjectileFormManager::kWeaponTarget_RelaunchInt && data.value.f.v1 < 0.0010)
+											break;
+										if ((data.target == CustomProjectileFormManager::kWeaponTarget_RelaunchInt || data.target == CustomProjectileFormManager::kWeaponTarget_MuzzleFlashDur) && data.value.f.v1 > 5.0)
+											break;
+										if (data.target == CustomProjectileFormManager::kWeaponTarget_Speed && data.value.f.v1 > 1000000000.00)
+											break;
+									}
 									success = true;
 								}
 								break;
 								case BGSMod::Container::Data::kOpFlag_Set_Form:
 								case BGSMod::Container::Data::kOpFlag_Add_Form:
 								{
-									_DEBUG("switchedForm");
 									str = cont["value"].asString();
-									_DEBUG("switchedFormOK");
 									if (str == "")
 									{
 										_MESSAGE("Data error in %s: 'projectileMod->BGSModContainerData->value(TESForm)' can not be an empty string", fileName.c_str());
@@ -1023,7 +1039,6 @@ namespace MSF_Data
 									break;
 									case CustomProjectileFormManager::kWeaponTarget_ExpType:
 									{
-										_DEBUG("switchedExp");
 										BGSExplosion* form = DYNAMIC_CAST(data.value.form, TESForm, BGSExplosion);
 										if (form)
 											success = true;
@@ -1072,6 +1087,15 @@ namespace MSF_Data
 										_MESSAGE("Data error in %s 'projectileMod->BGSModContainerData->value(TESForm)': invalid target specified for form '%s'", fileName.c_str(), str.c_str());
 									}
 									break;
+									}
+								}
+								break;
+								case BGSMod::Container::Data::kOpFlag_Rem_Form:
+								{
+									if (data.target > CustomProjectileFormManager::kWeaponTarget_RelaunchInt)
+									{
+										data.value.form = nullptr;
+										success = true;
 									}
 								}
 								break;
@@ -2730,12 +2754,10 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 		if (itData != projectileModMap.end())
 		{
 			toModify.push_back(&itData->second);
-			_DEBUG("projModFound: %08X", itData->first->formID);
 		}
 	}
 	if (toModify.size() == 0)
 	{
-		_DEBUG("size0");
 		return ReturnCleanup(itOldProj, instanceData);
 	}
 	BGSProjectile* baseProj = instanceData->firingData->projectileOverride; //priority order?
@@ -2749,7 +2771,6 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 	if (!baseProj)
 	{
 		return ReturnCleanup(itOldProj, instanceData);
-		_DEBUG("nobase");
 	}
 	Projectile* newProj = (Projectile*)baseProj;
 	if (newProj->formID >> 0x18 != 0xFF)
@@ -2757,16 +2778,13 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 	if (!newProj)
 	{
 		return ReturnCleanup(itOldProj, instanceData);
-		_DEBUG("nonewproj");
 	}
 	float fv1 = 0.0;
 	UInt32 iv1 = 0;
 	for (auto vec : toModify)
 	{
-		_DEBUG("vec");
 		for (auto data : *vec)
 		{
-			_DEBUG("data   target: %i, op: %i, value: %p", data.target, data.op, data.value.form);
 			switch (data.op)
 			{
 			case BGSMod::Container::Data::kOpFlag_Set_Bool:
@@ -2783,8 +2801,16 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 				iv1 = data.value.i.v1;
 				//iv2 = data->value.i.v2;
 				if (data.target == kWeaponTarget_TracerFreq)
-					newProj->data.tracerFrequency += iv1;
-
+				{
+					if (iv1 < 0 && newProj->data.tracerFrequency < iv1)
+						newProj->data.tracerFrequency = 0;
+					else
+					{
+						newProj->data.tracerFrequency += iv1;
+						if (newProj->data.tracerFrequency > 255)
+							newProj->data.tracerFrequency = 255;
+					}
+				}
 			}
 			break;
 			case BGSMod::Container::Data::kOpFlag_Set_Float:
@@ -2814,19 +2840,65 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 				//fv2 = data->value.f.v2;
 				switch (data.target)
 				{
-				case kWeaponTarget_TracerFreq: newProj->data.tracerFrequency = roundp(newProj->data.tracerFrequency * fv1); break;
+				case kWeaponTarget_TracerFreq: 
+				{
+					float res = newProj->data.tracerFrequency * fv1;
+					if (res < 0)
+						newProj->data.tracerFrequency = 0;
+					else if (res > 255)
+						newProj->data.tracerFrequency = 255;
+					else
+						newProj->data.tracerFrequency = roundp(res);
+				}
+				break;
 				case kWeaponTarget_Gravity: newProj->data.gravity = newProj->data.gravity * fv1; break;
-				case kWeaponTarget_Speed: newProj->data.speed = newProj->data.speed * fv1; break;
-				case kWeaponTarget_Range: newProj->data.range = newProj->data.range * fv1; break;
+				case kWeaponTarget_Speed: 
+				{
+					newProj->data.speed = newProj->data.speed * fv1;
+					if (newProj->data.speed < 0)
+						newProj->data.speed = 0.0;
+					else if (newProj->data.speed > 1000000000.00)
+						newProj->data.speed = 1000000000.00;
+				}
+				break;
+				case kWeaponTarget_Range: 
+				{
+					newProj->data.range = newProj->data.range * fv1;
+					if (newProj->data.range < 0)
+						newProj->data.range = 0.0;
+				}
+				break;
 				case kWeaponTarget_ExpProximity: newProj->data.explosionProximity = newProj->data.explosionProximity * fv1; break;
-				case kWeaponTarget_ExpTimer: newProj->data.explosionTimer = newProj->data.explosionTimer * fv1; break;
-				case kWeaponTarget_MuzzleFlashDur: newProj->data.muzzleFlashDuration = newProj->data.muzzleFlashDuration * fv1; break;
+				case kWeaponTarget_ExpTimer: 
+				{
+					newProj->data.explosionTimer = newProj->data.explosionTimer * fv1;
+					if (newProj->data.explosionTimer < 0)
+						newProj->data.explosionTimer = 0.0;
+				}
+				break;
+				case kWeaponTarget_MuzzleFlashDur: 
+				{
+					newProj->data.muzzleFlashDuration = newProj->data.muzzleFlashDuration * fv1;
+					if (newProj->data.muzzleFlashDuration < 0.0)
+						newProj->data.muzzleFlashDuration = 0.0;
+					else if (newProj->data.muzzleFlashDuration > 5.0)
+						newProj->data.muzzleFlashDuration = 5.0;
+				}
+				break;
 				case kWeaponTarget_FadeOutTime: newProj->data.fadeOutTime = newProj->data.fadeOutTime * fv1; break;
 				case kWeaponTarget_Force: newProj->data.force = newProj->data.force * fv1; break;
 				case kWeaponTarget_ConeSpread: newProj->data.coneSpread = newProj->data.coneSpread * fv1; break;
 				case kWeaponTarget_CollRadius: newProj->data.collisionRadius = newProj->data.collisionRadius * fv1; break;
 				case kWeaponTarget_Lifetime: newProj->data.lifetime = newProj->data.lifetime * fv1; break;
-				case kWeaponTarget_RelaunchInt: newProj->data.relaunchInterval = newProj->data.relaunchInterval * fv1; break;
+				case kWeaponTarget_RelaunchInt: 
+				{
+					newProj->data.relaunchInterval = newProj->data.relaunchInterval * fv1;
+					if (newProj->data.relaunchInterval < 0.0010)
+						newProj->data.relaunchInterval = 0.0010;
+					else if (newProj->data.relaunchInterval > 5.0)
+						newProj->data.relaunchInterval = 5.0;
+				}
+				break;
 				}
 			}
 			break;
@@ -2837,17 +2909,53 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 				switch (data.target)
 				{
 				case kWeaponTarget_Gravity: newProj->data.gravity += fv1; break;
-				case kWeaponTarget_Speed: newProj->data.speed += fv1; break;
-				case kWeaponTarget_Range: newProj->data.range += fv1; break;
+				case kWeaponTarget_Speed: 
+				{
+					newProj->data.speed += fv1;
+					if (newProj->data.speed < 0)
+						newProj->data.speed = 0.0;
+					else if (newProj->data.speed > 1000000000.00)
+						newProj->data.speed = 1000000000.00;
+				}
+				break;
+				case kWeaponTarget_Range: 
+				{
+					newProj->data.range += fv1;
+					if (newProj->data.range < 0)
+						newProj->data.range = 0.0;
+				}
+				break;
 				case kWeaponTarget_ExpProximity: newProj->data.explosionProximity += fv1; break;
-				case kWeaponTarget_ExpTimer: newProj->data.explosionTimer += fv1; break;
-				case kWeaponTarget_MuzzleFlashDur: newProj->data.muzzleFlashDuration += fv1; break;
+				case kWeaponTarget_ExpTimer: 
+				{
+					newProj->data.explosionTimer += fv1;
+					if (newProj->data.explosionTimer < 0)
+						newProj->data.explosionTimer = 0.0;
+				}
+				break;
+				case kWeaponTarget_MuzzleFlashDur: 
+				{
+					newProj->data.muzzleFlashDuration += fv1;
+					if (newProj->data.muzzleFlashDuration < 0.0)
+						newProj->data.muzzleFlashDuration = 0.0;
+					else if (newProj->data.muzzleFlashDuration > 5.0)
+						newProj->data.muzzleFlashDuration = 5.0;
+				}
+				break;
 				case kWeaponTarget_FadeOutTime: newProj->data.fadeOutTime += fv1; break;
 				case kWeaponTarget_Force: newProj->data.force += fv1; break;
 				case kWeaponTarget_ConeSpread: newProj->data.coneSpread += fv1; break;
 				case kWeaponTarget_CollRadius: newProj->data.collisionRadius += fv1; break;
 				case kWeaponTarget_Lifetime: newProj->data.lifetime += fv1; break;
-				case kWeaponTarget_RelaunchInt: newProj->data.relaunchInterval += fv1; break;
+				case kWeaponTarget_RelaunchInt: 
+				{
+					newProj->data.relaunchInterval += fv1;
+					if (newProj->data.relaunchInterval < 0.0010)
+						newProj->data.relaunchInterval = 0.0010;
+					else if (newProj->data.relaunchInterval > 5.0)
+						newProj->data.relaunchInterval = 5.0;
+				}
+				break;
 				}
 			}
 			break;
@@ -2857,11 +2965,13 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 				//iv2 = data->value.i.v2;
 				if (data.target == kWeaponTarget_SoundLevel)
 					newProj->soundLevel = iv1;
-
+				else if (data.target == kWeaponTarget_Type)
+					newProj->data.type = iv1;
 			}
 			break;
 			case BGSMod::Container::Data::kOpFlag_Set_Form:
 			case BGSMod::Container::Data::kOpFlag_Add_Form:
+			case BGSMod::Container::Data::kOpFlag_Rem_Form:
 			{
 				switch (data.target)
 				{

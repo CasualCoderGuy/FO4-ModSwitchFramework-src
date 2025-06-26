@@ -242,6 +242,7 @@ public:
 		//int
 		kWeaponTarget_TracerFreq,
 		kWeaponTarget_SoundLevel,
+		kWeaponTarget_Type,
 		//float
 		kWeaponTarget_Gravity,
 		kWeaponTarget_Speed,

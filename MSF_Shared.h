@@ -1172,6 +1172,14 @@ struct BGSProjectileData
 public:
 	enum
 	{
+		kType_Missile = 0x0001,
+		kType_Lobber = 0x0002,
+		kType_Beam = 0x0004,
+		kType_Flame = 0x0008,
+		kType_Cone = 0x0010,
+		kType_Barrier = 0x0020,
+		kType_Arrow = 0x0040,
+
 		bSupersonic = 0x0080,
 		bMuzzleFlash = 0x0008,
 		bExplosion = 0x0002,
@@ -1187,7 +1195,8 @@ public:
 		bSeeksTarget = 0x2000
 	};
 	// members
-	UInt32 flags;                      // 00
+	UInt16 flags;							  // 00
+	UInt16 type;							  // 02
 	float gravity;                            // 04
 	float speed;                              // 08
 	float range;                              // 0C
