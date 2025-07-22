@@ -66,7 +66,6 @@ bool RegisterAfterLoadEvents()
 		_MESSAGE("MSF was unable to register for ActorEquipManagerEvent");
 		return false;
 	}
-	_DEBUG("sinkFnPtr: %p", &HelperFn);
 
 	return true;
 }
@@ -87,6 +86,10 @@ public:
 		}
 		if (MSF_MainData::IsInitialized)
 		{
+			uint64_t res = CheckHooks();
+			if (res == 0)
+				_MESSAGE("Hooks OK.");
+
 			MSF_MainData::modSwitchManager.Reset();
 
 			_MESSAGE("Registering MSF menus.");
@@ -128,9 +131,9 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 		{
 			//MSF_Scaleform::RegisterMCMCallback();
 			if (!MSF_Data::InitData())
-				_FATALERROR("MSF was unable to initialize plugin data");
+				_FATALERROR("Fatal Error - MSF was unable to initialize plugin data");
 			else if (!MSF_Data::InitMCMSettings())
-				_FATALERROR("MSF was unable to initialize MCM settings");
+				_FATALERROR("Fatal Error - MSF was unable to initialize MCM settings");
 			else
 			{
 				static auto pLoadGameHandler = new TESLoadGameHandler();
@@ -165,7 +168,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 
 bool WriteHooks()
 {
-	AttackInputHandler_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_SelfHookTarget.GetUIntPtr(), &AttackInputHandlerReload_Hook);
+	AttackInputHandlerSelf_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_SelfHookTarget.GetUIntPtr(), &AttackInputHandlerReload_Hook);
 	HUDShowAmmoCounter_Copied = HookUtil::GetFnPtrFromCall5(HUDShowAmmoCounter_HookTarget.GetUIntPtr(), &HUDShowAmmoCounter_Hook);
 	EquipHandler_UpdateAnimGraph_Copied = HookUtil::GetFnPtrFromCall5(EquipHandler_UpdateAnimGraph_HookTarget.GetUIntPtr(), &EquipHandler_UpdateAnimGraph_Hook);
 	AttachModToStack_CallFromGameplay_Copied = HookUtil::GetFnPtrFromCall5(AttachModToStack_CallFromGameplay_HookTarget.GetUIntPtr(), &AttachModToStack_CallFromGameplay_Hook);
@@ -173,46 +176,51 @@ bool WriteHooks()
 	DeleteExtraData_CallFromWorkbenchUI_Copied = HookUtil::GetFnPtrFromCall5(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), &DeleteExtraData_CallFromWorkbenchUI_Hook);
 	UpdateEquipData_Copied = HookUtil::GetFnPtrFromCall5(UpdateEquipData_HookTarget.GetUIntPtr(), &UpdateEquipData_Hook);
 	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
+	AttackInputHandler_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_HookTarget.GetUIntPtr(), &AttackInputHandler_Hook);
+	ActorEquipManagerPre_Copied = HookUtil::GetFnPtrFromCall6(ActorEquipManagerPre_JumpHookTarget.GetUIntPtr());
 
-	if (!HUDShowAmmoCounter_Copied || !EquipHandler_UpdateAnimGraph_Copied || !AttachModToStack_CallFromGameplay_Copied || !AttachModToStack_CallFromWorkbenchUI_Copied || !DeleteExtraData_CallFromWorkbenchUI_Copied || !UpdateEquipData_Copied || !LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
-		return false;
-
-	if (LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr)
+	uint32_t res = CheckHookCopies();
+	if (res)
 	{
-		struct LoadExtraRank_InjectCode : Xbyak::CodeGenerator {
-			LoadExtraRank_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
-			{
-				Xbyak::Label hook, retnLabel;
-#ifndef NEXTGEN
-				mov(edx, dword[r13 + 0x24]);
-				add(rdx, qword[r13 + 0x8]);
-				mov(r8, r12);
-				mov(edx, dword[rdx]);
-				mov(r9, qword[rsp + 0x318]);
-#else
-				mov(edx, dword[r15 + 0x24]);
-				add(rdx, qword[r15 + 0x8]);
-				mov(r8, r13);
-				mov(edx, dword[rdx]);
-				xor(r9, r9);
-#endif
-				mov(rcx, rax);
-				call(ptr[rip + hook]);
-				jmp(ptr[rip + retnLabel]);
-
-				L(hook);
-				dq((uintptr_t)LoadBuffer_ExtraDataList_ExtraRank_Hook);
-				L(retnLabel);
-				dq(LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr);
-			}
-		};
-		void* codeBuf = g_localTrampoline.StartAlloc();
-		LoadExtraRank_InjectCode code(codeBuf);
-		g_localTrampoline.EndAlloc(code.getCurr());
-
-		LoadBuffer_ExtraDataList_ExtraRank_BranchCode = (uintptr_t)codeBuf;
-		g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
+		_ERROR("Error - Hook targets not found. Error code: 0x%08X", res);
+		return false;
 	}
+
+
+	struct LoadExtraRank_InjectCode : Xbyak::CodeGenerator {
+		LoadExtraRank_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
+		{
+			Xbyak::Label hook, retnLabel;
+#ifndef NEXTGEN
+			mov(edx, dword[r13 + 0x24]);
+			add(rdx, qword[r13 + 0x8]);
+			mov(r8, r12);
+			mov(edx, dword[rdx]);
+			mov(r9, qword[rsp + 0x318]);
+#else
+			mov(edx, dword[r15 + 0x24]);
+			add(rdx, qword[r15 + 0x8]);
+			mov(r8, r13);
+			mov(edx, dword[rdx]);
+			xor(r9, r9);
+#endif
+			mov(rcx, rax);
+			call(ptr[rip + hook]);
+			jmp(ptr[rip + retnLabel]);
+
+			L(hook);
+			dq((uintptr_t)LoadBuffer_ExtraDataList_ExtraRank_Hook);
+			L(retnLabel);
+			dq(LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr);
+		}
+	};
+	void* codeBuf = g_localTrampoline.StartAlloc();
+	LoadExtraRank_InjectCode code(codeBuf);
+	g_localTrampoline.EndAlloc(code.getCurr());
+
+	LoadBuffer_ExtraDataList_ExtraRank_BranchCode = (uintptr_t)codeBuf;
+	g_branchTrampoline.Write5Branch(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr(), LoadBuffer_ExtraDataList_ExtraRank_BranchCode);
+	
 
 	struct CheckAmmoCountForReload_InjectCode : Xbyak::CodeGenerator {
 		CheckAmmoCountForReload_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
@@ -314,7 +322,6 @@ bool WriteHooks()
 	g_branchTrampoline.Write5Branch(CannotEquipItemGen_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
 	g_branchTrampoline.Write5Branch(CannotEquipItemMod_JumpHookTarget.GetUIntPtr(), CannotEquipItem_BranchCode);
 
-	/////////////////////////
 	struct ActorEquipManagerPre_InjectCode : Xbyak::CodeGenerator {
 		ActorEquipManagerPre_InjectCode(void* buf) : Xbyak::CodeGenerator(4096, buf)
 		{
@@ -354,11 +361,15 @@ bool WriteHooks()
 	g_localTrampoline.EndAlloc(ActorEquipManagerPre_code.getCurr());
 	ActorEquipManagerPre_BranchCode = (uintptr_t)ActorEquipManagerPre_codeBuf;
 	g_branchTrampoline.Write6Branch(ActorEquipManagerPre_JumpHookTarget.GetUIntPtr(), ActorEquipManagerPre_BranchCode);
-	/////////////////////
 
 	PlayerAnimationEvent_Original = HookUtil::SafeWrite64(PlayerAnimationEvent_HookTarget.GetUIntPtr(), &PlayerAnimationEvent_Hook);
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
 	PipboyMenuInvoke_Copied = HookUtil::SafeWrite64(PipboyMenuInvoke_HookAddress.GetUIntPtr(), &PipboyMenuInvoke_Hook);
+	if (!PlayerAnimationEvent_Original || !ExtraRankCompare_Copied || !PipboyMenuInvoke_Copied)
+	{
+		_MESSAGE("Hook SafeWrite64 failed.");
+		return false;
+	}
 	//g_branchTrampoline.Write5Call(AttackBlockHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackBlockHandler_Hook);
 	g_branchTrampoline.Write5Call(AttackInputHandler_HookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandler_Hook);
 	g_branchTrampoline.Write5Call(AttackInputHandler_SelfHookTarget.GetUIntPtr(), (uintptr_t)AttackInputHandlerReload_Hook);
@@ -369,8 +380,10 @@ bool WriteHooks()
 	g_branchTrampoline.Write5Call(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)DeleteExtraData_CallFromWorkbenchUI_Hook);
 	g_branchTrampoline.Write5Call(UpdateEquipData_HookTarget.GetUIntPtr(), (uintptr_t)UpdateEquipData_Hook);
 
-	//if (! write success)
-	//	return false;
+	res = CheckHookTargets();
+	if (res)
+		_MESSAGE("Hook target mismatch found during initialization. This message may be ignored. Error code: 0x%08X", res);
+
 	return true;
 }
 
@@ -416,6 +429,7 @@ bool InitPlugin(const F4SEInterface* f4se)
 	_MESSAGE("NextGen version\n");
 #endif
 	_MESSAGE("Runtime version: %08X", f4se->runtimeVersion);
+	_MESSAGE("F4SE version: %08X", f4se->f4seVersion);
 #ifdef DEBUG
 	_MESSAGE("DebugMode enabled!");
 #endif
@@ -530,7 +544,10 @@ bool InitPlugin(const F4SEInterface* f4se)
 	RVAManager::UpdateAddresses(f4se->runtimeVersion);
 	//InitializeOffsets();
 	if (!WriteHooks())
+	{
+		_FATALERROR("Fatal Error - MSF was unable to write hooks");
 		return false;
+	}
 
 	srand(time(NULL));
 

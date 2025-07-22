@@ -74,6 +74,11 @@ UInt32 roundp(float a)
 	return 0;
 };
 
+UInt32 inttover(UInt32 input)
+{
+	return (input % 10) + ((input / 10 % 10) << 4) + ((input / 100 % 10) << 16) + ((input / 1000 % 10) << 24);
+}
+
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data)
 {
 	BGSObjectInstanceExtra* pInstanceData = (BGSObjectInstanceExtra*)BSExtraData::Create(sizeof(BGSObjectInstanceExtra), s_BGSObjectInstanceExtraVtbl.GetUIntPtr());

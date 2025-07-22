@@ -270,6 +270,8 @@ extern RelocAddr <uintptr_t> LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget;
 extern RelocAddr <uintptr_t> SkipReloadJumpAddr;
 extern RelocAddr <AttackInputHandler> AttackInputHandler_SelfHookTarget;
 extern AttackInputHandler AttackInputHandler_Copied;
+extern AttackInputHandler AttackInputHandlerSelf_Copied;
+extern uintptr_t ActorEquipManagerPre_Copied;
 extern _AttachModToStack AttachModToStack_CallFromGameplay_Copied;
 extern _AttachModToStack AttachModToStack_CallFromWorkbenchUI_Copied;
 extern _DeleteExtraData DeleteExtraData_CallFromWorkbenchUI_Copied;

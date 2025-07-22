@@ -30,6 +30,7 @@ extern F4SESerializationInterface* g_serialization;
 extern F4SETaskInterface* g_threading;
 
 UInt32 roundp(float a);
+UInt32 inttover(UInt32 input);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 

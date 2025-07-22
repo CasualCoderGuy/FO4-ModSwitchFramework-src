@@ -4,7 +4,11 @@
 
 const char* modText = "This mod can only be attached at a workbench.";
 const char* itemText = "You cannot equip this item.";
+const char* unsupportedAmmoText = "You cannot equip non-playable ammo or fusion cores.";
+const char* noAmmoTypeText = "You cannot equip this ammo type.";
+const char* ammoEquipFailedText = "You cannot equip this ammo right now.";
 const char* ammoUnequipText = "You cannot unequip ammo.";
+const char* ammoEquippedText = "Ammo equipped.";
 
 namespace MSF_Base
 {
@@ -94,6 +98,8 @@ namespace MSF_Base
 			_DEBUG("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
+			UInt64 invammo = Utilities::GetInventoryItemCount(playerActor->inventoryList, switchData->targetAmmo);
+			Utilities::SetAnimationVariableInt(playerActor, "NextReloadAmmoCount", invammo > instance->ammoCapacity ? instance->ammoCapacity : invammo);
 			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount))
 				MSF_MainData::modSwitchManager.ClearQueue();
 				//MSF_Base::SwitchMod(switchData, true);
@@ -151,17 +157,18 @@ namespace MSF_Base
 			UInt32 targetAmmoCount = 1;
 			UInt32 currentAmmoCount = 0;
 			if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch))
-				targetAmmoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, switchData->targetAmmo);
+				targetAmmoCount = Utilities::GetInventoryItemCount(playerActor->inventoryList, switchData->targetAmmo);
 			if (targetAmmoCount)
 			{
-				ExtraWeaponState* ws = MSF_MainData::weaponStateStore.GetEquipped(*g_player);
-				currentAmmoCount = Utilities::GetInventoryItemCount((*g_player)->inventoryList, ws->GetCurrentAmmo());
+				ExtraWeaponState* ws = MSF_MainData::weaponStateStore.GetEquipped(playerActor);
+				currentAmmoCount = Utilities::GetInventoryItemCount((playerActor)->inventoryList, ws->GetCurrentAmmo());
 			}
+			_DEBUG("toReload BCR");
 			if (!targetAmmoCount || !currentAmmoCount)
 			{
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 				MSF_Base::SwitchMod(switchData, true);
-				if (targetAmmoCount && (*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
+				if (targetAmmoCount && playerActor->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 					MSF_Base::ReloadWeapon(false, true);
 				return true;
 			}
@@ -169,7 +176,7 @@ namespace MSF_Base
 		else if (isTR)
 			switchData->SwitchFlags |= SwitchData::bReloadFull;
 
-		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
+		if (playerActor->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
 			{
@@ -178,8 +185,11 @@ namespace MSF_Base
 				MSF_Base::ReloadWeapon(isTR && !isBCR, isBCR);
 				return true;
 			}
+			_DEBUG("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
+			UInt64 invammo = Utilities::GetInventoryItemCount(playerActor->inventoryList, switchData->targetAmmo);
+			Utilities::SetAnimationVariableInt(playerActor, "NextReloadAmmoCount", invammo > instance->ammoCapacity ? instance->ammoCapacity : invammo);
 			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount))
 				MSF_MainData::modSwitchManager.ClearQueue();
 			//MSF_Base::SwitchMod(switchData, true);
@@ -189,7 +199,7 @@ namespace MSF_Base
 		{
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNeeded);
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
-			Utilities::DrawWeapon(*g_player);
+			Utilities::DrawWeapon(playerActor);
 			//delay check draw state
 			return true;
 		}
@@ -202,13 +212,13 @@ namespace MSF_Base
 		if (!bEquip)
 			return ammoUnequipText;
 		if (MSF_Base::IsNotSupportedAmmo(ammo))
-			return itemText;
+			return unsupportedAmmoText;
 		SwitchData* switchData = MSF_Data::GetModForAmmo(ammo);
 		if (!switchData)
-			return itemText;
+			return noAmmoTypeText;
 		switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 		if (!MSF_Base::SwitchMod(switchData, true))
-			return itemText;
+			return ammoEquipFailedText;
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload, *g_player, ExtraWeaponState::bEventTypeReloadInventory, 0);
 		MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
 		PlayEquipSound(*g_player, ammo, 1, 0);

@@ -1,4 +1,17 @@
 ---
+v1.1.1
+features:
+- added new animation variables: LoadedAmmoCount, MagAmmoCount, AmmoCapacity, NextReloadAmmoCount
+fixes:
+- fixed an issue with animation variables
+- more robust hook checks and more informative error/debug messages
+- easier version input in json files: each digit of the integer is a version number (current version: 1110)
+- more informative pipboy ammo equip messages
+file fixes:
+- fixed an issue with keybinds that caused loss of functionality
+- updated the behavior files with the latest hkxpack version, 3rd person behaviors added to main file as they no longer cause CTDs
+- updated the pdf manual 
+---
 v1.1.0
 features:
 - integrated automatic leveled list injection and chances

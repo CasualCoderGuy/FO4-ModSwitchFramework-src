@@ -1,6 +1,10 @@
 #pragma once
 #include <unordered_map>
 
+uint64_t CheckHooks();
+uint32_t CheckHookTargets();
+uint32_t CheckHookCopies();
+
 class IDDatabase
 {
 private:

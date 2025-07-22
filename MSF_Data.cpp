@@ -1,4 +1,5 @@
 #include "MSF_Data.h"
+#include "MSF_Addresses.h"
 #include "MSF_Scaleform.h"
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
@@ -76,10 +77,10 @@ CustomProjectileFormManager MSF_MainData::projectileManager;
 PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
 ActorEquipManagerEventSink MSF_MainData::actorEquipManagerEventSink;
 WeaponStateStore MSF_MainData::weaponStateStore;
-KeywordValue MSF_MainData::ammoAP = 0;
-KeywordValue MSF_MainData::magAP = 0;
-KeywordValue MSF_MainData::receiverAP = 0;
-KeywordValue MSF_MainData::muzzleAP = 0;
+KeywordValue MSF_MainData::ammoAP = -1;
+KeywordValue MSF_MainData::magAP = -1;
+KeywordValue MSF_MainData::receiverAP = -1;
+KeywordValue MSF_MainData::muzzleAP = -1;
 UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
 UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
@@ -107,7 +108,7 @@ namespace MSF_Data
 {
 	bool InjectAttachPoints()
 	{
-		if (!MSF_MainData::ammoAP)
+		if (MSF_MainData::ammoAP == -1)
 			return false;
 		tArray<TESObjectWEAP*>* weaps = &(*g_dataHandler)->arrWEAP;
 		for (UInt64 idx = 0; idx < weaps->count; idx++)
@@ -283,6 +284,9 @@ namespace MSF_Data
 			UInt32 TRformIDbase = ((UInt32)tacticalReloadModIndex) << 24;
 			MSF_MainData::tacticalReloadKW = (BGSKeyword*)LookupFormByID(TRformIDbase | (UInt32)0x0001734);
 		}
+
+		if (!ammoApkeyword || !MSF_MainData::hasUniqueStateKW || MSF_MainData::ammoAP == -1)
+			return false;
 
 		return InjectAttachPoints();
 	}
@@ -544,8 +548,7 @@ namespace MSF_Data
 						_MESSAGE("%s", err.c_str());
 						continue;
 					}
-				
-					if (json["version"].asInt() < MIN_SUPPORTED_KB_VERSION)
+					if (inttover(json["version"].asInt()) < MIN_SUPPORTED_KB_VERSION)
 					{
 						_ERROR("Unsupported keybind version: %s", keybindFiles[i].cFileName);
 						continue;
@@ -895,7 +898,7 @@ namespace MSF_Data
 					return false;
 				}
 
-				if (json["version"].asInt() < MIN_SUPPORTED_DATA_VERSION)
+				if (inttover(json["version"].asInt()) < MIN_SUPPORTED_DATA_VERSION)
 				{
 					_ERROR("JSON data: Unsupported data version in %s", fileName.c_str());
 					return false;
@@ -1907,6 +1910,7 @@ namespace MSF_Data
 	{
 		_MESSAGE("");
 		_MESSAGE("storedDATA:");
+		_MESSAGE("ammoAP: %04X", MSF_MainData::ammoAP);
 		_MESSAGE("MCM settings: %04X", MSF_MainData::MCMSettingFlags);
 		for (std::unordered_map<TESAmmo*, AmmoData*>::iterator it = MSF_MainData::ammoDataMap.begin(); it != MSF_MainData::ammoDataMap.end(); it++)
 		{
@@ -1915,7 +1919,7 @@ namespace MSF_Data
 				continue;
 			_MESSAGE("baseAmmo: %08X; size: %i, baseID: %i, baseChance: %f, leveledList: %08X", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size(), itAmmoData->baseAmmoData.ammoID, itAmmoData->baseAmmoData.spawnChance, itAmmoData->baseAmmoLL ? itAmmoData->baseAmmoLL->formID : 0);
 			for (auto itAmmoMod : itAmmoData->ammoMods)
-				_MESSAGE("----Ammo: %08X; AmmoMod: %08X, ammoID: %i, spawnChance: %f", itAmmoMod.ammo->formID, itAmmoMod.mod->formID, itAmmoMod.ammoID, itAmmoMod.spawnChance);
+				_MESSAGE("----Ammo: %08X; AmmoMod: %08X, ammoID: %i, spawnChance: %f, apOK: %02X", itAmmoMod.ammo->formID, itAmmoMod.mod->formID, itAmmoMod.ammoID, itAmmoMod.spawnChance, itAmmoMod.mod->unkC0 == MSF_MainData::ammoAP);
 		}
 		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
 		{
@@ -1979,6 +1983,27 @@ namespace MSF_Data
 			_MESSAGE("mzKeyword: %08X, display: %s", itData->keyword->formID, itData->displayString.c_str());
 
 		MSF_MainData::weaponStateStore.PrintStoredWeaponStates();
+
+		if (MSF_MainData::ammoAP != -1)
+		{
+			UInt32 errnum = 0;
+			tArray<TESObjectWEAP*>* weaps = &(*g_dataHandler)->arrWEAP;
+			for (UInt64 idx = 0; idx < weaps->count; idx++)
+			{
+				TESObjectWEAP* weapForm = nullptr;
+				weaps->GetNthItem(idx, weapForm);
+				AttachParentArray* aps = (AttachParentArray*)&weapForm->attachParentArray;
+				if (aps->kewordValueArray.GetItemIndex(MSF_MainData::ammoAP) == -1)
+					errnum += 1;
+			}
+			_MESSAGE("Missing ammo AP: %i", errnum);
+		}
+		else
+			_MESSAGE("Ammo attach point error.");
+
+		uint64_t res = CheckHooks();
+		if (res == 0)
+			_MESSAGE("Hooks OK.");
 
 		_MESSAGE("");
 	}

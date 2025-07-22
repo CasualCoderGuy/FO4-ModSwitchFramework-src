@@ -2,6 +2,8 @@
 #include "MSF_WeaponState.h"
 
 AttackInputHandler AttackInputHandler_Copied;
+AttackInputHandler AttackInputHandlerSelf_Copied;
+uintptr_t ActorEquipManagerPre_Copied;
 HUDShowAmmoCounter HUDShowAmmoCounter_Copied;
 _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
 _AttachModToStack AttachModToStack_CallFromGameplay_Copied;

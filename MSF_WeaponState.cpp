@@ -214,6 +214,13 @@ bool ExtraWeaponState::HandleWeaponStateEvents(UInt8 eventType, Actor* actor, UI
 	default:
 		return false; break;
 	}
+	Utilities::SetAnimationVariableInt(actor, "ChamberedAmmoCount", weaponState->currentState->chamberedCount);
+	Utilities::SetAnimationVariableInt(actor, "LoadedAmmoCount", weaponState->currentState->loadedAmmo);
+	Utilities::SetAnimationVariableInt(actor, "MagAmmoCount", weaponState->currentState->loadedAmmo-weaponState->currentState->chamberedCount);
+	Utilities::SetAnimationVariableInt(actor, "ChamberSize", weaponState->currentState->chamberSize);
+	Utilities::SetAnimationVariableInt(actor, "AmmoCapacity", weaponState->currentState->ammoCapacity);
+	UInt64 invammo = Utilities::GetInventoryItemCount(actor->inventoryList, weaponState->currentState->chamberedAmmo);
+	Utilities::SetAnimationVariableInt(actor, "NextReloadAmmoCount", invammo - weaponState->currentState->loadedAmmo > weaponState->currentState->ammoCapacity ? weaponState->currentState->ammoCapacity : invammo - weaponState->currentState->loadedAmmo);
 	return ret;
 }
 
