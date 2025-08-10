@@ -26,6 +26,7 @@ public:
 	static TESAmmo* GetAmmoForWorkbenchUI(ExtraDataList* extraList);
 	//static auto GetCurrentUniqueState(BGSObjectInstanceExtra* attachedMods);
 	static ModData::Mod* ExtraWeaponState::GetCurrentUniqueStateMod(BGSObjectInstanceExtra* attachedMods);
+	static bool ExtraWeaponState::HasTRSupport(ExtraDataList* extraDataList);
 	static ModData::Mod defaultStatePlaceholder;
 	//bool SetWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, bool temporary);
 	//bool RecoverTemporaryState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
@@ -420,4 +421,9 @@ private:
 	bool stored_uncull;
 	bool stored_readyToStop;
 	UInt32 stored_animDone;
+};
+
+namespace MSF_WeaponState
+{
+	bool EquippedWeaponHasTRSupport(Actor* owner);
 };

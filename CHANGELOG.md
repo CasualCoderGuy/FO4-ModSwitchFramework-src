@@ -1,4 +1,22 @@
 ---
+v1.2.0
+features:
+- added ammo cycling feature with hotkey
+- added quick ammo cycling feature
+- added base ammo mod functionality
+- added automatic weapon lowering feature
+- now it is possible to switch mods before the mod switch animation plays by setting the bDoSwitchBeforeAnimations flag (both ammo and omod switching)
+- reworked ammo checking, now an ammo type can have multiple ammo type omods associated with it
+- implemented loose mod equip from pipboy
+- now support for tactical reload can be independently specified as a chamberData flag
+- when spawning random ammo on NPCs, now it is possible to replace the base ammo with the same amount
+- added new ammo spawn amout multiplier json variables for ammo types 
+- added a base ammo spawn chance multiplier option to MCM settings
+- implemented MSFwidget settings
+fixes:
+- fixed possible CTDs caused by missing InstanceData
+- fixed keyboard input focus issue in action script
+---
 v1.1.1
 features:
 - added new animation variables: LoadedAmmoCount, MagAmmoCount, AmmoCapacity, NextReloadAmmoCount

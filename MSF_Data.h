@@ -14,10 +14,18 @@ class AmmoData
 public:
 	struct AmmoMod
 	{
+		enum
+		{
+			bDoSwitchBeforeAnimations = 0x0800,
+			mBitTransferMask = 0x0800
+		};
 		TESAmmo* ammo;
 		BGSMod::Attachment::Mod* mod;
 		UInt16 ammoID;
+		UInt16 flags;
 		float spawnChance;
+		float spawnMinAmountMultiplier;
+		float spawnMaxAmountMultiplier;
 	};
 	AmmoMod baseAmmoData;
 	std::vector<AmmoMod> ammoMods;
@@ -72,11 +80,13 @@ public:
 			bStandaloneRemove = 0x0002,
 			bHasSecondaryAmmo = 0x0004,
 			bHasUniqueState = 0x0008,
+			bCanBeEquippedByMiscMod = 0x0010,
+			bDoSwitchBeforeAnimations = 0x0800,
 			bNotRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,
-			mBitTransferMask = 0xF000,
+			mBitTransferMask = 0xF800UL,
 			bShouldNotStopIdle = 0x10000
 		};
 		class AttachRequirements
@@ -111,11 +121,11 @@ public:
 		UInt32 flags;
 		float spawnChanceBase;
 	};
-	enum
+	/*enum
 	{
-		bRequireAPmod = 0x0001,
+		bRequireAPmod = 0x0001
 		bHasUniqueState = 0x0002
-	};
+	};*/
 	UInt16 attachParentValue;
 	UInt16 flags;
 	Mod::AttachRequirements* APattachRequirements;
@@ -195,11 +205,13 @@ public:
 		bToggle = 0x20,
 		bHUDselection = 0x40,
 		bIsAmmo = 0x80,
-		mNumMask = 0x0F,
-		bMenuBoth = 0x100
+		mAmmoNumMask = 0x2F,
+		mModNumMask = 0x0F,
+		bMenuBoth = 0x100,
+		bQuickKey = 0x200
 	};
 	std::string functionID;
-	UInt8 type;
+	UInt16 type;
 	UInt16 keyCode;
 	UInt8 modifiers;
 	ModSelectionMenu* selectMenu;
@@ -308,23 +320,25 @@ public:
 		//bNeedInit = 0x0001,
 		//bQueuedHUDSelection = 0x0004,
 		//bSetChamberedAmmo = 0x0008,
-		bSwitchingInProgress = 0x0001,
-		bDrawNeeded = 0x0002,
-		bDrawInProgress = 0x0004,
-		bReloadNeeded = 0x0010,
-		bReloadInProgress = 0x0020,
-		bReloadNotFinished = 0x0040,
-		bReloadFull = 0x0080,
-		bReloadZeroCount = 0x0800,
-		bAnimNeeded = 0x0100,
-		bAnimInProgress = 0x0200,
-		bAnimNotFinished = 0x0400,
-		bDrawEnabled = 0x1000,
-		bSetLooseMods = 0x2000,
-		bUpdateAnimGraph = 0x4000,
-		bIgnoreAnimations = 0x8000
+		bSwitchingInProgress = 0x00010000,
+		bDrawNeeded = 0x00020000,
+		bDrawInProgress = 0x00040000,
+		bReloadNeeded = 0x00100000,
+		bReloadInProgress = 0x00200000,
+		bReloadNotFinished = 0x00400000,
+		bReloadFull = 0x00800000,
+		bReloadZeroCount = 0x08000000,
+		bAnimNeeded = 0x01000000,
+		bAnimInProgress = 0x02000000,
+		bAnimNotFinished = 0x04000000,
+		bDoSwitchBeforeAnimations = 0x00000800,
+		bDrawEnabled = 0x00001000,
+		bSetLooseMods = 0x00002000,
+		bUpdateAnimGraph = 0x00004000,
+		bIgnoreAnimations = 0x00008000
+		//bDoSwitchBeforeAnimations
 	};
-	UInt16 SwitchFlags;
+	UInt32 SwitchFlags;
 	KeywordValue animFlavor;
 	TESAmmo* targetAmmo;
 	BGSMod::Attachment::Mod* ModToAttach;
@@ -353,9 +367,31 @@ private:
 	std::vector<AmmoData::AmmoMod*> displayedAmmoChoices;
 	std::vector<ModData::Mod*> displayedModChoices;
 
+	union
+	{
+		struct
+		{
+			AmmoData* ammoData;
+			AmmoData::AmmoMod* ammoMod;
+		} ammo;
+		struct
+		{
+			ModData::ModCycle* cycle;
+			ModData::Mod* modToAttach;
+			ModData::Mod* modToRemove;
+		} mod;
+	} quickSelection;
+	UInt32 quickSelectIdx;
+	bool quickSelectIsAmmo;
+	bool keyIsDown;
+	SimpleLock quickSelectLock;
+	DelayedExecutor quickKeyTimer;
+	KeybindData* lastQuickKey;
+
 	TESObjectWEAP::InstanceData* volatile equippedInstanceData;
 public:
 	SimpleLock menuLock;
+	DelayedExecutor lowerGunTimer;
 	ModSwitchManager()
 	{
 		displayedAmmoChoices.reserve(20);
@@ -371,6 +407,7 @@ public:
 		InterlockedExchange16((volatile short*)&isInPA, 0);
 		InterlockedExchange16((volatile short*)&shouldBlendAnimation, 0);
 		InterlockedExchange16((volatile short*)&forcedReload, 0);
+		ClearQuickSelection();
 	};
 	enum
 	{
@@ -500,6 +537,13 @@ public:
 	void ClearAmmoDisplayChioces() { menuLock.Lock(); displayedAmmoChoices.clear(); displayedAmmoChoices.reserve(20); menuLock.Release(); }
 	void ClearModDisplayChioces() { menuLock.Lock(); displayedModChoices.clear(); displayedModChoices.reserve(20); menuLock.Release(); }
 	void HandlePAEvent();
+	
+	bool SetModSelection(ModData::ModCycle* cycle, ModData::Mod* modToAttach, ModData::Mod* modToRemove, UInt32 selectIdx);
+	bool SetAmmoSelection(AmmoData* data, AmmoData::AmmoMod* ammoMod, UInt32 selectIdx);
+	bool HandleQuickkey(KeybindData* input);
+	bool HandleQuickkeyTimeout();
+	void ClearQuickSelection(bool doLock = true, bool updateWidget = false);
+	void SetQuickkeyUp(KeybindData* input); //should not matter which;
 
 	void Reset()
 	{
@@ -516,7 +560,39 @@ public:
 		InterlockedExchange16((volatile short*)&isBCRreload, 0);
 		InterlockedExchange16((volatile short*)&shouldBlendAnimation, 0);
 		InterlockedExchange16((volatile short*)&forcedReload, 0);
+		ClearQuickSelection();
+		quickKeyTimer.cancel();
+		lowerGunTimer.cancel();
 	};
+};
+
+class MSFWidgetSettings
+{ 
+public:
+	UInt32 GetRGBcolor() { return (iColorR << 0x10) + (iColorG << 0x08) + (iColorB << 0x00); };
+	float fSliderMainX = 1250.0;
+	float fSliderMainY = 540.0;
+	float fSliderScale = 1.0;
+	float fSliderAlpha = 1.0;
+	float fPowerArmorOffsetX = 0.0;
+	float fPowerArmorOffsetY = -100.0;
+	UInt8 iColorR = 255;
+	UInt8 iColorG = 255;
+	UInt8 iColorB = 255;
+	UInt32 iFont = 1;
+
+	float fSliderAmmoIconX = 0.0;
+	float fSliderAmmoIconY = 0.0;
+	float fSliderMuzzleIconX = 0.0;
+	float fSliderMuzzleIconY = 0.0;
+	float fSliderAmmoNameX = 0.0;
+	float fSliderAmmoNameY = 0.0;
+	float fSliderMuzzleNameX = 0.0;
+	float fSliderMuzzleNameY = 0.0;
+	float fSliderFiringModeX = 0.0;
+	float fSliderFiringModeY = 0.0;
+	float fSliderScopeDataX = 0.0;
+	float fSliderScopeDataY = 0.0;
 };
 
 class MSF_MainData
@@ -527,6 +603,8 @@ public:
 
 	static RandomNumber rng;
 	static int iCheckDelayMS;
+	static int quickKeyTimeoutMS;
+	static float fBaseChanceMultiplier;
 
 	static GFxMovieRoot* MSFMenuRoot;
 	static ModSelectionMenu* widgetMenu;
@@ -539,6 +617,7 @@ public:
 	static PlayerInventoryListEventSink playerInventoryEventSink;
 	static ActorEquipManagerEventSink actorEquipManagerEventSink;
 	static UInt64 cancelSwitchHotkey;
+	static UInt64 patchBaseAmmoHotkey;
 	static UInt64 lowerWeaponHotkey;
 	static UInt64 DEBUGprintStoredDataHotkey;
 	static Utilities::Timer lowerTmr;
@@ -549,6 +628,7 @@ public:
 	//Data added by plugins
 	static std::unordered_map<UInt64, KeybindData*> keybindMap;
 	static std::unordered_map<std::string, KeybindData*> keybindIDMap;
+	static std::unordered_map<KeywordValue, KeybindData*> keybindAPMap;
 	static std::unordered_map<TESAmmo*, AmmoData*> ammoDataMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> reloadAnimDataMap;
 	static std::unordered_map<TESObjectWEAP*, AnimationData*> fireAnimDataMap;
@@ -560,13 +640,15 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
-	static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
+	//static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> modChamberMap;
+	static std::unordered_map<TESObjectMISC*, BGSMod::Attachment::Mod*> miscModMap;
 	//static std::unordered_map<BGSMod::Attachment::Mod*, UniqueState> modUniqueStateMap;
 	//static std::unordered_map<TESObjectWEAP*, UniqueState> weapUniqueStateMap;
 	static std::vector<KeywordValue> uniqueStateAPValues;
 	static std::vector<TESAmmo*> dontRemoveAmmoOnReload;
 	static std::vector<TESObjectWEAP*> BCRweapons;
+	static std::vector<BGSMod::Attachment::Mod*> equippableMods;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -623,7 +705,8 @@ public:
 		bShowMuzzleName = 0x00000010,
 		bShowFiringMode = 0x00000020,
 		bShowScopeData = 0x00000040,
-		bShowUnavailableMods = 0x00000080,
+		bShowQuickkeySelection = 0x00000080,
+		bShowUnavailableMods = 0x40000000,
 		bEnableMetadataSaving = 0x00010000,
 		bEnableAmmoSaving = 0x00020000,
 		bEnableTacticalReloadAll = 0x00040000,
@@ -637,22 +720,26 @@ public:
 		bDisplayMagInPipboy = 0x04000000,
 		bDisplayChamberInPipboy = 0x08000000,
 		bDisableAutomaticReload = 0x10000000,
+		bLowerWeaponAfterSprint = 0x20000000,
+		bReplaceAmmoWithSpawned = 0x40000000,
 		mMakeExtraRankMask = bEnableAmmoSaving | bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt32 MCMSettingFlags;
 	static UInt16 iMinRandomAmmo;
 	static UInt16 iMaxRandomAmmo;
-	static UInt16 iAutolowerTimeSec;
+	static UInt16 iAutolowerTimeMS;
 	static UInt16 iReloadAnimEndEventDelayMS;
 	static UInt16 iCustomAnimEndEventDelayMS;
 	static UInt16 iDrawAnimEndEventDelayMS;
-	static std::unordered_map<std::string, float> MCMfloatSettingMap;
+	static MSFWidgetSettings widgetSettings;
+	//static std::unordered_map<std::string, float> MCMfloatSettingMap;
 };
 
 namespace MSF_Data
 {
 	bool InitData();
 	bool InjectLeveledLists();
+	bool PatchBaseAmmoMods();
 	bool FillQuickAccessData();
 	bool InitCompatibility();
 	bool InitMCMSettings();
@@ -667,10 +754,12 @@ namespace MSF_Data
 	bool LoadPluginData();
 	bool ReadDataFromJSON(std::string fileName, std::string location);
 	void PrintStoredData();
+	SwitchData* GetNextAmmoMod(bool isQuickkey = false);
 	SwitchData* GetNthAmmoMod(UInt32 num);
 	SwitchData* GetModForAmmo(TESAmmo* targetAmmo);
 	bool GetNthMod(UInt32 num, BGSInventoryItem::Stack* eqStack, ModData* modData);
-	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData);
+	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData, bool isQuickkey = false);
+	ModData::Mod* GetOldModForEquip(BGSInventoryItem::Stack* eqStack, ModData* modData, ModData::Mod* modDataMod);
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);

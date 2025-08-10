@@ -534,6 +534,8 @@ bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeap
 {
 	_DEBUG("reloadState");
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	if (!extraInstanceData)
+		return false;
 	TESObjectWEAP* baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
 	TESObjectWEAP::InstanceData* currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	if (!currInstanceData || !baseWeap)
@@ -587,7 +589,7 @@ bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeap
 			UInt32 ammoToUse = Utilities::GetInventoryItemCount((*g_player)->inventoryList, this->currentState->equippedAmmo);
 			if (ammoToUse > currInstanceData->ammoCapacity)
 				ammoToUse = currInstanceData->ammoCapacity;
-			if (MSF_Data::InstanceHasTRSupport(currInstanceData) && (eventType != ExtraWeaponState::bEventTypeReloadAfterSwitch))
+			if ((MSF_Data::InstanceHasTRSupport(currInstanceData) || this->currentState->flags & ExtraWeaponState::WeaponState::bHasTacticalReload) && (eventType != ExtraWeaponState::bEventTypeReloadAfterSwitch))
 				equipData->loadedAmmoCount = ammoToUse + (oldLoadedAmmoCount < this->currentState->chamberedCount ? oldLoadedAmmoCount : this->currentState->chamberedCount); //currInstanceData->ammoCapacity +
 			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
 		}
@@ -704,6 +706,16 @@ TESAmmo* ExtraWeaponState::GetAmmoForWorkbenchUI(ExtraDataList* extraList)
 	return nullptr;
 }
 
+bool ExtraWeaponState::HasTRSupport(ExtraDataList* extraDataList)
+{
+	if (!extraDataList)
+		return false;
+	ExtraWeaponState* weaponState = ExtraWeaponState::Init(extraDataList, nullptr);
+	if (weaponState && weaponState->currentState && weaponState->currentState->flags & ExtraWeaponState::WeaponState::bHasTacticalReload)
+		return true;
+	return false;
+}
+
 bool ExtraWeaponState::SetCurrentAmmo(TESAmmo* ammo)
 {
 	if (this->currentState && ammo)
@@ -784,6 +796,20 @@ void ExtraWeaponState::PrintStoredData()
 		idx++;
 	}
 }
+
+namespace MSF_WeaponState
+{
+	bool EquippedWeaponHasTRSupport(Actor* owner)
+	{
+		BGSInventoryItem::Stack * eqStack = Utilities::GetEquippedStack(owner, 41);
+		if (!eqStack)
+			return nullptr;
+		ExtraDataList* dataList = eqStack->extraData;
+		if (!dataList)
+			return nullptr;
+		return ExtraWeaponState::HasTRSupport(dataList);
+	}
+};
 
 //bool ExtraWeaponState::SetParentRef(ObjectRefHandle refHandle)
 //{

@@ -84,6 +84,8 @@ bool BurstModeManager::HandleModChangeEvent(ExtraDataList* extraDataList)
 		return false;
 	}
 	ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+	if (!extraInstanceData)
+		return false;
 	TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	if (Utilities::WeaponInstanceHasKeyword(instanceData, MSF_MainData::FiringModBurstKW))
 		flags |= BurstModeData::bActive;

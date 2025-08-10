@@ -97,8 +97,9 @@ public:
 			//MSFAmmoMenu::RegisterMenu();
 			//MSFModMenu::RegisterMenu();
 			MSFWidgetMenu::OpenMenu();
+
 			//delayTask delayUpd(500, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
-			WidgetUpdateTask* updTask = new WidgetUpdateTask();
+			WidgetUpdateTask* updTask = new WidgetUpdateTask(true, true);
 			delayTask delayUpd(500, true, g_threading->AddUITask, updTask);
 
 			//BSScaleformTranslator * translator = (BSScaleformTranslator*)(*g_scaleformManager)->stateBag->GetStateAddRef(GFxState::kInterface_Translator);
@@ -116,6 +117,12 @@ public:
 			if (eqWeapData)
 				ammo = eqWeapData->ammo;
 			MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
+			if (MSF_MainData::iAutolowerTimeMS)
+			{
+				LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+				//delayTask(MSF_MainData::iAutolowerTimeMS, true, g_threading->AddTask, lowerTask);
+			}
 		}
 		return kEvent_Continue;
 	}
@@ -148,6 +155,7 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				MSF_Data::InjectLeveledLists();
 
 				REGISTER_EVENT(TESCellFullyLoadedEvent, cellFullyLoadedEventSink);
+				REGISTER_EVENT(TESCombatEvent, combatEvnSink);
 
 				MSF_Data::InitCompatibility();
 			}
@@ -177,6 +185,7 @@ bool WriteHooks()
 	UpdateEquipData_Copied = HookUtil::GetFnPtrFromCall5(UpdateEquipData_HookTarget.GetUIntPtr(), &UpdateEquipData_Hook);
 	LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr = HookUtil::GetFnPtrFromCall5(LoadBuffer_ExtraDataList_ExtraRank_JumpHookTarget.GetUIntPtr());
 	AttackInputHandler_Copied = HookUtil::GetFnPtrFromCall5(AttackInputHandler_HookTarget.GetUIntPtr(), &AttackInputHandler_Hook);
+	ObjectInstanceCtor_Copied = HookUtil::GetFnPtrFromCall5(ObjectInstanceCtor_HookTarget.GetUIntPtr(), &ObjectInstanceCtor_Hook);
 	ActorEquipManagerPre_Copied = HookUtil::GetFnPtrFromCall6(ActorEquipManagerPre_JumpHookTarget.GetUIntPtr());
 
 	uint32_t res = CheckHookCopies();
@@ -379,6 +388,7 @@ bool WriteHooks()
 	g_branchTrampoline.Write5Call(AttachModToStack_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)AttachModToStack_CallFromWorkbenchUI_Hook);
 	g_branchTrampoline.Write5Call(DeleteExtraData_CallFromWorkbenchUI_HookTarget.GetUIntPtr(), (uintptr_t)DeleteExtraData_CallFromWorkbenchUI_Hook);
 	g_branchTrampoline.Write5Call(UpdateEquipData_HookTarget.GetUIntPtr(), (uintptr_t)UpdateEquipData_Hook);
+	g_branchTrampoline.Write5Call(ObjectInstanceCtor_HookTarget.GetUIntPtr(), (uintptr_t)ObjectInstanceCtor_Hook);
 
 	res = CheckHookTargets();
 	if (res)

@@ -373,6 +373,8 @@ namespace Utilities
 			if (!dataList)
 				return nullptr;
 			ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			if (!extraInstanceData)
+				return nullptr;
 			return (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 		}
 		return nullptr;
@@ -800,6 +802,17 @@ namespace Utilities
 		return false;
 	}
 
+	bool HasAttachPoint(AttachParentArray* attachPoints, KeywordValue attachPointKW)
+	{
+		if (!attachPoints || attachPointKW == -1)
+			return false;
+		SInt64 idx = attachPoints->kewordValueArray.GetItemIndex(attachPointKW);
+		if (idx >= 0)
+			return true;
+
+		return false;
+	}
+
 	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW)
 	{
 		if (!modData || !attachPointKW)
@@ -820,6 +833,26 @@ namespace Utilities
 				if (keyword == attachPointKW)
 					return true;
 			}
+		}
+		return false;
+	}
+
+	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue attachPointKW)
+	{
+		if (!modData || attachPointKW == -1)
+			return false;
+		auto data = modData->data;
+		if (!data || !data->forms)
+			return false;
+		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+		{
+			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
+			AttachParentArray* attachPoints = reinterpret_cast<AttachParentArray*>(&objectMod->unk98);
+			SInt64 idx = attachPoints->kewordValueArray.GetItemIndex(attachPointKW);
+			if (idx >= 0)
+				return true;
 		}
 		return false;
 	}

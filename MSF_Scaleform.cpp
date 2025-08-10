@@ -101,7 +101,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//MSF_Test::ArmorAttachTest();
 				//MSF_Test::PrintAmmoCount();
 				//MSF_Test::AIM_ZM_MA_testDump();
-				MSF_Test::ProjectileTest();
+				//MSF_Test::ProjectileTest();
+				Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13454));
+				//MSF_Test::ModTemplateTest();
 
 				_DEBUG("test1");
 			}
@@ -121,7 +123,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//Utilities::ReloadWeapon(*g_player);
 				//MSF_Test::TestIdle(false);
 				//MSF_Test::DumpActorAnimData();
-				MSF_Test::TestEquipAmmo();
+				//MSF_Test::TestEquipAmmo();
+				Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13455));
+				//MSF_Data::PatchBaseAmmoMods();
 				_DEBUG("test2");
 			}
 		}
@@ -140,7 +144,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//Utilities::FireWeapon(*g_player, 1);
 				//MSF_Test::DumpActorAnimData();
 				//MSF_Test::DumpEquippedWeaponIdx();
-				MSF_Test::ProjectileTest();
+				Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13456));
+				//MSF_Test::ProjectileTest();
 				_DEBUG("test3");
 			}
 		}
@@ -155,22 +160,59 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				if (GetAsyncKeyState(VK_CONTROL) & 0x8000)	modifiers |= 0x2;
 				if (GetAsyncKeyState(VK_MENU) & 0x8000)		modifiers |= 0x4;
 				UInt64 key = ((UInt64)modifiers << 32) + keyCode;
-				if (key && key == MSF_MainData::lowerWeaponHotkey)
+				if (!key)
+					break;
+				if (key == MSF_MainData::lowerWeaponHotkey)
+				{
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 					Utilities::PlayIdleAction(*g_player, MSF_MainData::ActionGunDown);
-				if (key && key == MSF_MainData::cancelSwitchHotkey)
+					break;
+				}
+				//if (key == MSF_MainData::cancelQuickkey)
+				//{
+				//	MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+				//	break;
+				//}
+				if (key == MSF_MainData::cancelSwitchHotkey)
+				{
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 					MSF_MainData::modSwitchManager.ClearQueue();
-				if (key && key == MSF_MainData::DEBUGprintStoredDataHotkey)
+					break;
+				}
+				if (key == MSF_MainData::patchBaseAmmoHotkey)
+				{
+					MSF_Data::PatchBaseAmmoMods();
+					break;
+				}
+				if (key == MSF_MainData::DEBUGprintStoredDataHotkey)
+				{
 					MSF_Data::PrintStoredData();
+					break;
+				}
 				KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
 				if (!keyFn)
 					break;
 				_DEBUG("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
 				if (keyFn->type & KeybindData::bGlobalMenu)
+				{
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 					MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu, &keyFn->menuAttachPoints);
+				}
 				else if (keyFn->type & KeybindData::bHUDselection)
+				{
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 					MSF_Scaleform::ToggleSelectionMenu(keyFn->selectMenu, keyFn->modData);
+				}
 				else if (keyFn->type & KeybindData::bIsAmmo)
-					MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mNumMask);
+				{
+					if (keyFn->type & KeybindData::bQuickKey)
+						MSF_MainData::modSwitchManager.HandleQuickkey(keyFn);
+					else
+					{
+						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mAmmoNumMask);
+					}
+				}
 				//if (keyFn->type & KeybindData::bGlobalMenu)
 				//	MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu);
 				//else if(keyFn->type & KeybindData::bIsAmmo)
@@ -183,9 +225,20 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//else if (keyFn->type & KeybindData::bHUDselection)
 				//	MSF_Scaleform::ToggleModMenu(keyFn->selectMenu, keyFn->modData);
 				else if (keyFn->type & KeybindData::bToggle)
-					MSF_Base::ToggleModHotkey(keyFn->modData);
+				{
+					if (keyFn->type & KeybindData::bQuickKey)
+						MSF_MainData::modSwitchManager.HandleQuickkey(keyFn);
+					else
+					{
+						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+						MSF_Base::ToggleModHotkey(keyFn->modData);
+					}
+				}
 				else
-					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mNumMask, keyFn->modData);
+				{
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mModNumMask, keyFn->modData);
+				}
 			}
 		}
 			break;
@@ -197,6 +250,15 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 		{
 			if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
 				MSF_MainData::activeBurstManager->HandleReleaseEvent();
+		}
+		else
+		{
+			UInt8 modifiers = 0;
+			if (GetAsyncKeyState(VK_SHIFT) & 0x8000)	modifiers |= 0x1;
+			if (GetAsyncKeyState(VK_CONTROL) & 0x8000)	modifiers |= 0x2;
+			if (GetAsyncKeyState(VK_MENU) & 0x8000)		modifiers |= 0x4;
+			KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
+			MSF_MainData::modSwitchManager.SetQuickkeyUp(keyFn);
 		}
 	}
 }
@@ -277,6 +339,8 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 					//_DEBUG("adding items");
 					TESForm* pSelectedForm = pSelectedData->form;
 					BGSInventoryItem::Stack* selectedStack = Utilities::GetStack(pSelectedData, stackID);
+					if (!selectedStack)
+						return;
 					ExtraDataList* extraDataList = selectedStack->extraData;
 					ExtraWeaponState::AmmoStateData* ammoState = nullptr;
 					UInt8 notSupportedAmmo = 0;
@@ -609,12 +673,67 @@ namespace MSF_Scaleform
 		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
 		if (!movieRoot)
 			return false;
-		GFxValue arrArgs[4]; //obj?
+
+		GFxValue arrArgs[9];
 		arrArgs[0].SetUInt(MSF_MainData::MCMSettingFlags);
-		arrArgs[1].SetUInt(0);
-		arrArgs[2].SetUInt(0);
-		arrArgs[3].SetUInt(0);
-		movieRoot->Invoke("root.UpdateWidgetSettings", nullptr, arrArgs, 4);
+		arrArgs[1].SetUInt(MSF_MainData::widgetSettings.iFont);
+		arrArgs[2].SetUInt(MSF_MainData::widgetSettings.GetRGBcolor());
+		arrArgs[3].SetNumber(MSF_MainData::widgetSettings.fSliderMainX);
+		arrArgs[4].SetNumber(MSF_MainData::widgetSettings.fSliderMainY);
+		arrArgs[5].SetNumber(MSF_MainData::widgetSettings.fPowerArmorOffsetX);
+		arrArgs[6].SetNumber(MSF_MainData::widgetSettings.fPowerArmorOffsetY);
+		arrArgs[7].SetNumber(MSF_MainData::widgetSettings.fSliderAlpha);
+		arrArgs[8].SetNumber(MSF_MainData::widgetSettings.fSliderScale);
+		movieRoot->Invoke("root.UpdateWidgetSettings", nullptr, arrArgs, 9);
+		return true;
+	}
+
+	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, bool isAmmo)
+	{
+		static BSFixedString menuName("MSFwidget");
+		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
+		if (!widgetMenu)
+			return false;
+		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
+		if (!movieRoot)
+			return false;
+		const char* apName = "";
+		const char* modName = "";
+		if (isAmmo)
+			apName = "Ammo Type";
+		else if (ap == MSF_MainData::muzzleAP)
+			apName = "Muzzle";
+		else
+		{
+			BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, ap);
+			if (kw)
+				apName = kw->GetFullName();
+		}
+		if (nameForm)
+			modName = nameForm->GetFullName();
+		else
+			modName = "None";
+		GFxValue arrArgs[3]; //obj?
+		arrArgs[0].SetString(apName);
+		arrArgs[1].SetString(modName);
+		arrArgs[2].SetBool(isAmmo);
+		movieRoot->Invoke("root.UpdateWidgetQuickkeyMod", nullptr, arrArgs, 3);
+		return true;
+	}
+
+	bool ClearWidgetQuickkeyMod()
+	{
+		static BSFixedString menuName("MSFwidget");
+		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
+		if (!widgetMenu)
+			return false;
+		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
+		if (!movieRoot)
+			return false;
+		//GFxValue arrArgs[2]; //obj?
+		//arrArgs[0].SetString(nameForm->GetFullName());
+		//arrArgs[1].SetBool(isAmmo);
+		movieRoot->Invoke("root.ClearWidgetQuickkeyMod", nullptr, nullptr, 0);
 		return true;
 	}
 
@@ -662,6 +781,7 @@ namespace MSF_Scaleform
 			return nullptr;
 		//check conditions
 		//cross check custom and MSFMenu
+		_DEBUG("selectmenu");
 		static BSFixedString menuName("MSFMenu");
 		IMenu* MSFmenu = (*g_ui)->GetMenu(menuName);
 		if (!MSFmenu)
@@ -671,6 +791,7 @@ namespace MSF_Scaleform
 		GFxMovieRoot* menuRoot = MSFmenu->movie->movieRoot;
 		if (!menuRoot)
 			return nullptr;
+		_DEBUG("menuchecksok");
 		if (MSF_MainData::modSwitchManager.GetOpenedMenu() == selectMenu)
 		{
 			std::string closePath = "root." + selectMenu->scaleformName + "_loader.content.Close"; //visible
@@ -821,6 +942,7 @@ namespace MSF_Scaleform
 		GFxMovieRoot* menuRoot = HandleToggleMenu(selectMenu);
 		if (!menuRoot)
 			return false;
+		_DEBUG("menurootok");
 		switch (selectMenu->type)
 		{
 		case ModSelectionMenu::kType_AmmoMenu:
@@ -828,10 +950,12 @@ namespace MSF_Scaleform
 			GFxValue data;
 			if (!GetAmmoListForScaleform(menuRoot, &data))
 				return false;
+			_DEBUG("ammolistok");
 			std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveAmmoData";
 			MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu);
 			if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
 				return true;
+			_DEBUG("invokenotok");
 			break;
 		}
 		case ModSelectionMenu::kType_ModMenu:

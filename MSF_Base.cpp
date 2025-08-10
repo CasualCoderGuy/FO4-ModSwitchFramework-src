@@ -3,6 +3,9 @@
 #include "MSF_WeaponState.h"
 
 const char* modText = "This mod can only be attached at a workbench.";
+const char* noAPText = "The equipped weapon does not have a compatible attach point for this mod.";
+const char* noWeapText = "There is no compatible weapon equipped for this mod.";
+const char* couldntAttachText = "Could not attach this mod to the equipped weapon.";
 const char* itemText = "You cannot equip this item.";
 const char* unsupportedAmmoText = "You cannot equip non-playable ammo or fusion cores.";
 const char* noAmmoTypeText = "You cannot equip this ammo type.";
@@ -19,7 +22,8 @@ namespace MSF_Base
 	{
 		_DEBUG("selectCalled");
 		//AmmoData::AmmoMod* selectedAmmo = reinterpret_cast<AmmoData::AmmoMod*>(obj);
-
+		if (!selectedAmmo)
+			return false;
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled) )// || (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled))
 		{
 			if (!MSF_Base::HandlePendingAnimations())
@@ -30,19 +34,29 @@ namespace MSF_Base
 		_DEBUG("checksPassed");
 		SwitchData* switchData = new SwitchData();
 		BGSMod::Attachment::Mod* mod = selectedAmmo->mod;
+		BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(playerActor, 41);
+		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
 		switchData->targetAmmo = selectedAmmo->ammo;
+		switchData->SwitchFlags = selectedAmmo->flags & AmmoData::AmmoMod::mBitTransferMask;
 		_DEBUG("mod: %p", mod);
+		if (mod == attachedMod)
+		{
+			delete switchData;
+			return true;
+		}
 		if (mod)
 			switchData->ModToAttach = mod;
 		else
 		{
-			BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(playerActor, 41);
-			mod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
+			mod = attachedMod;
 			_DEBUG("modatAP: %p", mod);
 			if (mod)
 				switchData->ModToRemove = mod;
 			else
+			{
+				delete switchData;
 				return false;
+			}
 		}
 
 		_DEBUG("modOK");
@@ -57,11 +71,14 @@ namespace MSF_Base
 		}
 
 		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
+		{
+			delete switchData;
 			return false;
+		}
 
 		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
 		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
-		bool isTR = MSF_Data::InstanceHasTRSupport(instance);
+		bool isTR = MSF_Data::InstanceHasTRSupport(instance) || MSF_WeaponState::EquippedWeaponHasTRSupport(playerActor);
 		if (isBCR)
 		{
 			switchData->SwitchFlags |= SwitchData::bReloadZeroCount;
@@ -88,7 +105,7 @@ namespace MSF_Base
 
 		if ((*g_player)->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
-			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 			{
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 				MSF_Base::SwitchMod(switchData, true);
@@ -130,7 +147,11 @@ namespace MSF_Base
 		}
 		_DEBUG("animOK");
 
-		SwitchData* switchData = MSF_Data::GetNthAmmoMod(key);
+		SwitchData* switchData = nullptr;
+		if (key & KeybindData::bToggle)
+			switchData = MSF_Data::GetNextAmmoMod();
+		else
+			switchData = MSF_Data::GetNthAmmoMod(key);
 		if (!switchData)
 			return false;
 		_DEBUG("ammoSwitchDataOK");
@@ -150,7 +171,7 @@ namespace MSF_Base
 
 		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
 		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
-		bool isTR = MSF_Data::InstanceHasTRSupport(instance);
+		bool isTR = MSF_Data::InstanceHasTRSupport(instance) || MSF_WeaponState::EquippedWeaponHasTRSupport(playerActor);
 		if (isBCR)
 		{
 			switchData->SwitchFlags |= SwitchData::bReloadZeroCount;
@@ -178,7 +199,7 @@ namespace MSF_Base
 
 		if (playerActor->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 		{
-			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 			{
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 				MSF_Base::SwitchMod(switchData, true);
@@ -228,7 +249,7 @@ namespace MSF_Base
 	//FROM SCALEFORM:
 	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
 	{
-		if (!modToAttach && !modToRemove)
+		if (modToAttach == modToRemove)
 			return false;
 
 		//ModData::Mod* modToAttach = reinterpret_cast<ModData::Mod*>(modDataToAttach);
@@ -259,10 +280,48 @@ namespace MSF_Base
 	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip)
 	{
 		return modText;
-		//unordered_map MISC, ?
-		//attachParent
-		//modAssoc
-		//playsound
+		auto omod = MSF_MainData::miscModMap.find(miscMod);
+		if (omod == MSF_MainData::miscModMap.end())
+			return modText;
+		auto itMod = MSF_MainData::modDataMap.find(omod->second);
+		Actor* playerActor = *g_player;
+		if (itMod == MSF_MainData::modDataMap.end())
+		{
+			BGSObjectInstanceExtra* oie = Utilities::GetEquippedModData(playerActor);
+			TESObjectWEAP* baseWeap = Utilities::GetEquippedWeapon(playerActor);
+			if (!oie || !baseWeap)
+				return noWeapText;
+			if (omod->second->unkC0 && !Utilities::ObjectInstanceHasAttachPoint(oie, omod->second->unkC0) && !Utilities::HasAttachPoint((AttachParentArray*)&baseWeap->attachParentArray, omod->second->unkC0))
+				return noAPText;
+			BGSMod::Attachment::Mod* oldomod = Utilities::GetModAtAttachPoint(oie, omod->second->unkC0);
+			TESObjectMISC* oldlmod = nullptr;
+			if (oldomod)
+				oldlmod = Utilities::GetLooseMod(oldomod);
+			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
+				return couldntAttachText;
+			PlayEquipSound(*g_player, omod->first, 1, 0);
+			Utilities::RemoveItem(playerActor, omod->first, 1, true);
+			if (oldlmod)
+				Utilities::AddItem(playerActor, oldlmod, 1, true);
+		}
+		else
+		{
+			auto itKB = MSF_MainData::keybindAPMap.find(omod->second->unkC0);
+			if (itKB == MSF_MainData::keybindAPMap.end())
+				return noAPText;
+			ModData* modData = itKB->second->modData;
+			BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedWeaponStack(playerActor);
+			ModData::Mod* oldMod = MSF_Data::GetOldModForEquip(eqStack, modData, itMod->second);
+			if (!oldMod)
+				return noAPText;
+			TESObjectMISC* oldlmod = Utilities::GetLooseMod(oldMod->mod);
+			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
+				return couldntAttachText;
+			PlayEquipSound(*g_player, omod->first, 1, 0);
+			Utilities::RemoveItem(playerActor, omod->first, 1, true);
+			if (oldlmod)
+				Utilities::AddItem(playerActor, oldlmod, 1, true);
+		}
 		return nullptr;
 	}
 
@@ -301,27 +360,36 @@ namespace MSF_Base
 			{
 				if (switchData->SwitchFlags & SwitchData::bReloadNeeded)
 				{
-					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+					UInt32 flags = switchData->SwitchFlags;
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 						MSF_Base::SwitchMod(switchData, true);
 					}
 					else
+					{
 						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress | ~SwitchData::bReloadNeeded); // | SwitchData::bReloadNotFinished
-					if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount))
+						flags = switchData->SwitchFlags;
+					}
+					if (!MSF_Base::ReloadWeapon(flags & SwitchData::bReloadFull, flags & SwitchData::bReloadZeroCount))
 						MSF_MainData::modSwitchManager.ClearQueue();
 				}
 				else if (switchData->SwitchFlags & SwitchData::bAnimNeeded)
 				{
-					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode)
+					UInt32 flags = switchData->SwitchFlags;
+					AnimationData* anim = switchData->animData;
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 						MSF_Base::SwitchMod(switchData, true);
 					}
 					else
+					{
 						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | ~SwitchData::bAnimNeeded);
-					if (!MSF_Base::PlayAnim(switchData->animData))
-						MSF_Base::SwitchMod(switchData, true);
+						flags = switchData->SwitchFlags;
+					}
+					if (!MSF_Base::PlayAnim(anim))
+						MSF_MainData::modSwitchManager.ClearQueue(); //MSF_Base::SwitchMod(switchData, true);
 				}
 			}
 			else if (switchData->SwitchFlags & SwitchData::bDrawEnabled)
@@ -410,9 +478,9 @@ namespace MSF_Base
 		BSExtraData* extraMods = dataList->GetByType(kExtraData_ObjectInstance);
 		BGSObjectInstanceExtra* modList = DYNAMIC_CAST(extraMods, BSExtraData, BGSObjectInstanceExtra);
 		ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
-		TESObjectWEAP* weapBase = (TESObjectWEAP*)extraInstanceData->baseForm;
-		if (!modList)
+		if (!modList || !extraInstanceData)
 			return false;
+		TESObjectWEAP* weapBase = (TESObjectWEAP*)extraInstanceData->baseForm;
 		BGSInventoryItem* item = nullptr;
 		for (UInt32 i = 0; i < actor->inventoryList->items.count; i++)
 		{
@@ -489,6 +557,8 @@ namespace MSF_Base
 		}
 
 		extraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+		if (!extraInstanceData)
+			return false;
 		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 
 		BGSObjectInstance idStruct;
@@ -840,12 +910,28 @@ namespace MSF_Base
 		*finalAmmo = targetAmmo;
 		BGSMod::Attachment::Mod* ammoMod = Utilities::GetModAtAttachPoint(mods, MSF_MainData::ammoAP);
 		BGSMod::Attachment::Mod* targetMod = nullptr;
-		auto itAmmo = MSF_MainData::ammoMap.find(targetAmmo);
-		if (itAmmo != MSF_MainData::ammoMap.end())
-			targetMod = itAmmo->second->mod;
+		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(mods, baseWeap);
+		auto itBaseAmmo = MSF_MainData::ammoDataMap.end();
+		if (baseAmmo)
+			itBaseAmmo = MSF_MainData::ammoDataMap.find(baseAmmo);
+		if (itBaseAmmo != MSF_MainData::ammoDataMap.end())
+		{
+			if (targetAmmo == itBaseAmmo->second->baseAmmoData.ammo)
+				targetMod = itBaseAmmo->second->baseAmmoData.mod;
+			else
+			{
+				auto itAmmo = std::find_if(itBaseAmmo->second->ammoMods.begin(), itBaseAmmo->second->ammoMods.end(), [targetAmmo](AmmoData::AmmoMod& data) { //TEST IT!!!
+					return data.ammo == targetAmmo;
+					});
+				if (itAmmo != itBaseAmmo->second->ammoMods.end())
+					targetMod = itAmmo->mod;
+			}
+		}
+		//auto itAmmo = MSF_MainData::ammoMap.find(targetAmmo);
+		//if (itAmmo != MSF_MainData::ammoMap.end())
+		//	targetMod = itAmmo->second->mod;
 		if (!ammoMod && !targetMod)
 			return true;
-		TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(mods, baseWeap);
 		_DEBUG("targetAmmo: %08X", targetAmmo->formID);
 		if (baseAmmo)
 			_DEBUG("baseAmmo: %08X", baseAmmo->formID);
@@ -853,6 +939,7 @@ namespace MSF_Base
 			_DEBUG("ammoMod: %08X", ammoMod->formID);
 		if (targetMod)
 			_DEBUG("targetMod: %08X", targetMod->formID);
+		//TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(mods, baseWeap);
 		if (!baseAmmo)
 		{
 			_DEBUG("FindInvalid: no supported base ammo for instance");  //new: nullptr
@@ -867,11 +954,18 @@ namespace MSF_Base
 			*finalAmmo = baseAmmo;
 			return true;
 		}
-		auto itBaseAmmo = MSF_MainData::ammoDataMap.find(baseAmmo);
+		//auto itBaseAmmo = MSF_MainData::ammoDataMap.find(baseAmmo);
 		if (itBaseAmmo != MSF_MainData::ammoDataMap.end())
 		{
 			auto ammoData = (*itBaseAmmo).second;
-			//target mod == baseMod?
+			if (targetMod == ammoData->baseAmmoData.mod)
+			{
+				_DEBUG("FindInvalid: new base ammo, restore switched base ammo");  //new: targetAmmo (state change) //base-mod-OK?
+				*modResult = targetMod;
+				*finalAmmo = ammoData->baseAmmoData.ammo;
+				*bAttach = true;
+				return true;
+			}
 			auto itTargetMod = std::find_if(ammoData->ammoMods.begin(), ammoData->ammoMods.end(), [targetMod](AmmoData::AmmoMod& data) {
 				return data.mod == targetMod;
 				});
@@ -936,13 +1030,21 @@ namespace MSF_Base
 				if (randomActor->middleProcess && randomActor->middleProcess->unk08 && randomActor->middleProcess->unk08->equipData.entries && randomActor->middleProcess->unk08->equipData[0].equippedData)
 				{
 					_DEBUG("actor ok");
-					TESAmmo* ammo = randomActor->middleProcess->unk08->equipData[0].equippedData->ammo;
+					TESAmmo* baseAmmo = randomActor->middleProcess->unk08->equipData[0].equippedData->ammo;
+					TESAmmo* ammo = baseAmmo;
 					std::vector<BGSMod::Attachment::Mod*> mods;
 					UInt32 count = 0;
 					MSF_Data::PickRandomMods(&mods, &ammo, &count);
 					_DEBUG("picked ammo: %p, %i", ammo, count);
 					if (ammo)
 					{
+						if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReplaceAmmoWithSpawned)
+						{
+							count = Utilities::GetInventoryItemCount(randomActor->inventoryList, baseAmmo);
+							if (!count)
+								continue;
+							Utilities::RemoveItem(randomActor, baseAmmo, count, true);
+						}
 						Utilities::AddItem(randomActor, ammo, count, true);
 					}
 					for (auto itMods = mods.begin(); itMods != mods.end(); itMods++)

@@ -13,6 +13,7 @@ _UpdateEquipData UpdateEquipData_Copied;
 BGSOnPlayerUseWorkBenchEventSink useWorkbenchEventSink;
 BGSOnPlayerModArmorWeaponEventSink modArmorWeaponEventSink;
 TESCellFullyLoadedEventSink cellFullyLoadedEventSink;
+CombatEvnHandler combatEvnSink;
 PlayerAmmoCountEventSink playerAmmoCountEventSink;
 MenuOpenCloseSink menuOpenCloseSink;
 _PlayerAnimationEvent PlayerAnimationEvent_Original;
@@ -40,13 +41,22 @@ EventResult	TESCellFullyLoadedEventSink::ReceiveEvent(TESCellFullyLoadedEvent * 
 EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatcher)
 {
 	//instance midprocess ammo count!
-	//_DEBUG("combat started");
+	if (MSF_MainData::iAutolowerTimeMS)
+	{
+		Actor* playerActor = *g_player;
+		if (evn->source == playerActor || evn->target == playerActor)
+		{
+			if ((playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)) && evn->state) //== start
+				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
+			//else if (evn->state == end)
+			//{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			//}
+			_DEBUG("combat state: %08X", evn->state);
+		}
+	}
 	return kEvent_Continue;
-}
-
-void HelperFn(ActorEquipManagerEvent::Event* evn)
-{
-	_DEBUG("equipEvent");
 }
 
 EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher)
@@ -64,10 +74,9 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 		MSF_MainData::modSwitchManager.ClearQueue();
 		MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	}
+	MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	//TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
-	//MSF_Scaleform::UpdateWidgetData(eventInstanceData);
-	//delayTask delayUpd(250, true, &MSF_Scaleform::UpdateWidgetData, nullptr);
 	WidgetUpdateTask* updTask = new WidgetUpdateTask();
 	delayTask delayUpd(250, true, g_threading->AddUITask, updTask);
 	if (!eventInstanceData)// || !equippedInstanceData || (eventInstanceData != equippedInstanceData))
@@ -208,6 +217,7 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 	{
 		MSF_Data::ReadMCMKeybindData();
 		MSF_Data::ReadUserSettings();
+		MSF_Scaleform::UpdateWidgetSettings();
 	}
 	else if (!_strcmpi("ContainerMenu", evn->menuName.c_str()) || !_strcmpi("BarterMenu", evn->menuName.c_str()) || \
 		!_strcmpi("ExamineMenu", evn->menuName.c_str()) || !_strcmpi("WorkshopMenu", evn->menuName.c_str()) || \
@@ -218,6 +228,7 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		if (evn->isOpen)
 		{
 			MSF_MainData::modSwitchManager.IncOpenedMenus();
+			MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
 		}
 		else if (MSF_MainData::modSwitchManager.GetOpenedMenus() > 0)
 		{
@@ -234,8 +245,9 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 		else
 		{
 			//_DEBUG("OpenMSFMenu from MenuOpenCloseHandler");
-			MSFMenu::OpenMenu();
 			MSFWidgetMenu::OpenMenu();
+			//MSFMenu::RegisterMenu();
+			MSFMenu::OpenMenu();
 		}
 	}
 
@@ -365,11 +377,11 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	//		return ((loadedAmmo - ammoState->chamberedCount < ammoCap) && ammoReserve); //HasTRsupport
 	//}
 	TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(target);
-	if (MSF_Data::InstanceHasTRSupport(instanceData))
+	UInt16 chamberSize = 0;
+	UInt16 flags = 0;
+	MSF_Data::GetChamberData(Utilities::GetEquippedModData(target), instanceData, &chamberSize, &flags);
+	if (MSF_Data::InstanceHasTRSupport(instanceData) || flags & ExtraWeaponState::WeaponState::bHasTacticalReload)
 	{
-		UInt16 chamberSize = 0;
-		UInt16 flags = 0;
-		MSF_Data::GetChamberData(Utilities::GetEquippedModData(target), instanceData, &chamberSize, &flags);
 		return (loadedAmmo < (ammoCap+chamberSize) && loadedAmmo < ammoReserve);
 	}
 	return (loadedAmmo < ammoCap && loadedAmmo < ammoReserve);
@@ -618,6 +630,23 @@ bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2) //ctor: B8670 v
 		return extra1->rank != extra2->rank;
 }
 
+BGSObjectInstanceExtra* ObjectInstanceCtor_Hook(BGSObjectInstanceExtra* allocatedHeap, BGSMod::Template::Item* templateItem, TESBoundObject* parentForm, void* instanceFilter)
+{
+	BGSObjectInstanceExtra* modList = ObjectInstanceCtor_Copied(allocatedHeap, templateItem, parentForm, instanceFilter);
+	if (parentForm->formType != FormType::kFormType_WEAP)
+		return modList;
+	TESAmmo* baseAmmo = MSF_Data::GetBaseCaliber(modList, DYNAMIC_CAST(parentForm, TESBoundObject, TESObjectWEAP));
+	if (!baseAmmo)
+		return modList;
+	auto itAmmo = MSF_MainData::ammoDataMap.find(baseAmmo);
+	if (itAmmo == MSF_MainData::ammoDataMap.end())
+		return modList;
+	if (!itAmmo->second->baseAmmoData.mod)
+		return modList;
+	AddMod(modList, itAmmo->second->baseAmmoData.mod, 0, 1, true);
+	return modList;
+}
+
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3)
 {
 	const char* name = arg2->eventName.c_str();
@@ -652,6 +681,11 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				//_DEBUG("switchOK");
 			}
 		}
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
 		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload); //BCR!!
 
 	}
@@ -670,6 +704,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	else if (!_strcmpi("weaponDraw", name))
 	{
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
+		bool bDidAnim = false;
 		if (switchData)
 		{
 			//_DEBUG("drawFlags: %08X", switchData->SwitchFlags);
@@ -679,26 +714,45 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				if ((switchData->SwitchFlags & SwitchData::bReloadNeeded))
 				{
 					//_DEBUG("reloading");
-					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode)
+					UInt32 flags = switchData->SwitchFlags;
+					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 						MSF_Base::SwitchMod(switchData, true);
 					}
 					else
+					{
 						switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bReloadNeeded) | SwitchData::bReloadInProgress; // | SwitchData::bReloadNotFinished
-					ReloadTask* reloadTask = new ReloadTask(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
+						flags = switchData->SwitchFlags;
+					}
+					ReloadTask* reloadTask = new ReloadTask(flags & SwitchData::bReloadFull, flags & SwitchData::bReloadZeroCount, true, true);
 					delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, g_threading->AddTask, reloadTask);
+					bDidAnim = true;
 					//delayTask delayReload(MSF_MainData::iDrawAnimEndEventDelayMS, true, &MSF_Base::ReloadWeapon, switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true);
 					//if (!MSF_Base::ReloadWeapon())
 					//	MSF_MainData::modSwitchManager.ClearQueue();
 				}
 				else if (SwitchData::bAnimNeeded)
 				{
-					switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bAnimNeeded) | SwitchData::bAnimInProgress; //| SwitchData::bAnimNotFinished
-					if (!MSF_Base::PlayAnim(switchData->animData))
-						MSF_MainData::modSwitchManager.ClearQueue();
+					if (switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
+					{
+						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
+						MSF_Base::SwitchMod(switchData, true);
+					}
+					else
+					{
+						switchData->SwitchFlags = (switchData->SwitchFlags & ~SwitchData::bAnimNeeded) | SwitchData::bAnimInProgress; //| SwitchData::bAnimNotFinished
+					}
+					AnimTask* animTask = new AnimTask(switchData->animData);
+					delayTask delayAnim(MSF_MainData::iDrawAnimEndEventDelayMS, true, g_threading->AddTask, animTask);
+					bDidAnim = true;
 				}
 			}
+		}
+		if (!bDidAnim && MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
 	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
@@ -713,6 +767,11 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		//}
 		//_DEBUG("Anim: fire %i", MSF_MainData::tmr.stop());
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeFireWeapon);
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
 		//_DEBUG("Anim: fire");
 	}
 	else if (!_strcmpi("IdleStop", name))
@@ -757,6 +816,11 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, g_threading->AddTask, endTask);
 			//delayTask delayEnd(MSF_MainData::iCustomAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
 		}
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
 	}
 	else if (!_strcmpi("Event00", name))
 	{
@@ -781,6 +845,51 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	{
 		//get menu to open
 		//open menu
+	}
+	else if (!_strcmpi("weaponSwing", name))
+	{
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
+	}
+	else if (!_strcmpi("sightedStateExit", name))
+	{
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
+		}
+	else if (!_strcmpi("PASprintStop", name))
+	{
+		if (MSF_MainData::MCMSettingFlags & MSF_MainData::bLowerWeaponAfterSprint)
+		{
+			Actor* playerActor = *g_player;
+			//if (!(playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)))
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(25, g_threading->AddTask, lowerTask);
+			//delayTask(25, true, g_threading->AddTask, lowerTask);
+		}
+		else if (MSF_MainData::iAutolowerTimeMS)
+		{
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
+	}
+	else if (!_strcmpi("initiateStart", name))
+	{
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			Actor* playerActor = *g_player;
+			if (playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP))
+			{
+				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
+				LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			}
+		}
 	}
 	//else if (!_strcmpi("uncullBone", name))
 	//{

@@ -104,6 +104,7 @@ public:
 	virtual ~CombatEvnHandler() { };
 	virtual EventResult ReceiveEvent(TESCombatEvent * evn, void * dispatcher) override;
 };
+extern CombatEvnHandler combatEvnSink;
 
 //Equip event
 struct PlayerAmmoCountEvent
@@ -173,7 +174,6 @@ class ActorEquipManagerEventSink : public BSTEventSink<ActorEquipManagerEvent::E
 public:
 	virtual	EventResult	ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher) override;
 };
-void HelperFn(ActorEquipManagerEvent::Event* evn);
 
 struct PlayerWeaponReloadEvent
 {
@@ -257,7 +257,8 @@ extern RelocPtr <UInt32> uAmmoCounterFadeTimeMS;
 //typedef void* (*EquipHandler_UpdateAnimGraph)(Actor* actor, bool unk_rdx);
 extern RelocAddr <_UpdateAnimGraph> EquipHandler_UpdateAnimGraph_HookTarget;
 extern _UpdateAnimGraph EquipHandler_UpdateAnimGraph_Copied;
-
+extern RelocAddr <_BGSObjectInstanceExtra_ctor> ObjectInstanceCtor_HookTarget;
+extern _BGSObjectInstanceExtra_ctor ObjectInstanceCtor_Copied;
 extern RelocAddr <_EjectShellCasing> EjectShellCasing_HookTarget1;
 extern RelocAddr <_EjectShellCasing> EjectShellCasing_HookTarget2;
 extern RelocAddr <_AttachModToStack> AttachModToStack_CallFromGameplay_HookTarget;
@@ -320,11 +321,22 @@ extern ReloadJumpReplace ReloadJumpOverwriteCode;
 class WidgetUpdateTask : public ITaskDelegate
 {
 public:
+	WidgetUpdateTask(bool settings = false, bool quickkey = false)
+	{
+		doSettings = settings;
+		clearQuickkey = quickkey;
+	};
 	virtual void Run() final
 	{
+		if (doSettings)
+			MSF_Scaleform::UpdateWidgetSettings();
+		if (clearQuickkey)
+			MSF_Scaleform::ClearWidgetQuickkeyMod();
 		_DEBUG("widget update thread");
 		MSF_Scaleform::UpdateWidgetData();
 	}
+	bool doSettings;
+	bool clearQuickkey;
 };
 
 class EndSwitchTask : public ITaskDelegate
@@ -365,18 +377,77 @@ private:
 	bool bIsSwitch;
 };
 
-class LowerWeaponTask : public ITaskDelegate
+class AnimTask : public ITaskDelegate
+{
+public:
+	AnimTask(AnimationData* animation)
+	{
+		animData = animation;
+	};
+	virtual void Run() final
+	{
+		MSF_Base::PlayAnim(animData);
+	}
+private:
+	AnimationData* animData;
+};
+
+class FireGunTask : public ITaskDelegate
 {
 public:
 	virtual void Run() final
 	{
-		if (MSF_MainData::lowerTmr.IsRunning() && MSF_MainData::lowerTmr.getElapsed() > MSF_MainData::lowerDelay) //game time!
+		Actor* playerActor = *g_player;
+		auto instance = Utilities::GetEquippedInstanceData(playerActor);
+		if (!instance)
+			return;
+		if (instance->flags & TESObjectWEAP::InstanceData::kFlag_Automatic)
+			Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionFireAuto);
+		else
+			Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionFireSingle);
+	}
+};
+
+class LowerWeaponTask : public ITaskDelegate
+{
+public:
+	LowerWeaponTask() : doDown(true), force(false)
+	{};
+	virtual void Run() final
+	{
+		_DEBUG("Lower Task");
+		Actor* playerActor = *g_player;
+		if (playerActor->IsInCombat() && !force)
 		{
-			MSF_MainData::lowerTmr.stop();
-			Actor* playerActor = *g_player;
-			if (!(playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)))
-				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
+			LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			return;
 		}
+		UInt32 weaponActivity = playerActor->actorState.flags & ActorStateFlags0C::mWeaponActivityMask;
+		//if (!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) || (playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Draw | ActorStateFlags0C::kWeaponState_Sheathing | \
+		//	ActorStateFlags0C::kActorState_FurnitureState)) || (weaponActivity == ActorStateFlags0C::kWeaponState_Reloading || weaponActivity == ActorStateFlags0C::kWeaponState_Firing) || \
+		//	(playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Sprint | ActorStateFlags08::kActorState_Bashing)))
+		if ((playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing)) || // | ActorStateFlags08::kActorState_Sprint
+				(playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Sheathing)) ||
+				(weaponActivity == ActorStateFlags0C::kWeaponState_Reloading || weaponActivity == ActorStateFlags0C::kWeaponState_Firing) ||
+				(!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && (playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Draw)))
+			return;
+		bool isDown = (playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP));
+		_DEBUG("Lower Check OK, isDown: %i, doDown: %i", isDown, doDown);
+		if (isDown ^ doDown)
+			Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
+	}
+private:
+	bool doDown;
+	bool force;
+};
+
+class QuickkeySelectTask : public ITaskDelegate
+{
+public:
+	virtual void Run() final
+	{
+		MSF_MainData::modSwitchManager.HandleQuickkeyTimeout();
 	}
 };
 
@@ -392,6 +463,7 @@ bool DeleteExtraData_CallFromWorkbenchUI_Hook(BSExtraData** extraDataHead, Extra
 bool UpdMidProc_Hook(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
 void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt32* r8d);
 void UpdateEquippedWeaponData_Hook(EquippedWeaponData* data);
+BGSObjectInstanceExtra* ObjectInstanceCtor_Hook(BGSObjectInstanceExtra* allocatedHeap, BGSMod::Template::Item* templateItem, TESBoundObject* parentForm, void* instanceFilter);
 ExtraRank* LoadBuffer_ExtraDataList_ExtraRank_Hook(ExtraRank* newExtraRank, UInt32 rank, ExtraDataList* futureParentList, BGSInventoryItem::Stack* futureParentStack);
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
 bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve);

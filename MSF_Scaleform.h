@@ -20,6 +20,8 @@ namespace MSF_Scaleform
 	bool StartWidgetHideCountdown(UInt32 delayTime);
 	bool UpdateWidgetData(TESObjectWEAP::InstanceData* instanceData = nullptr);
 	bool UpdateWidgetSettings();
+	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, bool isAmmo);
+	bool ClearWidgetQuickkeyMod();
 	UInt32 GetInterfaceVersion(); 
 	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);
 	bool ToggleSelectionMenu(ModSelectionMenu* selectMenu, ModData* mods);
@@ -417,8 +419,8 @@ public:
 		if ((*g_ui) != nullptr && !(*g_ui)->IsMenuRegistered(menuName))
 		{
 			(*g_ui)->Register("MSFMenu", CreateMSFMenu);
+			_MESSAGE("MSFMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 		}
-		_MESSAGE("MSFMenu %s", (*g_ui)->IsMenuRegistered(menuName) ? "registered" : "not registered");
 	}
 };
 

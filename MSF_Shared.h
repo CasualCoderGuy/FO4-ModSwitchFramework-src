@@ -19,6 +19,7 @@
 #include  <chrono>
 #include  <sstream>
 #include <algorithm>
+#include <condition_variable>
 
 
 extern IDebugLog gLog;
@@ -36,6 +37,7 @@ ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 
 typedef unsigned short KeywordValue;
 typedef UInt32 ObjectRefHandle;
+
 
 namespace InventoryInterface
 {
@@ -609,7 +611,9 @@ namespace Utilities
 	KeywordValue GetInstantiationValueForTypedKeyword(BGSKeyword* keyword);
 	KeywordValue GetAnimFlavorValueForTypedKeyword(BGSKeyword* keyword);
 	bool HasAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
+	bool HasAttachPoint(AttachParentArray* attachPoints, KeywordValue attachPointKW);
 	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, BGSKeyword* attachPointKW);
+	bool ObjectInstanceHasAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue attachPointKW);
 	BGSMod::Attachment::Mod* GetModAtAttachPoint(BGSObjectInstanceExtra* modData, KeywordValue keywordValue);
 	bool GetParentInstantiationValues(BGSObjectInstanceExtra* modData, KeywordValue parentValue, std::vector<KeywordValue>* instantiationValues);
 	bool AddAttachPoint(AttachParentArray* attachPoints, BGSKeyword* attachPointKW);
@@ -710,7 +714,7 @@ public:
 				std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 				task();
 				delete tlsShare;
-			}).detach();
+				}).detach();
 		}
 		else
 		{
@@ -718,11 +722,63 @@ public:
 			task();
 		}
 	}
+};
 
+class DelayedExecutor
+{
+public:
+	DelayedExecutor() : cancelled(false), running(false), id(0)
+	{}
+	~DelayedExecutor()
+	{
+		cancel();
+	}
+	template <class callable, class... arguments>
+	void start(int delay_ms, callable&& f, arguments&&... args)
+	{
+		cancel();
+		std::function<typename std::result_of<callable(arguments...)>::type()> func(std::bind(std::forward<callable>(f), std::forward<arguments>(args)...));
+		worker = std::thread([=] {
+			std::unique_lock<std::mutex> lock(mtx);
+			cancelled = false;
+			running = true;
+			int selfid = id;
+			id++;
+			if (cv.wait_for(lock, std::chrono::milliseconds(delay_ms), [&] { return cancelled.load(); }))
+				return;
+			if (!cancelled) 
+			{
+				_DEBUG("selfid: %i", selfid);
+				func();
+			}
+			running = false;
+			});
+		worker.detach();
+	}
+	void cancel()
+	{
+		{
+			std::lock_guard<std::mutex> lock(mtx);
+			cancelled = true;
+			running = false;
+		}
+		cv.notify_all();
+	}
+	bool is_running() { 
+		std::lock_guard<std::mutex> lock(mtx);
+		return running; 
+	}
+private:
+	std::atomic<bool> cancelled;
+	std::atomic<bool> running;
+	std::atomic<int> id;
+	std::thread worker;
+	std::condition_variable cv;
+	std::mutex mtx;
 };
 
 typedef void(*_AttachModToInventoryItem)(VirtualMachine* vm, UInt32 stackId, TESObjectREFR* objRef, TESForm* invItem, BGSMod::Attachment::Mod* mod, bool unkbool);
-typedef void(*_AttachMod)(Actor* actor, TESBoundObject* baseItem, CheckStackIDFunctor* CheckStackIDFunctor, StackDataWriteFunctor* ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
+typedef void(*_AttachRemoveModInternal)(Actor* actor, TESBoundObject* baseItem, CheckStackIDFunctor* CheckStackIDFunctor, StackDataWriteFunctor* ModifyModDataFunctor, UInt8 arg_unk28, void** weapbaseMf0, UInt8 unk_FFor0, BGSMod::Attachment::Mod* mod);
 typedef bool(*_AttachModToStack)(BGSInventoryItem* invItem, CheckStackIDFunctor* IDfunctor, StackDataWriteFunctor* modFuntor, UInt32 unk_r9d, UInt32* unk_rsp20); //, UInt32 unk_rsp50
 typedef bool(*_ModifyStackData)(BGSInventoryItem* invItem, BGSInventoryItem::Stack** stack, StackDataWriteFunctor* modFuntor);
 typedef bool(*_UpdMidProc)(Actor::AIProcess* midProc, Actor* actor, BGSObjectInstance weaponBaseStruct, BGSEquipSlot* equipSlot);
@@ -732,6 +788,14 @@ typedef void(*_UpdateEnchantments)(Actor* actor, BGSObjectInstance BGSObjectInst
 typedef void(*_UpdateAVModifiers)(ActorStruct actorStruct, tArray<TBO_InstanceData::ValueModifier>* valueModifiers);
 typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, void* dataHolder, float newValue);
 typedef bool(*_DeleteExtraData)(BSExtraData** extraDataHead, ExtraDataType type);
+
+typedef BGSObjectInstanceExtra::Data*(*_CreateInstanceModsFromTemplate)(void* scrapHeap, void* rdx, TESObjectWEAP* templateWeap, void* r9);
+typedef BGSObjectInstanceExtra*(*_BGSObjectInstanceExtra_ctor)(BGSObjectInstanceExtra* allocatedHeap, BGSMod::Template::Item* templateItem, TESBoundObject* parentForm, void* instanceFilter);
+typedef void(*_AttachMod)(TESObjectREFR* ref, BGSMod::Attachment::Mod* newMod, UInt8 attachIndex, UInt8 rank);
+typedef void(*_AddMod)(BGSObjectInstanceExtra* extraModList, BGSMod::Attachment::Mod* newMod, UInt8 attachIndex, UInt8 rank, bool removeInvalidMods);
+typedef UInt32(*_RemoveMod)(BGSObjectInstanceExtra* extraModList, BGSMod::Attachment::Mod* modToRemove, UInt8 attachIndex);
+typedef UInt32(*_RemoveInvalidMods)(BGSObjectInstanceExtra* extraModList, AttachParentArray* baseObjectParents);
+
 
 typedef void(*_UpdateEquippedWeaponData)(EquippedWeaponData* data, UInt32 edx);
 typedef bool(*_MainEquipHandler)(void* unkmanager, Actor* actor, BGSObjectInstance weaponBaseStruct, unkEquipSlotStruct equipSlotStruct);
@@ -840,6 +904,12 @@ extern RelocAddr <_UnkSub_DFE930> UnkSub_DFE930;
 extern RelocAddr <_MainEquipHandler> MainEquipHandler;
 extern RelocAddr <_NiStuff> NiStuff;
 extern RelocAddr <_UpdateEquippedWeaponData> UpdateEquippedWeaponData;
+extern RelocAddr <_CreateInstanceModsFromTemplate> CreateInstanceModsFromTemplate;
+extern RelocAddr <_BGSObjectInstanceExtra_ctor> BGSObjectInstanceExtra_ctor;
+extern RelocAddr <_AttachMod> AttachMod;
+extern RelocAddr <_AddMod> AddMod;
+extern RelocAddr <_RemoveMod> RemoveMod;
+extern RelocAddr <_RemoveInvalidMods> RemoveInvalidMods;
 
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;
