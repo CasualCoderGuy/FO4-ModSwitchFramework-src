@@ -17,7 +17,7 @@
 // Plugin Information
 //-----------------------
 
-#define DEBUG "DevMode"
+//#define DEBUG "DevMode"
 
 #define MSF_VERSION_INTEGER_MAJOR	1
 #define MSF_VERSION_INTEGER_MINOR	2

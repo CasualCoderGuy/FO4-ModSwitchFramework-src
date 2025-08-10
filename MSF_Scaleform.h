@@ -20,7 +20,7 @@ namespace MSF_Scaleform
 	bool StartWidgetHideCountdown(UInt32 delayTime);
 	bool UpdateWidgetData(TESObjectWEAP::InstanceData* instanceData = nullptr);
 	bool UpdateWidgetSettings();
-	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, bool isAmmo);
+	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, std::string nullModName, bool isAmmo);
 	bool ClearWidgetQuickkeyMod();
 	UInt32 GetInterfaceVersion(); 
 	GFxMovieRoot* HandleToggleMenu(ModSelectionMenu* selectMenu);

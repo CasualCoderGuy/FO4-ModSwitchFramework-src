@@ -12,8 +12,9 @@ class BurstModeData;
 class AmmoData
 {
 public:
-	struct AmmoMod
+	class AmmoMod
 	{
+	public:
 		enum
 		{
 			bDoSwitchBeforeAnimations = 0x0800,
@@ -110,8 +111,9 @@ public:
 		AnimationData* animData;
 	};
 	typedef std::vector<Mod*> ModVector;
-	struct ModCycle
+	class ModCycle
 	{
+	public:
 		enum
 		{
 			bCannotHaveNullMod = 0x0001,
@@ -120,6 +122,7 @@ public:
 		ModVector mods;
 		UInt32 flags;
 		float spawnChanceBase;
+		std::string nullModName;
 	};
 	/*enum
 	{

@@ -688,7 +688,7 @@ namespace MSF_Scaleform
 		return true;
 	}
 
-	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, bool isAmmo)
+	bool UpdateWidgetQuickkeyMod(KeywordValue ap, TESForm* nameForm, std::string nullModName, bool isAmmo)
 	{
 		static BSFixedString menuName("MSFwidget");
 		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
@@ -711,6 +711,8 @@ namespace MSF_Scaleform
 		}
 		if (nameForm)
 			modName = nameForm->GetFullName();
+		else if (nullModName != "")
+			modName = nullModName.c_str();
 		else
 			modName = "None";
 		GFxValue arrArgs[3]; //obj?

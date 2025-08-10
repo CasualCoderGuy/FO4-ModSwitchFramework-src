@@ -150,6 +150,8 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 	if (input != lastQuickKey)
 	{
 		ClearQuickSelection(false);
+		lastQuickKey = input;
+		keyIsDown = true;
 		quickSelectLock.Release();
 		bool gotNext = false;
 		if (isAmmo)
@@ -159,14 +161,15 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 		if (gotNext)
 		{
 			quickSelectLock.Lock();
-			keyIsDown = true;
-			lastQuickKey = input;
 			TESForm* selectedItem = nullptr;
+			std::string nullModName = "";
 			//bool bRemove = false;
 			if (!isAmmo)
 			{
 				if (quickSelection.mod.modToAttach)
 					selectedItem = quickSelection.mod.modToAttach->mod;
+				if (!selectedItem)
+					nullModName = quickSelection.mod.cycle->nullModName;
 				//else if (quickSelection.mod.modToRemove)
 				//{
 				//	selectedItem = quickSelection.mod.modToRemove->mod;
@@ -178,7 +181,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 			quickSelectLock.Release();
 			QuickkeySelectTask* selectTask = new QuickkeySelectTask();
 			quickKeyTimer.start(MSF_MainData::quickKeyTimeoutMS, g_threading->AddTask, selectTask);
-			MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, isAmmo);
+			MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, nullModName, isAmmo);
 		}
 		else
 		{
@@ -192,7 +195,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 		quickSelectIdx++;
 		if (isAmmo && quickSelectIsAmmo)
 		{
-			if (quickSelectIdx >= quickSelection.ammo.ammoData->ammoMods.size())
+			if (quickSelectIdx > quickSelection.ammo.ammoData->ammoMods.size())
 				quickSelectIdx = 0;
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bRequireAmmoToSwitch)
 			{
@@ -234,14 +237,17 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 		}
 		else if (!isAmmo && !quickSelectIsAmmo)
 		{
+			_DEBUG("qsidx: %08X", quickSelectIdx);
 			bool nullMod = !(quickSelection.mod.cycle->flags & ModData::ModCycle::bCannotHaveNullMod);
-			if ((quickSelectIdx + nullMod) >= quickSelection.mod.cycle->mods.size())
+			if ((quickSelectIdx + 1) > quickSelection.mod.cycle->mods.size() + nullMod)
 				quickSelectIdx = 0;
+			_DEBUG("qsidx: %08X, null: %02X", quickSelectIdx, nullMod);
 			UInt32 idx = -2;
 			for (UInt32 it = quickSelectIdx; it < quickSelectIdx + quickSelection.mod.cycle->mods.size(); it++)
 			{
 				UInt32 real = it;
 				real -= nullMod;
+				_DEBUG("it: %02X, real: %02X", it, real);
 				if (it != 0 && real >= quickSelection.mod.cycle->mods.size())
 					real -= quickSelection.mod.cycle->mods.size() + nullMod;
 				if (real == -1)
@@ -274,7 +280,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 				MSF_Scaleform::ClearWidgetQuickkeyMod();
 				return false;
 			}
-			quickSelectIdx = idx + 1;
+			quickSelectIdx = idx + nullMod;
 
 			//if (quickSelection.mod.cycle->flags & ModData::ModCycle::bCannotHaveNullMod) ///CCC
 			//{
@@ -300,11 +306,14 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 			return false;
 		}
 		TESForm* selectedItem = nullptr;
+		std::string nullModName = "";
 		//bool bRemove = false;
 		if (!isAmmo)
 		{
 			if (quickSelection.mod.modToAttach)
 				selectedItem = quickSelection.mod.modToAttach->mod;
+			if (!selectedItem)
+				nullModName = quickSelection.mod.cycle->nullModName;
 			//else if (quickSelection.mod.modToRemove)
 			//{
 			//	selectedItem = quickSelection.mod.modToRemove->mod;
@@ -317,7 +326,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 		QuickkeySelectTask* selectTask = new QuickkeySelectTask();
 		quickKeyTimer.start(MSF_MainData::quickKeyTimeoutMS, g_threading->AddTask, selectTask);
 		_DEBUG("selID: %08X, size: %08X", quickSelectIdx, quickSelection.ammo.ammoData->ammoMods.size());
-		MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, isAmmo);
+		MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, nullModName, isAmmo);
 	}
 	return true;
 }
@@ -1769,7 +1778,7 @@ namespace MSF_Data
 							baseMod->unkC0 = MSF_MainData::ammoAP;
 						}
 						UInt16 ammoIDbase = ammoData["baseAmmoID"].asInt();
-						UInt16 flags = ammoData["flags"].asInt();
+						UInt16 baseFlags = ammoData["flags"].asInt();
 						float spawnChanceBase = ammoData["spawnChanceBase"].asFloat();
 						float spawnMinAmountMultiplierB = ammoData["spawnMinAmountMultiplier"].asFloat();
 						float spawnMaxAmountMultiplierB = ammoData["spawnMaxAmountMultiplier"].asFloat();
@@ -1789,7 +1798,7 @@ namespace MSF_Data
 							AmmoData* itAmmoData = itAD->second;
 							itAmmoData->baseAmmoData.mod = baseMod;
 							itAmmoData->baseAmmoData.ammoID = ammoIDbase;
-							itAmmoData->baseAmmoData.flags = flags;
+							itAmmoData->baseAmmoData.flags = baseFlags;
 							itAmmoData->baseAmmoData.spawnChance = spawnChanceBase;
 							itAmmoData->baseAmmoData.spawnMinAmountMultiplier = spawnMinAmountMultiplierB;
 							itAmmoData->baseAmmoData.spawnMaxAmountMultiplier = spawnMaxAmountMultiplierB;
@@ -1854,7 +1863,6 @@ namespace MSF_Data
 										ammoMod.spawnMinAmountMultiplier = spawnMinAmountMultiplier;
 										ammoMod.spawnMaxAmountMultiplier = spawnMaxAmountMultiplier;
 										itAmmoData->ammoMods.push_back(ammoMod);
-										_DEBUG("ammoSize: %08X", itAmmoData->ammoMods.size());
 									}
 								}
 							}
@@ -1865,7 +1873,7 @@ namespace MSF_Data
 							ammoDataStruct->baseAmmoData.ammo = baseAmmo;
 							ammoDataStruct->baseAmmoData.mod = baseMod;
 							ammoDataStruct->baseAmmoData.ammoID = ammoIDbase;
-							ammoDataStruct->baseAmmoData.flags = flags;
+							ammoDataStruct->baseAmmoData.flags = baseFlags;
 							ammoDataStruct->baseAmmoData.spawnChance = spawnChanceBase;
 							ammoDataStruct->baseAmmoData.spawnMinAmountMultiplier = spawnMinAmountMultiplierB;
 							ammoDataStruct->baseAmmoData.spawnMaxAmountMultiplier = spawnMaxAmountMultiplierB;
@@ -1930,7 +1938,6 @@ namespace MSF_Data
 										ammoMod.spawnMinAmountMultiplier = spawnMinAmountMultiplier;
 										ammoMod.spawnMaxAmountMultiplier = spawnMaxAmountMultiplier;
 										ammoDataStruct->ammoMods.push_back(ammoMod);
-										_DEBUG("ammoSize: %08X", ammoDataStruct->ammoMods.size());
 									}
 								}
 							}
@@ -2026,6 +2033,7 @@ namespace MSF_Data
 									}
 									UInt16 ifflags = modCycle["ifFlags"].asInt();
 									float spawnChanceBase = modCycle["spawnChanceBase"].asFloat();
+									std::string nullModName = modCycle["nullModName"].asString();
 									auto itCycle = modData->modCycleMap.find(ifValue);
 									ModData::ModCycle* cycle = nullptr;
 									if (itCycle == modData->modCycleMap.end())
@@ -2033,6 +2041,7 @@ namespace MSF_Data
 										cycle = new ModData::ModCycle();
 										cycle->flags = ifflags;
 										cycle->spawnChanceBase = spawnChanceBase;
+										cycle->nullModName = nullModName;
 									}
 									else
 										cycle = itCycle->second;
@@ -2379,9 +2388,9 @@ namespace MSF_Data
 			AmmoData* itAmmoData = it->second;
 			if (!itAmmoData)
 				continue;
-			_MESSAGE("baseAmmo: %08X; size: %i, baseID: %i, baseChance: %f, leveledList: %08X", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size(), itAmmoData->baseAmmoData.ammoID, itAmmoData->baseAmmoData.spawnChance, itAmmoData->baseAmmoLL ? itAmmoData->baseAmmoLL->formID : 0);
+			_MESSAGE("baseAmmo: %08X; size: %i, baseID: %i, baseFlags: %04X, baseChance: %f, leveledList: %08X", itAmmoData->baseAmmoData.ammo->formID, itAmmoData->ammoMods.size(), itAmmoData->baseAmmoData.ammoID, itAmmoData->baseAmmoData.flags, itAmmoData->baseAmmoData.spawnChance, itAmmoData->baseAmmoLL ? itAmmoData->baseAmmoLL->formID : 0);
 			for (auto itAmmoMod : itAmmoData->ammoMods)
-				_MESSAGE("----Ammo: %08X; AmmoMod: %08X, ammoID: %i, spawnChance: %f, spawnMultMin: %f, spawnMultMax: %f, apOK: %02X", itAmmoMod.ammo->formID, itAmmoMod.mod->formID, itAmmoMod.ammoID, itAmmoMod.spawnChance, itAmmoMod.spawnMinAmountMultiplier, itAmmoMod.spawnMaxAmountMultiplier, itAmmoMod.mod->unkC0 == MSF_MainData::ammoAP);
+				_MESSAGE("----Ammo: %08X; AmmoMod: %08X, ammoID: %i, flags: %04X, spawnChance: %f, spawnMultMin: %f, spawnMultMax: %f, apOK: %02X", itAmmoMod.ammo->formID, itAmmoMod.mod->formID, itAmmoMod.ammoID, itAmmoMod.flags, itAmmoMod.spawnChance, itAmmoMod.spawnMinAmountMultiplier, itAmmoMod.spawnMaxAmountMultiplier, itAmmoMod.mod->unkC0 == MSF_MainData::ammoAP);
 		}
 		for (std::unordered_map<std::string, KeybindData*>::iterator it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
 		{
@@ -2404,7 +2413,7 @@ namespace MSF_Data
 				g_InstantiationKeywordArray->GetNthItem(itCycles->first, ifkw);
 				ModData::ModCycle* cycle = itCycles->second;
 				if (ifkw && cycle)
-					_MESSAGE("-modCycle: ifkeyword: %08X, flags: %08X, modCount: %i", ifkw->formID, cycle->flags, cycle->mods.size());
+					_MESSAGE("-modCycle: ifkeyword: %08X, flags: %08X, nullModName: %s, modCount: %i", ifkw->formID, cycle->flags, cycle->nullModName.c_str(), cycle->mods.size());
 				for (std::vector<ModData::Mod*>::iterator itData = cycle->mods.begin(); itData != cycle->mods.end(); itData++)
 				{
 					ModData::Mod* mod = *itData;
@@ -2878,10 +2887,13 @@ namespace MSF_Data
 		itstat += nullMod;
 		for (it; it < itstat + modCycle->mods.size(); it++)
 		{
+			_DEBUG("it: %02X", it);
 			UInt32 real = it;
 			real -= nullMod;
+			_DEBUG("real: %02X", real);
 			if (it != 0 && real >= modCycle->mods.size())
 				real -= modCycle->mods.size() + nullMod;
+			_DEBUG("real: %02X", real);
 			if (real == -1)
 			{
 				modToAttach = nullptr;
@@ -2892,6 +2904,7 @@ namespace MSF_Data
 			}
 			else 
 			{
+				_DEBUG("else");
 				modToAttach = modCycle->mods[real];
 				if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
 				{
@@ -2901,15 +2914,16 @@ namespace MSF_Data
 				}
 				if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
 					continue;
+				_DEBUG("miscok");
 				attachIdx = real;
 				break;
 			}
 		}
 		if (attachIdx == -2)
 			return nullptr;
-
+		_DEBUG("attachIdx: %02X", attachIdx);
 		if (isQuickkey)
-			return MSF_MainData::modSwitchManager.SetModSelection(modCycle, modToAttach, modToRemove, attachIdx);
+			return MSF_MainData::modSwitchManager.SetModSelection(modCycle, modToAttach, modToRemove, attachIdx+1);
 		return QueueModsToSwitch(modToAttach, modToRemove);
 	}
 
@@ -2921,6 +2935,10 @@ namespace MSF_Data
 	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove)
 	{
 		_DEBUG("Queueing");
+		if (modToAttach)
+			_DEBUG("attach: %s", modToAttach->mod->GetFullName());
+		if (modToRemove)
+			_DEBUG("remove: %s", modToRemove->mod->GetFullName());
 		if (modToAttach == modToRemove)
 			return false; //no change
 		SwitchData* switchRemove = nullptr;
