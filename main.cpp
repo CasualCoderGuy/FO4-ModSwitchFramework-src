@@ -18,6 +18,7 @@
 #include "MSF_Papyrus.h"
 #include "MSF_WeaponState.h"
 #include "MSF_Serialization.h"
+#include "MSF_Localization.h"
 #include "MSF_Addresses.h"
 #ifdef DEBUG
 #include "MSF_Test.h"
@@ -227,6 +228,21 @@ public:
 			if (eqWeapData)
 				ammo = eqWeapData->ammo;
 			MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
+
+			TESObjectWEAP* weapBase = Utilities::GetEquippedGun(*g_player);
+			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
+			if (weapBase && instanceData)
+			{
+				BGSObjectInstance idStruct;
+				idStruct.object = weapBase;
+				idStruct.instanceData = instanceData;
+				//MSF_MainData::modSwitchManager.SetIgnoreEquipAction(true);
+				MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
+				MSF_MainData::modSwitchManager.SetDontPutYourGunIn(true);
+				EquipItemInternal(g_ActorEquipManager, *g_player, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
+				MSF_MainData::modSwitchManager.SetDontPutYourGunIn(false);
+			}
+
 			if (MSF_MainData::iAutolowerTimeMS)
 			{
 				LowerWeaponTask* lowerTask = new LowerWeaponTask();
@@ -264,6 +280,8 @@ void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 				tmr.start();
 				MSF_Data::LoadPluginData();
 				_MESSAGE("Plugin Data Loading Time: %llu ms.", tmr.stop());
+
+				MSF_Localization::ParseTranslations();
 
 				MSF_Data::InjectLeveledLists();
 
@@ -432,7 +450,7 @@ bool WriteHooks()
 			L(cantTextToLoad);
 			dq(CannotEquipItem_TextAddr);
 			L(modTextToLoad);
-			dq((uintptr_t)modText);
+			dq(0); //(uintptr_t)modText
 			L(retnGenLabel);
 			dq(CannotEquipItemGen_ReturnJumpAddr);
 			L(retnModLabel);
@@ -458,7 +476,9 @@ bool WriteHooks()
 			push(r11);
 			push(rdx);
 			push(rax);
+			//push(r8);
 			sub(rsp, 0x100);
+			mov(r8d, r9d);
 #ifndef NEXTGEN
 			mov(rdx, rsi);
 #else
@@ -468,6 +488,7 @@ bool WriteHooks()
 			call(ptr[rip + hook]);
 
 			add(rsp, 0x100);
+			//pop(r8);
 			pop(rax);
 			pop(rdx);
 			pop(r11);

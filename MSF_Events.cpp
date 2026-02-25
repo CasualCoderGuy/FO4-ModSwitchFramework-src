@@ -1,4 +1,5 @@
 #include "MSF_Events.h"
+#include "MSF_Localization.h"
 #include "MSF_WeaponState.h"
 
 AttackInputHandler AttackInputHandler_Copied;
@@ -111,11 +112,11 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	return kEvent_Continue;
 }
 
-void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object)
+void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object, UInt32 eqStackID)
 {
 
 	ExtraDataList* dataList = nullptr;
-	if (!owner->inventoryList || !object || !object->object || !object->instanceData)
+	if (!owner->inventoryList || !object || !object->object)
 		return;
 	if (object->object->formType != kFormType_WEAP)
 		return;
@@ -123,22 +124,28 @@ void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object)
 	{
 		if (owner->inventoryList->items.entries[i].form == object->object)
 		{
+			UInt32 stackID = 0;
 			for (auto stack = owner->inventoryList->items.entries[i].stack; stack; stack = stack->next)
 			{
 				if (!stack->extraData)
+				{
+					stackID++;
 					continue;
+				}
 				ExtraInstanceData* eidata = (ExtraInstanceData*)stack->extraData->GetByType(ExtraDataType::kExtraData_InstanceData);
-				if (eidata && eidata->instanceData == object->instanceData)
+				if (eidata && ((!object->instanceData && (eqStackID == stackID)) || (eidata->instanceData == object->instanceData)))
 				{
 					dataList = stack->extraData;
 					break;
 				}
+				stackID++;
 			}
 		}
 	}
 	if (!dataList)
 		return;
-	MSF_MainData::projectileManager.ApplyMods(dataList);
+	bool success = MSF_MainData::projectileManager.ApplyMods(dataList);
+	_DEBUG("projectileManager success: %i", success);
 }
 
 EventResult PlayerAmmoCountEventSink::ReceiveEvent(PlayerAmmoCountEvent * evn, void * dispatcher)
@@ -235,6 +242,7 @@ EventResult	MenuOpenCloseSink::ReceiveEvent(MenuOpenCloseEvent * evn, void * dis
 	{
 		MSF_Data::ReadMCMKeybindData();
 		MSF_Data::ReadUserSettings();
+		MSF_Localization::ParseTranslations();
 		MSF_Scaleform::UpdateWidgetSettings();
 	}
 	else if (!_strcmpi("ContainerMenu", evn->menuName.c_str()) || !_strcmpi("BarterMenu", evn->menuName.c_str()) || \
@@ -408,12 +416,12 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 unequip, UInt32 type)
 {
 	if (!item || target != *g_player)
-		return type == 2 ? modText : itemText;
+		return type == 2 ? MSF_Localization::GetTranslation(MSF_Localization::Keys::modText) : MSF_Localization::GetTranslation(MSF_Localization::Keys::itemText);
 	if (item->formType == kFormType_AMMO)
 		return MSF_Base::EquipAmmoPipboy((TESAmmo*)item, !unequip);
 	if (item->formType == kFormType_MISC)
 		return MSF_Base::EquipModPipboy((TESObjectMISC*)item, !unequip);
-	return type == 2 ? modText : itemText;
+	return type == 2 ? MSF_Localization::GetTranslation(MSF_Localization::Keys::modText) : MSF_Localization::GetTranslation(MSF_Localization::Keys::itemText);
 }
 
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
@@ -795,6 +803,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			_DEBUG("swDatOK");
 			if (switchData->SwitchFlags & SwitchData::bReloadInProgress)
 			{
+				BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 				switchData->SwitchFlags &= ~SwitchData::bReloadInProgress;
 				if ((*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState) == 0)
 					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
@@ -803,7 +812,11 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 					MSF_MainData::BCRinterfaceHolder.StoreBCRvariables();
 					MSF_MainData::modSwitchManager.SetIsBCRreload(ExtraWeaponState::bEventTypeReloadSwitchBCR);
 				}
-				MSF_Base::SwitchMod(switchData, true);
+				bool res = MSF_Base::SwitchMod(switchData, true);
+				//if (res)
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+				//else
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				didSwitch = ExtraWeaponState::bEventTypeReloadAfterSwitch;
 				//_DEBUG("switchOK");
 			}
@@ -844,8 +857,13 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 					UInt32 flags = switchData->SwitchFlags;
 					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
+						BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-						MSF_Base::SwitchMod(switchData, true);
+						bool res = MSF_Base::SwitchMod(switchData, true);
+						//if (res)
+						//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+						//else
+						//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 					}
 					else
 					{
@@ -863,8 +881,13 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				{
 					if (switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
+						BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-						MSF_Base::SwitchMod(switchData, true);
+						bool res = MSF_Base::SwitchMod(switchData, true);
+						//if (res)
+						//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+						//else
+						//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 					}
 					else
 					{
@@ -916,8 +939,13 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 			if (switchData) //!(switchData->SwitchFlags & SwitchData::bSwitchingInProgress))
 			{
+				BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-				MSF_Base::SwitchMod(switchData, true);
+				bool res = MSF_Base::SwitchMod(switchData, true);
+				//if (res)
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+				//else
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			}
 		}
 	}
@@ -928,10 +956,15 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		{
 			if (switchData->SwitchFlags & SwitchData::bAnimInProgress)
 			{
+				BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 				switchData->SwitchFlags &= ~SwitchData::bAnimInProgress;
 				if ((*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState) == 0)
 					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_AnimNotFinished);
-				MSF_Base::SwitchMod(switchData, true);
+				bool res = MSF_Base::SwitchMod(switchData, true);
+				//if (res)
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+				//else
+				//	PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			}
 		}
 	}
@@ -1059,7 +1092,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	{
 		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
 		if (eqData && eqData->loadedAmmoCount == 0 && Utilities::GetInventoryItemCount((*g_player)->inventoryList, eqData->ammo) == 0)
-			MSF_Base::SwitchAmmoHotkey(KeybindData::bToggle, true, true);
+			MSF_Base::SwitchAmmoHotkey(KeybindData::bToggle, nullptr, true, true);
 	}
 
 	return ret;

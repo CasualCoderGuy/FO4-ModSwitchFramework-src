@@ -12,6 +12,7 @@
 #include "f4se/PapyrusUtilities.h"
 #include "f4se/PapyrusEvents.h"
 #include "f4se/GameCamera.h"
+#include "f4se/ScaleformLoader.h"
 #include "rva/RVA.h"
 //#include "decomp\BSPointerHandle.h"
 #include "RNG.h"
@@ -586,7 +587,8 @@ namespace Utilities
 	bool AddToFormList(BGSListForm* flst, TESForm* form, SInt64 idx);
 	UInt32 GetLoadedAmmoCount(Actor* owner);
 	UInt32 GetEquippedItemFormID(Actor * ownerActor, UInt32 iEquipSlot = 41);
-	TESObjectWEAP::InstanceData * GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
+	TESObjectWEAP::InstanceData* GetEquippedWeaponInstanceData(Actor* ownerActor);
+	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedModData(Actor * ownerActor, UInt32 iEquipSlot = 41);
 	BGSObjectInstanceExtra* GetEquippedWeaponModData(Actor* ownerActor);
 	BGSInventoryItem::Stack* GetEquippedStack(Actor* owner, UInt32 slotIndex);
@@ -795,6 +797,7 @@ typedef void(*_UpdateAnimValueFloat)(IAnimationGraphManagerHolder* animManager, 
 typedef bool(*_DeleteExtraData)(BSExtraData** extraDataHead, ExtraDataType type);
 typedef void (*_ExtraRankCtor)(ExtraDataList* parentList, UInt32 rank);
 typedef ExtraRank* (*_ExtraRankDtor)(ExtraRank* extra, bool cast);
+typedef bool(*_LoadMovieEx)(BSScaleformManager* mgr, IMenu* menu, GFxMovieView*&, const char* name, const char* stagePath, UInt32 a_scaleMode, float a_backgroundAlpha);
 
 typedef BGSObjectInstanceExtra::Data*(*_CreateInstanceModsFromTemplate)(void* scrapHeap, void* rdx, TESObjectWEAP* templateWeap, void* r9);
 typedef BGSObjectInstanceExtra*(*_BGSObjectInstanceExtra_ctor)(BGSObjectInstanceExtra* allocatedHeap, BGSMod::Template::Item* templateItem, TESBoundObject* parentForm, void* instanceFilter);
@@ -832,7 +835,11 @@ typedef bool(*_PlayIdle)(VirtualMachine* vm, UInt32 stackId, Actor* actor, TESId
 typedef bool(*_PlayIdle2)(Actor* actor, TESIdleForm* idle, UInt64 unk, VirtualMachine* vm, UInt32 stackId);
 typedef UInt32(*_PlaySoundVM)(VirtualMachine* vm, UInt32 stackId, BGSSoundDescriptorForm* sound, TESObjectREFR* ref);
 typedef UInt32(*_PlaySoundInt)(BGSSoundDescriptorForm* sound, TESObjectREFR* ref);
+#ifndef NEXTGEN
 typedef bool(*_PlayIdleAction)(Actor* actor, BGSAction* action, TESObjectREFR* target, VirtualMachine* vm, UInt32 stackId);
+#else
+typedef bool(*_PlayIdleAction)(VirtualMachine* vm, UInt32 stackId, Actor* actor, BGSAction* action, TESObjectREFR* target);
+#endif
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
 typedef bool(*_InitializeActorInstant)(Actor* actor, UInt32 edx);
 typedef void(*_UpdateAnimation)(PlayerCharacter* player, float delta);
@@ -848,7 +855,8 @@ typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex);                                                                                        // 0EF E9BE00
 typedef UInt32(*_UseAmmo)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex, UInt32 a_shotCount);                                                         // 0F0 EFCE90
 typedef void(*_EjectShellCasing)(TESObjectREFR* ref, TESObjectWEAP::InstanceData* instanceData, BGSEquipIndex eqIdx);
-typedef void(*_ShowNotification)(const char* text, UInt32 edx, UInt32 r8d);
+//typedef void(*_ShowNotification)(const char* text, const char* context, UInt32 r8d, UInt32 r9b);
+typedef void(*_ShowNotification)(const char* text, const char* context, UInt32 r8d, bool r9b);
 typedef bool(*_EquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, UInt32 stackID, UInt32 number, const BGSEquipSlot* slot, bool queue, bool forceEquip, bool playSound, bool applyNow, bool preventUnequip);
 typedef bool(*_UnEquipItem)(void* actorEquipManager, Actor* actor, const BGSObjectInstance& a_object, SInt32 number, const BGSEquipSlot* slot, UInt32 stackID, bool queue, bool forceEquip, bool playSound, bool applyNow, const BGSEquipSlot* a_slotBeingReplaced);
 
@@ -924,6 +932,7 @@ extern RelocAddr <_AttachMod> AttachMod;
 extern RelocAddr <_AddMod> AddMod;
 extern RelocAddr <_RemoveMod> RemoveMod;
 extern RelocAddr <_RemoveInvalidMods> RemoveInvalidMods;
+extern RelocAddr <_LoadMovieEx> LoadMovieEx;
 
 extern RelocPtr <void*> g_pipboyInventoryData;
 extern RelocPtr <void*> g_CheckStackIDFunctor;

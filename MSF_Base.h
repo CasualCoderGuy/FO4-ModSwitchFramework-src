@@ -5,11 +5,11 @@
 
 namespace MSF_Base
 {
-	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo);//(void* obj)(void* obj);
-	bool SwitchAmmoHotkey(UInt8 key, bool ignoreAnim = false, bool requireAmmo = false);
+	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo, BGSSoundDescriptorForm* sound);//(void* obj)(void* obj);
+	bool SwitchAmmoHotkey(UInt8 key, BGSSoundDescriptorForm* sound, bool ignoreAnim = false, bool requireAmmo = false);
 	bool SwitchAmmoCommon(SwitchData* switchData);
 	const char* EquipAmmoPipboy(TESAmmo* ammo, bool bEquip);
-	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove);//(void* modToAttach, void* modToRemove, bool bNeedInit);
+	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove, BGSSoundDescriptorForm* sound);//(void* modToAttach, void* modToRemove, bool bNeedInit);
 	bool ToggleModHotkey(ModData* modData);
 	bool SwitchModHotkey(UInt8 key, ModData* modData);
 	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip);
@@ -34,12 +34,8 @@ namespace MSF_Base
 	bool ReloadWeapon(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true);
 	bool DrawWeapon();
 	bool PlayAnim(AnimationData* animData);
-	bool PlayFeedbackSound(bool play, bool fail, BGSSoundDescriptorForm* success);
+	bool PlayFeedbackSound(bool play, UInt8 type, BGSSoundDescriptorForm* success);
 }
-
-extern const char* modText;
-extern const char* itemText;
-extern const char* ammoUnequipText;
 
 struct AttachModMessage
 {

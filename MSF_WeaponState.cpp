@@ -304,6 +304,8 @@ ModData::Mod* ExtraWeaponState::GetCurrentUniqueStateMod(BGSObjectInstanceExtra*
 	for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 	{
 		BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+		if (!objectMod)
+			continue;
 		UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
 		if (currPriority < priority)
 			continue;
@@ -754,6 +756,8 @@ TESAmmo* ExtraWeaponState::GetAmmoForWorkbenchUI(ExtraDataList* extraList)
 		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
 			if (currPriority < priority)
 				continue;

@@ -1,10 +1,28 @@
 ---
+v1.2.4
+features:
+- added melee and unarmed support for MSF widgets
+- added feedback sounds (fail/success/next sounds for ammo & mod switching, menus, quickkeys)
+- localization support with UTF-8 BOM encoded character sets from Data/MSF/Translations/MSF_[loc].txt (for sysntax and localized strings see MSF_en.txt)
+- localization and priority support for widget display strings (see manual for more information)
+- MSF widget and menus can now request game localization and receive localization and power armor status with the sent menu data
+fixes:
+- animation fixes with a roll back on general animation graph updates introduced in v1.2.2 as it caused several issues
+- PlayIdleAction dependent functions (reload, lower weapon, etc.) now properly work in the NG build
+- fixed potential CTDs where OMODs in the objects mod list were not valid
+- fixed potential CTD when casting objects from inventory events
+- replaced F4SE LoadMovie function that was missing an argument which may have caused visual bugs in the NG build
+- some missing MSF widget functions are now properly registered
+- custom projectile overrides now properly update when loading a save or modding a weapon at the workbench
+---
 v1.2.3
 features:
 - MSF now implements mod selection menus as proper individual custom menus, instead of injecting them to MSFMenu.swf; this requires new implementations in Action Script for the interface files (see MSF manual)
 fixes:
 - AttachRemoveModToInventoryStack now allows attaching mods to items without ExtraData
 - AttachRemoveModToEquippedItem now allows attaching mods to equipped items that have missing equip flags
+- circumvents the pipboy light event source override by BakaFramework.dll, which prevented MSF to function properly
+- fixed possible CTD when invalid weapon state IDs were present
 ---
 v1.2.2
 features:

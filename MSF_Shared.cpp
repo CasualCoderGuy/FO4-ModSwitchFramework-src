@@ -241,12 +241,12 @@ namespace Utilities
 
 	void SendNotification(std::string asNotificationText)
 	{
-		ShowNotification(asNotificationText.c_str(), 0, 1);
+		ShowNotification(asNotificationText.c_str(), nullptr, 1, 1);
 	}
 
 	UInt32 PlaySoundInternal(BGSSoundDescriptorForm* sound, TESObjectREFR* target)
 	{
-		return PlaySoundInt(sound, target);//(*g_gameVM)->m_virtualMachine, 0, 
+		return PlaySoundVM((*g_gameVM)->m_virtualMachine, 0, sound, target); //PlaySoundInt(sound, target);//(*g_gameVM)->m_virtualMachine, 0, 
 	}
 
 	//void ShowMessagebox(std::string asText) {
@@ -358,9 +358,36 @@ namespace Utilities
 		return 0;
 	}
 
-	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor * ownerActor, UInt32 iEquipSlot)
+	TESObjectWEAP::InstanceData* GetEquippedWeaponInstanceData(Actor * ownerActor)
 	{
-		if (ownerActor) 
+		BipedAnim* equipData = ownerActor->biped.get();
+		if (!equipData)
+			return nullptr;
+		UInt32 idx = 41;
+		auto item = equipData->object[idx].parent.object;
+		if (!item)
+		{
+			idx = 33;
+			item = equipData->object[idx].parent.object;
+			if (!item)
+			{
+				idx = 37;
+				item = equipData->object[idx].parent.object;
+				if (!item)
+				{
+					idx = 32;
+					item = equipData->object[idx].parent.object;
+				}
+			}
+		}
+		if (!item || !equipData->object[idx].parent.instanceData)
+			return nullptr;
+		return (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(equipData->object[idx].parent.instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	}
+
+	TESObjectWEAP::InstanceData* GetEquippedInstanceData(Actor* ownerActor, UInt32 iEquipSlot)
+	{
+		if (ownerActor)
 		{
 			if (iEquipSlot >= BIPOBJECT::BIPED_OBJECT::kTotal)
 				return nullptr;
@@ -676,6 +703,8 @@ namespace Utilities
 		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			for (UInt32 i4 = 0; i4 < objectMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
 			{
 				BGSMod::Container::Data * data = &objectMod->modContainer.data[i4];
@@ -701,6 +730,8 @@ namespace Utilities
 		for (UInt32 i3 = 0; i3 < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i3++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i3].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			for (UInt32 i4 = 0; i4 < objectMod->modContainer.dataSize / sizeof(BGSMod::Container::Data); i4++)
 			{
 				BGSMod::Container::Data * data = &objectMod->modContainer.data[i4];
@@ -725,6 +756,8 @@ namespace Utilities
 		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			if (objectMod->priority == priority)
 				return objectMod;
 		}
@@ -1100,7 +1133,11 @@ namespace Utilities
 
 	bool PlayIdleAction(Actor* actor, BGSAction* action)
 	{
+#ifndef NEXTGEN
 		return PlayIdleActionInternal(actor, action, nullptr, (*g_gameVM)->m_virtualMachine, 0);
+#else
+		return PlayIdleActionInternal((*g_gameVM)->m_virtualMachine, 0, actor, action, nullptr);
+#endif
 	}
 
 	void DrawWeapon(Actor* actor)

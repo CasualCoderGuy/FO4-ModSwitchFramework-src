@@ -33,6 +33,7 @@ namespace MSF_Scaleform
 	bool UpdateAmmoMenuCount(TESAmmo* ammo, UInt32 newCount);
 	bool UpdateAmmoMenuEq(BGSMod::Attachment::Mod* ammoMod);
 	bool UpdateModMenuReqs(TESObjectMISC* misc, UInt32 newCount);
+	void RegisterStringW(GFxValue* dst, GFxMovieRoot* root, const char* name, const wchar_t* str);
 	void RegisterString(GFxValue* dst, GFxMovieRoot* root, const char* name, const char* str);
 	void RegisterObject(GFxValue* dst, GFxMovieRoot* root, const char* name, void* obj);
 	void RegisterBool(GFxValue* dst, GFxMovieRoot* root, const char* name, bool value);
@@ -59,6 +60,7 @@ public:
 	//using FnInvoke = void(__thiscall PipboyMenu::*)(ScaleformArgs*);
 	//static FnInvoke Invoke_Original;
 
+	bool CreateItemDataW(PipboyMenu::ScaleformArgs* args, std::wstring text, std::string value);
 	bool CreateItemData(PipboyMenu::ScaleformArgs* args, std::string text, std::string value);
 };
 typedef void(*_PipboyMenuInvoke)(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args);
@@ -214,7 +216,7 @@ public:
 		};
 		flags = kFlag_AllowSaving | kFlag_AlwaysOpen | kFlag_DontHideCursorWhenTopmost;// | kFlag_ApplyDropDownFilter | kFlag_Unk800000;// | 0x40000 | 0x80000 | 0x200000;
 		depth = 0x6;
-		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFwidget", "root1", 0))
+		if (LoadMovieEx(*g_scaleformManager, this, this->movie, "MSFwidget", "root1", 0, 0.0F))//(CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFwidget", "root1", 0))
 		{
 
 			_MESSAGE("MSF widget loaded.");
@@ -295,7 +297,7 @@ public:
 		flags = kFlag_AllowSaving | kFlag_AlwaysOpen;// | kFlag_UsesCursor | kFlag_UpdateUsesCursor | kFlag_PausesGame | kFlag_FreezeFrameBackground //| kFlag_ApplyDropDownFilter | kFlag_Unk800000 | kFlag_DisableInteractive;// | 0x40000 | 0x80000 | 0x200000;
 		//kFlag_UsesMenuContext kFlag_FreezeFramePause kFlag_DontHideCursorWhenTopmost kFlag_UsesBlurredBackground
 		depth = 0x6;
-		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFMenu", "root1", 0))
+		if (LoadMovieEx(*g_scaleformManager, this, this->movie, "MSFMenu", "root1", 0, 0.0F))//(CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(this, this->movie, "MSFMenu", "root1", 0))
 		{
 
 			_MESSAGE("MSF Menu loaded.");

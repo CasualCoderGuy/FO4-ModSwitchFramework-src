@@ -3,7 +3,9 @@
 #include "MSF_Scaleform.h"
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
+#include "MSF_Localization.h"
 #include "rva/Hook/HookUtil.h"
+#include "f4se\GameSettings.h"
 #include "json/json.h"
 #include "RNG.h"
 #include <fstream>
@@ -71,6 +73,7 @@ float MSF_MainData::fBaseChanceMultiplier = 1.0;
 GFxMovieRoot* MSF_MainData::MSFMenuRoot = nullptr;
 ModSelectionMenu* MSF_MainData::widgetMenu = nullptr;
 HUDMenuAmmoDisplay* MSF_MainData::ammoDisplay = nullptr;
+std::string MSF_MainData::loc = "";
 
 BurstModeManager* MSF_MainData::activeBurstManager = nullptr;
 
@@ -91,6 +94,9 @@ UInt64 MSF_MainData::cancelSwitchHotkey = 0;
 UInt64 MSF_MainData::patchBaseAmmoHotkey = 0;
 UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
 BGSSoundDescriptorForm* MSF_MainData::failSound = nullptr;
+BGSSoundDescriptorForm* MSF_MainData::failSoundQuickkey = nullptr;
+BGSSoundDescriptorForm* MSF_MainData::failSoundMenu = nullptr;
+BGSSoundDescriptorForm* MSF_MainData::nextSoundQuickkey = nullptr;
 std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
 std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDataMap;
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
@@ -102,6 +108,7 @@ std::vector<KeywordValue> MSF_MainData::uniqueStateAPValues;
 std::vector<TESAmmo*> MSF_MainData::dontRemoveAmmoOnReload;
 std::vector<TESObjectWEAP*>  MSF_MainData::BCRweapons;
 std::vector<BGSMod::Attachment::Mod*> MSF_MainData::equippableMods;
+std::unordered_map<std::string, std::string> MSF_MainData::translationMap;
 Utilities::Timer MSF_MainData::lowerTmr;
 
 RandomNumber MSF_MainData::rng;
@@ -175,12 +182,13 @@ bool ModSwitchManager::SetAmmoSelection(AmmoData* data, AmmoData::AmmoMod* ammoM
 
 bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 {
+	bool isAmmo = (input->type & KeybindData::bIsAmmo);
 	if (GetQueueCount() > 0 || GetState() != 0)
 	{
-		ClearQuickSelection(true, true);
+		quickSelectIsAmmo = isAmmo;
+		ClearQuickSelection(true, true, true);
 		return false;
 	}
-	bool isAmmo = (input->type & KeybindData::bIsAmmo);
 	quickSelectLock.Lock();
 	if (input != lastQuickKey)
 	{
@@ -213,14 +221,17 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 			}
 			else if (quickSelection.ammo.ammoMod)
 				selectedItem = quickSelection.ammo.ammoMod->ammo;
+			quickKeySound = input->successSound;
 			quickSelectLock.Release();
 			QuickkeySelectTask* selectTask = new QuickkeySelectTask();
 			quickKeyTimer.start(MSF_MainData::quickKeyTimeoutMS, g_threading->AddTask, selectTask);
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyNext, 0, MSF_MainData::nextSoundQuickkey);
 			MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, nullModName, isAmmo);
 		}
 		else
 		{
-			ClearQuickSelection(true, true);
+			quickSelectIsAmmo = isAmmo;
+			ClearQuickSelection(true, true, true);
 			return false;
 		}
 	}
@@ -262,6 +273,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 					ClearQuickSelection(false);
 					quickSelectLock.Release();
 					MSF_Scaleform::ClearWidgetQuickkeyMod();
+					MSF_Base::PlayFeedbackSound((!isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)) || MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyFail, 2, nullptr);
 					return false;
 				}
 				quickSelectIdx = idx + 1;
@@ -314,6 +326,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 				ClearQuickSelection(false);
 				quickSelectLock.Release();
 				MSF_Scaleform::ClearWidgetQuickkeyMod();
+				MSF_Base::PlayFeedbackSound((!isAmmo && (MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundModFail)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)) || MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyFail, 2, nullptr);
 				return false;
 			}
 			quickSelectIdx = idx + nullMod;
@@ -339,6 +352,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 			ClearQuickSelection(false);
 			quickSelectLock.Release();
 			MSF_Scaleform::ClearWidgetQuickkeyMod();
+			MSF_Base::PlayFeedbackSound((!isAmmo && (MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundModFail)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)) || MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyFail, 2, nullptr);
 			return false;
 		}
 		TESForm* selectedItem = nullptr;
@@ -362,6 +376,7 @@ bool ModSwitchManager::HandleQuickkey(KeybindData* input)
 		QuickkeySelectTask* selectTask = new QuickkeySelectTask();
 		quickKeyTimer.start(MSF_MainData::quickKeyTimeoutMS, g_threading->AddTask, selectTask);
 		_DEBUG("selID: %08X, size: %08X", quickSelectIdx, quickSelection.ammo.ammoData->ammoMods.size());
+		MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundQuickkeyNext, 0, MSF_MainData::nextSoundQuickkey);
 		MSF_Scaleform::UpdateWidgetQuickkeyMod(input->modData ? input->modData->attachParentValue : -1, selectedItem, nullModName, isAmmo);
 	}
 	return true;
@@ -372,9 +387,11 @@ bool ModSwitchManager::HandleQuickkeyTimeout()
 	quickSelectLock.Lock();
 	if (keyIsDown)
 	{
+		bool wasAmmo = quickSelectIsAmmo;
 		ClearQuickSelection(false);
 		quickSelectLock.Release();
 		MSF_Scaleform::ClearWidgetQuickkeyMod();
+		MSF_Base::PlayFeedbackSound((!wasAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail)) || (wasAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)) || MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyFail, 2, nullptr);
 		return true;
 	}
 	if (lastQuickKey && quickSelectIdx != -1)
@@ -382,19 +399,21 @@ bool ModSwitchManager::HandleQuickkeyTimeout()
 		if (quickSelectIsAmmo && quickSelection.ammo.ammoData)
 		{
 			AmmoData::AmmoMod* target = quickSelection.ammo.ammoMod;
+			BGSSoundDescriptorForm* sound = quickKeySound;
 			ClearQuickSelection(false);
 			quickSelectLock.Release();
 			MSF_Scaleform::ClearWidgetQuickkeyMod();
-			MSF_Base::SwitchToSelectedAmmo(target);
+			MSF_Base::SwitchToSelectedAmmo(target, sound);
 		}
 		else if (quickSelection.mod.cycle && (quickSelection.mod.modToAttach || quickSelection.mod.modToRemove))
 		{
 			ModData::Mod* attach = quickSelection.mod.modToAttach;
 			ModData::Mod* remove = quickSelection.mod.modToRemove;
+			BGSSoundDescriptorForm* sound = quickKeySound;
 			ClearQuickSelection(false);
 			quickSelectLock.Release();
 			MSF_Scaleform::ClearWidgetQuickkeyMod();
-			MSF_Base::SwitchToSelectedMod(attach, remove);
+			MSF_Base::SwitchToSelectedMod(attach, remove, sound);
 		}
 		else
 			quickSelectLock.Release();
@@ -404,10 +423,12 @@ bool ModSwitchManager::HandleQuickkeyTimeout()
 	return true;
 }
 
-void ModSwitchManager::ClearQuickSelection(bool doLock, bool updateWidget)
+void ModSwitchManager::ClearQuickSelection(bool doLock, bool updateWidget, bool playFailSound, bool onlyRunning)
 {
 	if (doLock)
 		quickSelectLock.Lock();
+	bool wasAmmo = quickSelectIsAmmo;
+	bool wasRunning = quickKeyTimer.is_running();
 	quickKeyTimer.cancel();
 	lastQuickKey = nullptr;
 	keyIsDown = false;
@@ -416,10 +437,13 @@ void ModSwitchManager::ClearQuickSelection(bool doLock, bool updateWidget)
 	quickSelection.mod.cycle = nullptr;
 	quickSelection.mod.modToAttach = nullptr;
 	quickSelection.mod.modToRemove = nullptr;
+	quickKeySound = nullptr;
 	if (doLock)
 		quickSelectLock.Release();
 	if (updateWidget)
 		MSF_Scaleform::ClearWidgetQuickkeyMod();
+	if (playFailSound && (wasRunning || !onlyRunning))
+		MSF_Base::PlayFeedbackSound((!wasAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail)) || (wasAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)) || MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundQuickkeyFail, 2, nullptr);
 }
 
 void ModSwitchManager::SetQuickkeyUp(KeybindData* input)
@@ -705,7 +729,10 @@ namespace MSF_Data
 		MSF_MainData::BCR_AVIF = reinterpret_cast<ActorValueInfo*>(LookupFormByID((UInt32)0x0000300)); 
 		MSF_MainData::BCR_AVIF2 = reinterpret_cast<ActorValueInfo*>(LookupFormByID((UInt32)0x00002FC));
 		MSF_MainData::FusionCoreKW = reinterpret_cast<BGSKeyword*>(LookupFormByID((UInt32)0x005BDAA)); //1025AE
+		MSF_MainData::nextSoundQuickkey = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x003C753));
 		MSF_MainData::failSound = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x003EC24));
+		MSF_MainData::failSoundQuickkey = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x00C8C6E));
+		MSF_MainData::failSoundMenu = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x00C6D13));
 
 		UInt8 tacticalReloadModIndex = (*g_dataHandler)->GetLoadedModIndex("TacticalReload.esm");
 		if (tacticalReloadModIndex != 0xFF)
@@ -809,11 +836,14 @@ namespace MSF_Data
 		if (!ReadMCMKeybindData())
 			return false;
 
-		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch\
-			| MSF_MainData::bReplaceAmmoWithSpawned | MSF_MainData::bSpawnRandomMods | MSF_MainData::bInjectLeveledLists | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon | MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName \
-			| MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods | MSF_MainData::bEnableMetadataSaving \
-			| MSF_MainData::bEnableExtraWeaponState | MSF_MainData::bEnableTacticalReloadChamber | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport | MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy \
-			| MSF_MainData::bDisplayChamberInPipboy | MSF_MainData::bShowQuickkeySelection | MSF_MainData::bPatchVanillaAVcalculation | MSF_MainData::bDontAutolowerWeaponWithFlashlightOn | MSF_MainData::bStartDepletedSwitchFromBaseAmmo);
+		MSF_MainData::MCMSettingFlags = (MSF_MainData::bReloadEnabled | MSF_MainData::bCustomAnimEnabled | MSF_MainData::bAmmoRequireWeaponToBeDrawn | MSF_MainData::bRequireAmmoToSwitch \
+			| MSF_MainData::bReplaceAmmoWithSpawned | MSF_MainData::bSpawnRandomMods | MSF_MainData::bInjectLeveledLists | MSF_MainData::bWidgetAlwaysVisible | MSF_MainData::bShowAmmoIcon \
+			| MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName | MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods \
+			| MSF_MainData::bEnableMetadataSaving | MSF_MainData::bEnableExtraWeaponState | MSF_MainData::bEnableTacticalReloadChamber | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport \
+			| MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy | MSF_MainData::bDisplayChamberInPipboy | MSF_MainData::bShowQuickkeySelection | MSF_MainData::bPatchVanillaAVcalculation \
+			| MSF_MainData::bDontAutolowerWeaponWithFlashlightOn | MSF_MainData::bStartDepletedSwitchFromBaseAmmo \
+			| MSF_MainData::bPlayFeedbackSoundAmmoFail | MSF_MainData::bPlayFeedbackSoundModFail | MSF_MainData::bPlayFeedbackSoundMenuFail | MSF_MainData::bPlayFeedbackSoundQuickkeyFail | MSF_MainData::bPlayFeedbackSoundQuickkeyNext \
+			);
 
 		if (ReadUserSettings())
 			_MESSAGE("User settings loaded for MSF");
@@ -1023,9 +1053,10 @@ namespace MSF_Data
 									_MESSAGE("Keybind read warning in %s: mod selection menu data in keybind with id '%s' has been overwritten", modName.c_str(), id.c_str());
 									kb->selectMenu->scaleformName = menuName;
 									kb->selectMenu->type = menutype;
+									kb->selectMenu->successSound = successSound;
 								}
 								else
-									kb->selectMenu = new ModSelectionMenu(menuName, menutype);
+									kb->selectMenu = new ModSelectionMenu(menuName, menutype, successSound);
 								const Json::Value& menuData = keybind["menuData"];
 								std::string root = "root1";
 								UInt32 menuFlags = IMenu::kFlag_AllowSaving;
@@ -1106,7 +1137,7 @@ namespace MSF_Data
 									menutype = ModSelectionMenu::kType_AmmoMenu;
 								else
 									menutype = ModSelectionMenu::kType_ModMenu;
-								kb->selectMenu = new ModSelectionMenu(menuName, menutype);
+								kb->selectMenu = new ModSelectionMenu(menuName, menutype, successSound);
 								const Json::Value& menuData = keybind["menuData"];
 								std::string root = "root1";
 								UInt32 menuFlags = IMenu::kFlag_AllowSaving;
@@ -1325,6 +1356,10 @@ namespace MSF_Data
 				flag = MSF_MainData::bPlayFeedbackSoundMenuOpen;
 			else if (settingName == "bPlayFeedbackSoundMenuFail")
 				flag = MSF_MainData::bPlayFeedbackSoundMenuFail;
+			else if (settingName == "bPlayFeedbackSoundQuickkeyFail")
+				flag = MSF_MainData::bPlayFeedbackSoundQuickkeyFail;
+			else if (settingName == "bPlayFeedbackSoundQuickkeyNext")
+				flag = MSF_MainData::bPlayFeedbackSoundQuickkeyNext;
 			else if (settingName == "bEnableTacticalReloadChamber") //bEnableTacticalReloadAll
 				flag = MSF_MainData::bEnableTacticalReloadChamber;
 			else if (settingName == "bEnableTacticalReloadAnim")
@@ -1505,6 +1540,12 @@ namespace MSF_Data
 						}
 					}
 				}
+
+				Setting* setting = GetINISetting("sLanguage:General");
+				std::string gameloc = (setting && setting->GetType() == Setting::kType_String) ? setting->data.s : "en";
+				std::string fileloc = json["loc"].asString();
+				if (fileloc == "")
+					fileloc = "en";
 
 				data1 = json["pipboyOMODequip"];
 				if (data1.isArray())
@@ -2471,7 +2512,25 @@ namespace MSF_Data
 						{
 							if (itData->keyword == keyword)
 							{
-								itData->displayString = str;
+								if (gameloc == fileloc)
+									itData->displayString = str;
+								if (scaleformData["priority"].isNumeric())
+								{
+									HUDFiringModeData displayData;
+									displayData.keyword = itData->keyword;
+									displayData.displayString = itData->displayString;
+									displayData.priority = scaleformData["priority"].asFloat();
+									MSF_MainData::fmDisplayData.erase(itData);
+									for (itData = MSF_MainData::fmDisplayData.begin(); itData != MSF_MainData::fmDisplayData.end(); itData++)
+									{
+										if (itData->priority > displayData.priority)
+										{
+											MSF_MainData::fmDisplayData.insert(itData, displayData);
+											break;
+										}
+									}
+									itData = MSF_MainData::fmDisplayData.begin();
+								}
 								break;
 							}
 						}
@@ -2480,7 +2539,27 @@ namespace MSF_Data
 							HUDFiringModeData displayData;
 							displayData.keyword = keyword;
 							displayData.displayString = str;
-							MSF_MainData::fmDisplayData.push_back(displayData);
+							displayData.priority = 1;
+							if (scaleformData["priority"].isNumeric())
+							{
+								displayData.priority = scaleformData["priority"].asFloat();
+								for (auto itSc = MSF_MainData::fmDisplayData.begin(); itSc != MSF_MainData::fmDisplayData.end(); itSc++)
+								{
+									if (itSc->priority > displayData.priority)
+									{
+										MSF_MainData::fmDisplayData.insert(itSc, displayData);
+										break;
+									}
+								}
+							}
+							else if (MSF_MainData::fmDisplayData.size() != 0)
+							{
+								itData--;
+								displayData.priority = itData->priority + 1;
+								MSF_MainData::fmDisplayData.push_back(displayData);
+							}
+							else
+								MSF_MainData::fmDisplayData.push_back(displayData);
 						}
 					}
 				}
@@ -2503,7 +2582,25 @@ namespace MSF_Data
 						{
 							if (itData->keyword == keyword)
 							{
-								itData->displayString = str;
+								if (gameloc == fileloc)
+									itData->displayString = str;
+								if (scaleformData["priority"].isNumeric())
+								{
+									HUDScopeData displayData;
+									displayData.keyword = itData->keyword;
+									displayData.displayString = itData->displayString;
+									displayData.priority = scaleformData["priority"].asFloat();
+									MSF_MainData::scopeDisplayData.erase(itData);
+									for (itData = MSF_MainData::scopeDisplayData.begin(); itData != MSF_MainData::scopeDisplayData.end(); itData++)
+									{
+										if (itData->priority > displayData.priority)
+										{
+											MSF_MainData::scopeDisplayData.insert(itData, displayData);
+											break;
+										}
+									}
+									itData = MSF_MainData::scopeDisplayData.begin();
+								}
 								break;
 							}
 						}
@@ -2512,7 +2609,27 @@ namespace MSF_Data
 							HUDScopeData displayData;
 							displayData.keyword = keyword;
 							displayData.displayString = str;
-							MSF_MainData::scopeDisplayData.push_back(displayData);
+							displayData.priority = 1;
+							if (scaleformData["priority"].isNumeric())
+							{
+								displayData.priority = scaleformData["priority"].asFloat();
+								for (auto itSc = MSF_MainData::scopeDisplayData.begin(); itSc != MSF_MainData::scopeDisplayData.end(); itSc++)
+								{
+									if (itSc->priority > displayData.priority)
+									{
+										MSF_MainData::scopeDisplayData.insert(itSc, displayData);
+										break;
+									}
+								}
+							}
+							else if (MSF_MainData::scopeDisplayData.size() != 0)
+							{
+								itData--;
+								displayData.priority = itData->priority + 1;
+								MSF_MainData::scopeDisplayData.push_back(displayData);
+							}
+							else
+								MSF_MainData::scopeDisplayData.push_back(displayData);
 						}
 					}
 				}
@@ -2535,7 +2652,25 @@ namespace MSF_Data
 						{
 							if (itData->keyword == keyword)
 							{
-								itData->displayString = str;
+								if (gameloc == fileloc)
+									itData->displayString = str;
+								if (scaleformData["priority"].isNumeric())
+								{
+									HUDMuzzleData displayData;
+									displayData.keyword = itData->keyword;
+									displayData.displayString = itData->displayString;
+									displayData.priority = scaleformData["priority"].asFloat();
+									MSF_MainData::muzzleDisplayData.erase(itData);
+									for (itData = MSF_MainData::muzzleDisplayData.begin(); itData != MSF_MainData::muzzleDisplayData.end(); itData++)
+									{
+										if (itData->priority > displayData.priority)
+										{
+											MSF_MainData::muzzleDisplayData.insert(itData, displayData);
+											break;
+										}
+									}
+									itData = MSF_MainData::muzzleDisplayData.begin();
+								}
 								break;
 							}
 						}
@@ -2544,12 +2679,32 @@ namespace MSF_Data
 							HUDMuzzleData displayData;
 							displayData.keyword = keyword;
 							displayData.displayString = str;
-							MSF_MainData::muzzleDisplayData.push_back(displayData);
+							displayData.priority = 1;
+							if (scaleformData["priority"].isNumeric())
+							{
+								displayData.priority = scaleformData["priority"].asFloat();
+								for (auto itSc = MSF_MainData::muzzleDisplayData.begin(); itSc != MSF_MainData::muzzleDisplayData.end(); itSc++)
+								{
+									if (itSc->priority > displayData.priority)
+									{
+										MSF_MainData::muzzleDisplayData.insert(itSc, displayData);
+										break;
+									}
+								}
+							}
+							else if (MSF_MainData::muzzleDisplayData.size() != 0)
+							{
+								itData--;
+								displayData.priority = itData->priority + 1;
+								MSF_MainData::muzzleDisplayData.push_back(displayData);
+							}
+							else
+								MSF_MainData::muzzleDisplayData.push_back(displayData);
 						}
 					}
 				}
 
-				data1 = json["failSound"];
+				data1 = json["failSoundGeneral"];
 				if (data1.isString())
 				{
 					std::string str = data1.asString();
@@ -2558,6 +2713,30 @@ namespace MSF_Data
 						BGSSoundDescriptorForm* sound = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSSoundDescriptorForm);
 						if (sound)
 							MSF_MainData::failSound = sound;
+					}
+				}
+
+				data1 = json["failSoundQuickkey"];
+				if (data1.isString())
+				{
+					std::string str = data1.asString();
+					if (str != "")
+					{
+						BGSSoundDescriptorForm* sound = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSSoundDescriptorForm);
+						if (sound)
+							MSF_MainData::failSoundQuickkey = sound;
+					}
+				}
+
+				data1 = json["failSoundMenu"];
+				if (data1.isString())
+				{
+					std::string str = data1.asString();
+					if (str != "")
+					{
+						BGSSoundDescriptorForm* sound = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSSoundDescriptorForm);
+						if (sound)
+							MSF_MainData::failSoundMenu = sound;
 					}
 				}
 
@@ -2945,7 +3124,7 @@ namespace MSF_Data
 		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
 			return false;
 
-		return QueueModsToSwitch(modToAttach, modToRemove);
+		return QueueModsToSwitch(modToAttach, modToRemove, modData->successSound);
 	}
 
 	ModData::Mod* GetOldModForEquip(BGSInventoryItem::Stack* eqStack, ModData* modData, ModData::Mod* modDataMod)
@@ -3124,7 +3303,7 @@ namespace MSF_Data
 		_DEBUG("attachIdx: %02X", attachIdx);
 		if (isQuickkey)
 			return MSF_MainData::modSwitchManager.SetModSelection(modCycle, modToAttach, modToRemove, attachIdx+1);
-		return QueueModsToSwitch(modToAttach, modToRemove);
+		return QueueModsToSwitch(modToAttach, modToRemove, modData->successSound);
 	}
 
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove)
@@ -3132,7 +3311,20 @@ namespace MSF_Data
 		return true;
 	}
 
-	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove)
+	inline bool SwitchModWithSoundAnim(SwitchData* data, bool updWidget, BGSSoundDescriptorForm* sound, AnimationData* anim)
+	{
+		bool success = MSF_Base::SwitchMod(data, updWidget);
+		if (success)
+		{
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound);
+			MSF_Base::PlayAnim(anim);
+		}
+		else
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
+		return success;
+	}
+
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, BGSSoundDescriptorForm* sound)
 	{
 		_DEBUG("Queueing");
 		if (modToAttach)
@@ -3140,7 +3332,10 @@ namespace MSF_Data
 		if (modToRemove)
 			_DEBUG("remove: %s", modToRemove->mod->GetFullName());
 		if (modToAttach == modToRemove)
+		{
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound);
 			return false; //no change
+		}
 		SwitchData* switchRemove = nullptr;
 		SwitchData* switchAttach = nullptr;
 		if (modToRemove && (!modToAttach || (modToRemove->flags & ModData::Mod::bStandaloneRemove) || (modToAttach && (modToAttach->flags & ModData::Mod::bStandaloneAttach))))
@@ -3148,7 +3343,10 @@ namespace MSF_Data
 			if (!(modToRemove->flags & SwitchData::bIgnoreAnimations))
 			{
 				if (!MSF_Base::HandlePendingAnimations())
+				{
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 					return false;
+				}
 			}
 			switchRemove = new SwitchData();
 			switchRemove->ModToRemove = modToRemove->mod;
@@ -3166,7 +3364,8 @@ namespace MSF_Data
 				if (Utilities::GetInventoryItemCount((*g_player)->inventoryList, looseMod) == 0)
 				{
 					delete switchRemove;
-					Utilities::SendNotification("Missing required loose mod.");
+					Utilities::SendNotification(MSF_Localization::GetTranslation(MSF_Localization::Keys::missingLooseModText));
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 					return false;
 				}
 			}
@@ -3175,6 +3374,7 @@ namespace MSF_Data
 				_DEBUG("Pending");
 				if (!MSF_Base::HandlePendingAnimations())
 				{
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 					delete switchRemove;
 					return false;
 				}
@@ -3197,27 +3397,34 @@ namespace MSF_Data
 
 		if (switchRemove && (!switchRemove->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
 		{
+			BGSSoundDescriptorForm* sound = switchRemove->soundToPlay;
 			if ((MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0) && switchAttach && switchAttach->animData && (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
 			{
+				MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 				delete switchRemove;
 				delete switchAttach;
 				return false;
 			}
 			if (!MSF_Base::SwitchMod(switchRemove, true))
 			{
+				MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 				delete switchAttach;
 				return false;
 			}
 			if (!switchAttach)
+			{
+				MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound);
 				return true;
+			}
 			if (!switchAttach->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
-				return MSF_Base::SwitchMod(switchAttach, true);
+				return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr);
 		}
 		else if (switchAttach && ((!switchRemove && !switchAttach->animData) || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
-			return MSF_Base::SwitchMod(switchAttach, true);
+			return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr);
 
 		if (MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0)
 		{
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 			delete switchRemove;
 			delete switchAttach;
 			return false;
@@ -3244,27 +3451,29 @@ namespace MSF_Data
 			if (switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 			{
 				AnimationData* anim = switchData->animData;
-				MSF_Base::SwitchMod(switchData, true);
-				MSF_Base::PlayAnim(anim);
-				return true;
+				return SwitchModWithSoundAnim(switchData, true, sound, anim);
 			}
 			if (!MSF_Base::PlayAnim(switchData->animData))
 			{
-				MSF_Base::SwitchMod(switchData, true);
+				bool success = MSF_Base::SwitchMod(switchData, true);
 				if (QueueAttach)
 				{
 					switchAttach->SwitchFlags &= ~SwitchData::bAnimNeeded;
 					if (switchAttach->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						AnimationData* anim = switchAttach->animData;
-						MSF_Base::SwitchMod(switchAttach, true);
-						MSF_Base::PlayAnim(anim);
-						return true;
+						return SwitchModWithSoundAnim(switchAttach, true, sound, anim);
 					}
 					if (!MSF_Base::PlayAnim(switchAttach->animData))
-						MSF_Base::SwitchMod(switchAttach, true);
+						return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr); //SOUND:onplayanim?
 				}
+				if (success)
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound); //SOUND:onplayanim?
+				else
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
+				return success;
 			}
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound);
 			return true;
 		}
 		else if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled)
@@ -3274,9 +3483,11 @@ namespace MSF_Data
 			if (QueueAttach)
 				MSF_MainData::modSwitchManager.QueueSwitch(switchAttach);
 			Utilities::DrawWeapon(*g_player);
+			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundMod, 0, sound); //SOUND:ondraw?
 			//delay check draw state
 			return true;
 		}
+		MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 		delete switchRemove;
 		delete switchAttach;
 		return false;
@@ -3342,6 +3553,8 @@ namespace MSF_Data
 		for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
 		{
 			BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+			if (!objectMod)
+				continue;
 			UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
 			if (currPriority < priority)
 				continue;
@@ -3694,6 +3907,8 @@ bool CustomProjectileFormManager::ApplyMods(ExtraDataList* extraDataList)
 	for (UInt32 idx = 0; idx < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); idx++)
 	{
 		BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[idx].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+		if (!mod)
+			continue;
 		objMods.push_back(mod);
 	}
 	std::sort(objMods.begin(), objMods.end(),

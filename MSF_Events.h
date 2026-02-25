@@ -384,20 +384,28 @@ public:
 
 	static void StartUpdate(TESBoundObject* changeditem)
 	{
-		TESAmmo* ammo = DYNAMIC_CAST(changeditem, TESBoundObject, TESAmmo);
-		if (ammo)
-		{
-			MSF_Scaleform::UpdateAmmoMenuCount(ammo, Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammo));
-			//MSFMenuUpdateTask* updTask = new MSFMenuUpdateTask(ammo, nullptr);
-			//g_threading->AddUITask(updTask);
+		if (!changeditem)
 			return;
-		}
-		TESObjectMISC* misc = DYNAMIC_CAST(changeditem, TESBoundObject, TESObjectMISC);
-		if (misc)
+		if (changeditem->formType == FormType::kFormType_AMMO)
 		{
-			MSF_Scaleform::UpdateModMenuReqs(misc, Utilities::GetInventoryItemCount((*g_player)->inventoryList, misc));
-			//MSFMenuUpdateTask* updTask = new MSFMenuUpdateTask(nullptr, misc);
-			//g_threading->AddUITask(updTask);
+			TESAmmo* ammo = DYNAMIC_CAST(changeditem, TESBoundObject, TESAmmo);
+			if (ammo)
+			{
+				MSF_Scaleform::UpdateAmmoMenuCount(ammo, Utilities::GetInventoryItemCount((*g_player)->inventoryList, ammo));
+				//MSFMenuUpdateTask* updTask = new MSFMenuUpdateTask(ammo, nullptr);
+				//g_threading->AddUITask(updTask);
+				return;
+			}
+		}
+		else if (changeditem->formType == FormType::kFormType_MISC)
+		{
+			TESObjectMISC* misc = DYNAMIC_CAST(changeditem, TESBoundObject, TESObjectMISC);
+			if (misc)
+			{
+				MSF_Scaleform::UpdateModMenuReqs(misc, Utilities::GetInventoryItemCount((*g_player)->inventoryList, misc));
+				//MSFMenuUpdateTask* updTask = new MSFMenuUpdateTask(nullptr, misc);
+				//g_threading->AddUITask(updTask);
+			}
 		}
 	}
 };
@@ -538,7 +546,7 @@ ExtraRank* ExtraRankDestructor_Hook(ExtraRank* extra, bool cast);
 bool ExtraRankCompare_Hook(ExtraRank* extra1, ExtraRank* extra2);
 bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoCap, UInt32 ammoReserve);
 const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 unequip, UInt32 type);
-void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object);
+void ActorEquipManagerPre_Hook(Actor* owner, BGSObjectInstance* object, UInt32 eqStackID);
 
 bool RegisterInventoryEvent(BGSInventoryList* list, BSTEventSink<BGSInventoryListEventData::Event>* sink);
 BSTEventDispatcher<void*>* GetGlobalEventDispatcher(BSTGlobalEvent* globalEvents, const char * dispatcherName);

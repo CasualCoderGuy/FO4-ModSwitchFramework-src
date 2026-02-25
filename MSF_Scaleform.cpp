@@ -2,6 +2,8 @@
 #include "MSF_Test.h"
 #include "MSF_WeaponState.h"
 #include "MSF_BurstMode.h"
+#include "MSF_Localization.h"
+#include "f4se\GameSettings.h"
 
 _LoadCustomMenu LoadCustomMenu_F4SEHook;
 SimpleLock MSFCustomMenu::menuLock;
@@ -108,9 +110,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13454));
 				//MSF_Test::ModTemplateTest();
 
-				//Utilities::PlaySoundInternal(MSF_MainData::failSound, *g_player);
+				Utilities::PlaySoundInternal(MSF_MainData::failSound, *g_player);
 				//MSF_Test::AttachStackTest(2, true);
-				MSF_Test::RaiderTest();
+				//MSF_Test::RaiderTest();
+				//ShowNotification("φόσυϊιαϋν", nullptr, 0, 0);
+				_DEBUG("str %s", "φόσυϊιαϋν");
 				_DEBUG("test1");
 			}
 		}
@@ -133,7 +137,9 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13455));
 				//MSF_Data::PatchBaseAmmoMods();
 				//MSF_Test::RemapAnimTest(true, true);
-				MSF_Test::AttachStackTest(0, true);
+				//MSF_Test::AttachStackTest(0, true);
+				//ShowNotification("test", nullptr, 1, 0);
+				PlaySoundVM((*g_gameVM)->m_virtualMachine, 0, MSF_MainData::failSound, *g_player);
 				_DEBUG("test2");
 			}
 		}
@@ -155,7 +161,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13456));
 				//MSF_Test::ProjectileTest();
 				//MSF_Test::RemapAnimTest(false, true);
-				MSF_Test::AttachStackTest(2, false);
+				//MSF_Test::AttachStackTest(2, false);
+				ShowNotification("test", nullptr, 1, 0);
 				_DEBUG("test3");
 			}
 		}
@@ -174,7 +181,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 					break;
 				if (key == MSF_MainData::lowerWeaponHotkey)
 				{
-					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true); //sound:playFailIfRunning??
 					Utilities::PlayIdleAction(*g_player, MSF_MainData::ActionGunDown);
 					break;
 				}
@@ -185,7 +192,7 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				//}
 				if (key == MSF_MainData::cancelSwitchHotkey)
 				{
-					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true);
 					MSF_MainData::modSwitchManager.ClearQueue();
 					break;
 				}
@@ -205,12 +212,12 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				_DEBUG("key: %i, type: %02X", keyFn->keyCode, keyFn->type);
 				if (keyFn->type & KeybindData::bGlobalMenu)
 				{
-					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true);
 					MSF_Scaleform::ToggleGlobalMenu(keyFn->selectMenu, &keyFn->menuAttachPoints);
 				}
 				else if (keyFn->type & KeybindData::bHUDselection)
 				{
-					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true);
 					MSF_Scaleform::HandleToggleMenu(keyFn->selectMenu, keyFn->modData);
 				}
 				else if (keyFn->type & KeybindData::bIsAmmo)
@@ -219,8 +226,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 						MSF_MainData::modSwitchManager.HandleQuickkey(keyFn);
 					else
 					{
-						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
-						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mAmmoNumMask);
+						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true);
+						MSF_Base::SwitchAmmoHotkey(keyFn->type & KeybindData::mAmmoNumMask, keyFn->successSound);
 					}
 				}
 				//if (keyFn->type & KeybindData::bGlobalMenu)
@@ -240,13 +247,13 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 						MSF_MainData::modSwitchManager.HandleQuickkey(keyFn);
 					else
 					{
-						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+						MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true);
 						MSF_Base::ToggleModHotkey(keyFn->modData);
 					}
 				}
 				else
 				{
-					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
+					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true, true);
 					MSF_Base::SwitchModHotkey(keyFn->type & KeybindData::mModNumMask, keyFn->modData);
 				}
 			}
@@ -313,7 +320,7 @@ void LoadMSFCustomMenu_Hook(IMenu* menu)
 				menu->flags &= ~IMenu::kFlag_UsesCursor;
 		}
 
-		if (CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(menu, menu->movie, menuPath.c_str(), rootPath.c_str(), movieFlags))
+		if (LoadMovieEx(*g_scaleformManager, menu, menu->movie, menuPath.c_str(), rootPath.c_str(), movieFlags, 0.0F))//(CALL_MEMBER_FN((*g_scaleformManager), LoadMovie)(menu, menu->movie, menuPath.c_str(), rootPath.c_str(), movieFlags))
 		{
 			menuData->second->isValid = true;
 			menu->stage.SetMember("menuFlags", &GFxValue(menu->flags));
@@ -339,6 +346,21 @@ void LoadMSFCustomMenu_Hook(IMenu* menu)
 	else
 		LoadCustomMenu_F4SEHook(menu);
 	MSFCustomMenu::menuLock.Release();
+}
+
+bool PipboyMenu::CreateItemDataW(PipboyMenu::ScaleformArgs* args, std::wstring text, std::string value)
+{
+	if (!args)
+		return false;
+	auto* movieRoot = args->movie->movieRoot;
+	auto& pInfoObj = args->args[1];
+	GFxValue extraData;
+	movieRoot->CreateObject(&extraData);
+	MSF_Scaleform::RegisterStringW(&extraData, movieRoot, "text", text.c_str());//
+	MSF_Scaleform::RegisterString(&extraData, movieRoot, "value", value.c_str());
+	MSF_Scaleform::RegisterInt(&extraData, movieRoot, "difference", 0);
+	args->args[1].PushBack(&extraData);
+	return true;
 }
 
 bool PipboyMenu::CreateItemData(PipboyMenu::ScaleformArgs* args, std::string text, std::string value)
@@ -440,7 +462,7 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 							{
 								_DEBUG("creating items");
 								std::string displayString = std::to_string(ammoState.ammoCapacity) + "/" + std::to_string(ammoState.loadedAmmo);
-								menu->CreateItemData(args, "Mag Size/Loaded", displayString);
+								menu->CreateItemData(args, MSF_Localization::GetTranslation(MSF_Localization::Keys::pipboyMagsizeLoadedText), displayString); //L"Mag size/Loaded"
 							}
 							//if (ammoState && ammoState->ammoCapacity && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDisplayChamberInPipboy))
 							//{
@@ -512,6 +534,17 @@ namespace MSF_Scaleform
 		}
 	};
 
+	class SendLocalization : public GFxFunctionHandler {
+	public:
+		virtual void Invoke(Args* args) {
+			args->result->SetString("");
+			if (args->numArgs != 0) return;
+			Setting* setting = GetINISetting("sLanguage:General");
+			std::string loc = (setting && setting->GetType() == Setting::kType_String) ? setting->data.s : "en";
+			args->result->SetString(loc.c_str());
+		}
+	};
+
 	class MenuClosedEventSink : public GFxFunctionHandler { //also:onmenuopencloseevent:hudmenu
 	public:
 		virtual void Invoke(Args* args) {
@@ -553,13 +586,17 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 			_DEBUG("ammo scaleform callback idx");
 			if (args->numArgs != 1) return;
+			ModSwitchManager::OpenedMenuData menuData = MSF_MainData::modSwitchManager.GetOpenedMenuData();
+			BGSSoundDescriptorForm* sound = nullptr;
+			if (menuData.selectMenu)
+				sound = menuData.selectMenu->successSound;
 			MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			_DEBUG("val: %i, %i", args->args[0].type, args->args[0].data.u32);
 			if (args->args[0].type == GFxValue::kType_UInt)
 			{
 				AmmoData::AmmoMod* ammo = MSF_MainData::modSwitchManager.GetDisplayedAmmoByIndex(args->args[0].data.u32);
 				_DEBUG("ptr: %p", ammo);
-				MSF_Base::SwitchToSelectedAmmo(ammo);
+				MSF_Base::SwitchToSelectedAmmo(ammo, sound);
 			}
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			args->result->SetBool(true);
@@ -585,12 +622,16 @@ namespace MSF_Scaleform
 			args->result->SetBool(false);
 
 			if (args->numArgs != 2) return;
+			ModSwitchManager::OpenedMenuData menuData = MSF_MainData::modSwitchManager.GetOpenedMenuData();
+			BGSSoundDescriptorForm* sound = nullptr;
+			if (menuData.selectMenu)
+				sound = menuData.selectMenu->successSound;
 			MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			if (args->args[0].type == GFxValue::kType_UInt && args->args[1].type == GFxValue::kType_UInt) //, args->args[2].type == GFxValue::kType_Bool)
 			{
 				ModData::Mod* modAdd = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[0].data.u32);
 				ModData::Mod* modRem = MSF_MainData::modSwitchManager.GetDisplayedModByIndex(args->args[1].data.u32);
-				MSF_Base::SwitchToSelectedMod(modAdd, modRem);// args->args[2].data.boolean);
+				MSF_Base::SwitchToSelectedMod(modAdd, modRem, sound);// args->args[2].data.boolean);
 			}
 			MSF_MainData::modSwitchManager.ClearDisplayChioces();
 			args->result->SetBool(true);
@@ -649,6 +690,19 @@ namespace MSF_Scaleform
 		}
 	}
 
+	void SetStringW(GFxValue* dst, const wchar_t* str)
+	{
+		dst->SetString(reinterpret_cast<const char*>(str));
+		dst->type = GFxValue::kType_Unknown7;
+	}
+
+	void RegisterStringW(GFxValue* dst, GFxMovieRoot* root, const char* name, const wchar_t* str)
+	{
+		GFxValue	fxValue;
+		root->CreateStringW(&fxValue, str);
+		dst->SetMember(name, &fxValue);
+	}
+
 	void RegisterString(GFxValue * dst, GFxMovieRoot * root, const char * name, const char * str)
 	{
 		GFxValue	fxValue;
@@ -702,7 +756,10 @@ namespace MSF_Scaleform
 		if (!movieRoot)
 			return false;
 
-		GFxValue arrArgs[9];
+		Setting* setting = GetINISetting("sLanguage:General");
+		std::string loc = (setting && setting->GetType() == Setting::kType_String) ? setting->data.s : "en";
+
+		GFxValue arrArgs[10];
 		arrArgs[0].SetUInt(MSF_MainData::MCMSettingFlags);
 		arrArgs[1].SetUInt(MSF_MainData::widgetSettings.iFont);
 		arrArgs[2].SetUInt(MSF_MainData::widgetSettings.GetRGBcolor());
@@ -712,7 +769,8 @@ namespace MSF_Scaleform
 		arrArgs[6].SetNumber(MSF_MainData::widgetSettings.fPowerArmorOffsetY);
 		arrArgs[7].SetNumber(MSF_MainData::widgetSettings.fSliderAlpha);
 		arrArgs[8].SetNumber(MSF_MainData::widgetSettings.fSliderScale);
-		movieRoot->Invoke("root.UpdateWidgetSettings", nullptr, arrArgs, 9);
+		arrArgs[9].SetString(loc.c_str());
+		movieRoot->Invoke("root.UpdateWidgetSettings", nullptr, arrArgs, 10);
 		return true;
 	}
 
@@ -728,9 +786,9 @@ namespace MSF_Scaleform
 		const char* apName = "";
 		const char* modName = "";
 		if (isAmmo)
-			apName = "Ammo Type";
+			apName = MSF_Localization::GetTranslation(MSF_Localization::Keys::menuAmmoTypeText); //"Ammo Type"
 		else if (ap == MSF_MainData::muzzleAP)
-			apName = "Muzzle";
+			apName = MSF_Localization::GetTranslation(MSF_Localization::Keys::menuMuzzleText); //"Muzzle"
 		else
 		{
 			BGSKeyword* kw = GetKeywordFromValueArray(AttachParentArray::iDataType, ap);
@@ -742,7 +800,7 @@ namespace MSF_Scaleform
 		else if (nullModName != "")
 			modName = nullModName.c_str();
 		else
-			modName = "None";
+			modName = MSF_Localization::GetTranslation(MSF_Localization::Keys::menuNoneText); //"None"
 		GFxValue arrArgs[3]; //obj?
 		arrArgs[0].SetString(apName);
 		arrArgs[1].SetString(modName);
@@ -771,7 +829,7 @@ namespace MSF_Scaleform
 	{
 		Actor* playerActor = *g_player;
 		if (!instanceData)
-			instanceData = Utilities::GetEquippedInstanceData(playerActor, 41);
+			instanceData = Utilities::GetEquippedWeaponInstanceData(playerActor); //Utilities::GetEquippedInstanceData(playerActor, 41);
 		static BSFixedString menuName("MSFwidget");
 		IMenu* widgetMenu = (*g_ui)->GetMenu(menuName);
 		if (!widgetMenu)
@@ -805,30 +863,37 @@ namespace MSF_Scaleform
 		//out of ammo, full (+1?)
 	}
 
+	inline bool PlayMenuFailed()
+	{
+		MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
+		return false;
+	}
+
 	bool HandleToggleMenu(ModSelectionMenu* selectMenu, ModData* mods)
 	{
 		if (!selectMenu || !selectMenu->customMenuData)
-			return false;
+			return PlayMenuFailed();
 		//check conditions
 		//cross check custom and MSFMenu
 		_DEBUG("selectcustommenu");
 		//static BSFixedString menuName("MSFMenu"); //!/rewrite
 		ModSwitchManager::OpenedMenuData openedMenu = MSF_MainData::modSwitchManager.GetOpenedMenuData();
 		if (openedMenu.isOpening)
-			return false;
+			return PlayMenuFailed();
 		if (openedMenu.selectMenu)
 		{
 			if (!(*g_ui)->IsMenuOpen(BSFixedString(openedMenu.selectMenu->customMenuData->menuName.c_str())))
 				MSF_MainData::modSwitchManager.CloseOpenedMenu();
+				//sound:menuSuccess
 			else if (openedMenu.selectMenu == selectMenu)
 			{
 				MSF_MainData::modSwitchManager.CloseOpenedMenu();
-				return false;
+				return true;
 			}
 			else if (!(selectMenu->customMenuData->extFlags & MSFCustomMenuData::kExtFlag_DontAllowMenuChange) && (MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowChangingMSFMenus))
 				MSF_MainData::modSwitchManager.CloseOpenedMenu();
 			else
-				return false;
+				return PlayMenuFailed();
 		}
 		_DEBUG("menuchecks0ok");
 		//if (MSF_MainData::modSwitchManager.GetOpenedMenu() == selectMenu)
@@ -842,7 +907,10 @@ namespace MSF_Scaleform
 		//}
 		//else if (MSF_MainData::modSwitchManager.GetOpenedMenu() != nullptr)
 		//	return nullptr;
-		return MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu, mods);
+		bool res = MSF_MainData::modSwitchManager.SetOpenedMenu(selectMenu, mods);
+		if (res)
+			return true;
+		return PlayMenuFailed();
 	}
 
 	bool GetAmmoListForScaleform(GFxMovieRoot* menuRoot, GFxValue* dst)
@@ -955,7 +1023,7 @@ namespace MSF_Scaleform
 		{
 			DisplayData itemData;
 			itemData.mod = nullptr;
-			itemData.modName = "None";
+			itemData.modName = MSF_Localization::GetTranslation(MSF_Localization::Keys::menuNoneText); //"None"
 			itemData.apName = apName;
 			itemData.isEquipped = attachedMod == nullptr;
 			bool reqsOK = true;
@@ -1008,33 +1076,41 @@ namespace MSF_Scaleform
 		if (selectMenu && menuRoot)
 		{
 			_DEBUG("menurootok");
+			Setting* setting = GetINISetting("sLanguage:General");
+			std::string loc = (setting && setting->GetType() == Setting::kType_String) ? setting->data.s : "en";
+			bool isInPA = IsInPowerArmor(*g_player);
+
 			switch (selectMenu->type)
 			{
 			case ModSelectionMenu::kType_AmmoMenu:
 			{
-				GFxValue data;
-				if (!GetAmmoListForScaleform(menuRoot, &data))
+				GFxValue data[3];
+				if (!GetAmmoListForScaleform(menuRoot, &data[0]))
 					break;
 				_DEBUG("ammolistok");
+				data[1].SetBool(isInPA);
+				data[2].SetString(loc.c_str());
 				//std::string openPath = "root." + selectMenu->scaleformName + "_loader.content.ReceiveAmmoData";
 				std::string openPath = "root.ReceiveAmmoData";
-				if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
+				if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 3))
 					return true;
 				break;
 			}
 			case ModSelectionMenu::kType_ModMenu:
 			{
-				GFxValue data;
-				if (!GetModListForScaleform(menuRoot, &data, mods))
+				GFxValue data[3];
+				if (!GetModListForScaleform(menuRoot, &data[0], mods))
 					break;
+				data[1].SetBool(isInPA);
+				data[2].SetString(loc.c_str());
 				std::string openPath = "root.ReceiveModData";
-				if (menuRoot->Invoke(openPath.c_str(), nullptr, &data, 1))
+				if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 3))
 					return true;
 				break;
 			}
 			case ModSelectionMenu::kType_All:
 			{
-				GFxValue data[4];
+				GFxValue data[6];
 				bool bAmmo = GetAmmoListForScaleform(menuRoot, &data[0]);
 
 				bool bMod = false;
@@ -1055,8 +1131,10 @@ namespace MSF_Scaleform
 					break;
 				data[2].SetBool(bAmmo);
 				data[3].SetBool(bMod);
+				data[4].SetBool(isInPA);
+				data[5].SetString(loc.c_str());
 				std::string openPath = "root.ReceiveAmmoAndModData";
-				if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 4))
+				if (menuRoot->Invoke(openPath.c_str(), nullptr, data, 6))
 					return true;
 				break;
 			}
@@ -1066,6 +1144,7 @@ namespace MSF_Scaleform
 		_DEBUG("invokefail");
 		MSF_MainData::modSwitchManager.CloseOpenedMenu();
 		MSF_MainData::modSwitchManager.ClearDisplayChioces();
+		MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
 		return false;
 	}
 
@@ -1173,7 +1252,12 @@ namespace MSF_Scaleform
 		RegisterFunction<SendF4SEVersion>(codeObj, movieRoot, "GetF4SEVersion");
 		RegisterFunction<SendGameVersion>(codeObj, movieRoot, "GetGameVersion");
 		RegisterFunction<SendMSFVersion>(codeObj, movieRoot, "GetMSFVersion");
+		RegisterFunction<SendLocalization>(codeObj, movieRoot, "GetLocalization");
 		RegisterFunction<ReceiveScaleformProperties>(codeObj, movieRoot, "SendInterfaceProperties");
+	}
+
+	void RegisterMSFmenuFuncs(GFxValue* codeObj, GFxMovieRoot* movieRoot)
+	{
 		RegisterFunction<MenuClosedEventSink>(codeObj, movieRoot, "MenuClosedEventDispatcher");
 		RegisterFunction<MenuOpenedEventSink>(codeObj, movieRoot, "MenuOpenedEventDispatcher");
 		RegisterFunction<ReceiveSelectedAmmoIdx>(codeObj, movieRoot, "SendBackSelectedAmmoIdx");
@@ -1211,6 +1295,7 @@ namespace MSF_Scaleform
 			GFxValue msf; movieRoot->CreateObject(&msf);
 			root.SetMember("msf", &msf);
 			RegisterMSFScaleformFuncs(&msf, movieRoot);
+			RegisterMSFwidgetFuncs(&msf, movieRoot);
 		}
 		// Look for the menu that we want to inject into.
 		else if (false)//(currentSWFPathString && strcmp(currentSWFPathString, "Interface/MSFMenu.swf") == 0) 
@@ -1222,6 +1307,7 @@ namespace MSF_Scaleform
 			GFxValue msf; movieRoot->CreateObject(&msf);
 			root.SetMember("msf", &msf);
 			RegisterMSFScaleformFuncs(&msf, movieRoot);
+			RegisterMSFmenuFuncs(&msf, movieRoot);
 			_MESSAGE("MSF code object created in MSFMenu.");
 
 			for (auto it = MSF_MainData::keybindIDMap.begin(); it != MSF_MainData::keybindIDMap.end(); it++)
@@ -1280,12 +1366,14 @@ namespace MSF_Scaleform
 					if (!movieRoot->GetVariable(&root, "root") || !root.IsObject() || !root.GetMember("onMSFCodeObjCreated", &funcObj) || !funcObj.IsFunction()) //!root.HasMember("onMSFCodeObjCreated") || 
 					{
 						MSF_MainData::modSwitchManager.CloseOpenedMenu();
+						MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
 						return true;
 					}
 					GFxValue type, ver;
 					if (!root.GetMember("InterfaceVersion", &ver) || ver.GetType() != GFxValue::Type::kType_UInt || !root.GetMember("InterfaceType", &type) || type.GetType() != GFxValue::Type::kType_UInt)
 					{
 						MSF_MainData::modSwitchManager.CloseOpenedMenu();
+						MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
 						return true;
 					}
 					UInt32 itype = type.GetUInt();
@@ -1295,16 +1383,19 @@ namespace MSF_Scaleform
 					if (itype != openedMenu.selectMenu->type || ((itype & 1) && iver < MIN_SUPPORTED_SWF_AMMO_VERSION) || ((itype & 2) && iver < MIN_SUPPORTED_SWF_MOD_VERSION) || ((itype == 1) && (!root.GetMember("ReceiveAmmoData", &funcObj2) || !funcObj2.IsFunction())) || ((itype == 2) && (!root.GetMember("ReceiveModData", &funcObj2) || !funcObj2.IsFunction())) || ((itype == 3) && (!root.GetMember("ReceiveAmmoAndModData", &funcObj2) || !funcObj2.IsFunction())))
 					{
 						MSF_MainData::modSwitchManager.CloseOpenedMenu();
+						MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
 						return true;
 					}
 					GFxValue msf; 
 					movieRoot->CreateObject(&msf);
 					root.SetMember("msf", &msf);
 					RegisterMSFScaleformFuncs(&msf, movieRoot);
+					RegisterMSFmenuFuncs(&msf, movieRoot);
 					_DEBUG("MSF code object created.");
 					if (!root.Invoke("onMSFCodeObjCreated", nullptr, &msf, 1))
 					{
 						MSF_MainData::modSwitchManager.CloseOpenedMenu();
+						MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundMenuFail, 3, nullptr);
 						return true;
 					}
 					MSF_MainData::modSwitchManager.SetMenuIsOpened();

@@ -1,24 +1,14 @@
 #include "MSF_Base.h"
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
-
-const char* modText = "This mod can only be attached at a workbench.";
-const char* noAPText = "The equipped weapon does not have a compatible attach point for this mod.";
-const char* noWeapText = "There is no compatible weapon equipped for this mod.";
-const char* couldntAttachText = "Could not attach this mod to the equipped weapon.";
-const char* itemText = "You cannot equip this item.";
-const char* unsupportedAmmoText = "You cannot equip non-playable ammo or fusion cores.";
-const char* noAmmoTypeText = "You cannot equip this ammo type.";
-const char* ammoEquipFailedText = "You cannot equip this ammo right now.";
-const char* ammoUnequipText = "You cannot unequip ammo.";
-const char* ammoEquippedText = "Ammo equipped.";
+#include "MSF_Localization.h"
 
 namespace MSF_Base
 {
 	//========================== Main Functions ===========================
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo)//(void* obj)
+	bool SwitchToSelectedAmmo(AmmoData::AmmoMod* selectedAmmo, BGSSoundDescriptorForm* sound)//(void* obj)
 	{
 		_DEBUG("selectCalled");
 		//AmmoData::AmmoMod* selectedAmmo = reinterpret_cast<AmmoData::AmmoMod*>(obj);
@@ -27,7 +17,10 @@ namespace MSF_Base
 		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled) )// || (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled))
 		{
 			if (!MSF_Base::HandlePendingAnimations())
+			{
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				return false;
+			}
 		}
 		Actor* playerActor = *g_player;
 
@@ -38,9 +31,11 @@ namespace MSF_Base
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(modData, MSF_MainData::ammoAP);
 		switchData->targetAmmo = selectedAmmo->ammo;
 		switchData->SwitchFlags = selectedAmmo->flags & AmmoData::AmmoMod::mBitTransferMask;
+		switchData->soundToPlay = sound;
 		_DEBUG("mod: %p", mod);
 		if (mod == attachedMod)
 		{
+			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, switchData->soundToPlay);
 			delete switchData;
 			return true;
 		}
@@ -54,6 +49,7 @@ namespace MSF_Base
 				switchData->ModToRemove = mod;
 			else
 			{
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				delete switchData;
 				return false;
 			}
@@ -64,7 +60,7 @@ namespace MSF_Base
 	}
 
 	//FROM HOTKEY (or fire anim):
-	bool SwitchAmmoHotkey(UInt8 key, bool ignoreAnim, bool requireAmmo)
+	bool SwitchAmmoHotkey(UInt8 key, BGSSoundDescriptorForm* sound, bool ignoreAnim, bool requireAmmo)
 	{
 		Actor* playerActor = *g_player;
 		_DEBUG("queueCount: %i; state: %02X; unk08: %08X; flags: %08X", MSF_MainData::modSwitchManager.GetQueueCount(), MSF_MainData::modSwitchManager.GetState(), playerActor->actorState.unk08, playerActor->actorState.flags);
@@ -72,7 +68,10 @@ namespace MSF_Base
 		if (!ignoreAnim && (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))// || (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled))
 		{
 			if (!MSF_Base::HandlePendingAnimations())
+			{
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				return false;
+			}
 		}
 		_DEBUG("animOK");
 
@@ -82,7 +81,11 @@ namespace MSF_Base
 		else
 			switchData = MSF_Data::GetNthAmmoMod(key);
 		if (!switchData)
+		{
+			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			return false;
+		}
+		switchData->soundToPlay = sound;
 		_DEBUG("ammoSwitchDataOK");
 		return SwitchAmmoCommon(switchData);
 	}
@@ -91,8 +94,12 @@ namespace MSF_Base
 	{
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled))
 		{
+			BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 			switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-			MSF_Base::SwitchMod(switchData, true);
+			if (MSF_Base::SwitchMod(switchData, true))
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+			else
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			//if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled)
 			//	Utilities::DrawWeapon(*g_player);
 			return true;
@@ -100,6 +107,7 @@ namespace MSF_Base
 
 		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
 		{
+			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			delete switchData;
 			return false;
 		}
@@ -124,8 +132,12 @@ namespace MSF_Base
 			_DEBUG("toReload BCR");
 			if (!targetAmmoCount || !currentAmmoCount)
 			{
+				BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-				MSF_Base::SwitchMod(switchData, true);
+				if (MSF_Base::SwitchMod(switchData, true))
+					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+				else
+					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				if (targetAmmoCount && playerActor->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
 					MSF_Base::ReloadWeapon(false, true);
 				return true;
@@ -138,29 +150,42 @@ namespace MSF_Base
 		{
 			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 			{
+				BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 				switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-				MSF_Base::SwitchMod(switchData, true);
+				if (MSF_Base::SwitchMod(switchData, true))
+					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
+				else
+					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				MSF_Base::ReloadWeapon(isTR && !isBCR, isBCR);
 				return true;
 			}
 			_DEBUG("toReload");
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress); // | SwitchData::bReloadNotFinished
+			BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			UInt64 invammo = Utilities::GetInventoryItemCount(playerActor->inventoryList, switchData->targetAmmo);
 			Utilities::SetAnimationVariableInt(playerActor, "NextReloadAmmoCount", invammo > instance->ammoCapacity ? instance->ammoCapacity : invammo);
 			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount))
+			{
 				MSF_MainData::modSwitchManager.ClearQueue();
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
+			}
+			else
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound); //SOUND:onreload?
 			//MSF_Base::SwitchMod(switchData, true);
 			return true;
 		}
 		else if (MSF_MainData::MCMSettingFlags & MSF_MainData::bDrawEnabled)
 		{
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNeeded);
+			BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			Utilities::DrawWeapon(playerActor);
+			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound); //SOUND:ondraw?
 			//delay check draw state
 			return true;
 		}
+		PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 		delete switchData;
 		return false;
 	}
@@ -170,15 +195,15 @@ namespace MSF_Base
 	const char* EquipAmmoPipboy(TESAmmo* ammo, bool bEquip)
 	{
 		if (!bEquip)
-			return ammoUnequipText;
+			return MSF_Localization::GetTranslation(MSF_Localization::Keys::ammoUnequipText);
 		if (MSF_Base::IsNotSupportedAmmo(ammo))
-			return unsupportedAmmoText;
+			return MSF_Localization::GetTranslation(MSF_Localization::Keys::unsupportedAmmoText);
 		SwitchData* switchData = MSF_Data::GetModForAmmo(ammo);
 		if (!switchData)
-			return noAmmoTypeText;
+			return MSF_Localization::GetTranslation(MSF_Localization::Keys::noAmmoTypeText);
 		switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
 		if (!MSF_Base::SwitchMod(switchData, true))
-			return ammoEquipFailedText;
+			return MSF_Localization::GetTranslation(MSF_Localization::Keys::ammoEquipFailedText);
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload, *g_player, ExtraWeaponState::bEventTypeReloadInventory, 0);
 		MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
 		PlayEquipSound(*g_player, ammo, 1, 0);
@@ -186,7 +211,7 @@ namespace MSF_Base
 	}
 
 	//FROM SCALEFORM:
-	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
+	bool SwitchToSelectedMod(ModData::Mod* modToAttach, ModData::Mod* modToRemove, BGSSoundDescriptorForm* sound)//(void* modDataToAttach, void* modDataToRemove, bool bNeedInit)
 	{
 		if (modToAttach == modToRemove)
 			return false;
@@ -197,7 +222,7 @@ namespace MSF_Base
 		//if (!MSF_Data::CheckSwitchRequirements(stack, modToAttach, modToRemove))
 		//	return false;
 
-		return MSF_Data::QueueModsToSwitch(modToAttach, modToRemove);
+		return MSF_Data::QueueModsToSwitch(modToAttach, modToRemove, sound);
 	}
 
 
@@ -218,10 +243,10 @@ namespace MSF_Base
 
 	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip)
 	{
-		return modText;
+		return MSF_Localization::GetTranslation(MSF_Localization::Keys::modText);
 		auto omod = MSF_MainData::miscModMap.find(miscMod);
 		if (omod == MSF_MainData::miscModMap.end())
-			return modText;
+			return MSF_Localization::GetTranslation(MSF_Localization::Keys::modText);
 		auto itMod = MSF_MainData::modDataMap.find(omod->second);
 		Actor* playerActor = *g_player;
 		if (itMod == MSF_MainData::modDataMap.end())
@@ -229,15 +254,15 @@ namespace MSF_Base
 			BGSObjectInstanceExtra* oie = Utilities::GetEquippedModData(playerActor);
 			TESObjectWEAP* baseWeap = Utilities::GetEquippedWeapon(playerActor);
 			if (!oie || !baseWeap)
-				return noWeapText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::noWeapText);
 			if (omod->second->unkC0 && !Utilities::ObjectInstanceHasAttachPoint(oie, omod->second->unkC0) && !Utilities::HasAttachPoint((AttachParentArray*)&baseWeap->attachParentArray, omod->second->unkC0))
-				return noAPText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::noAPText);
 			BGSMod::Attachment::Mod* oldomod = Utilities::GetModAtAttachPoint(oie, omod->second->unkC0);
 			TESObjectMISC* oldlmod = nullptr;
 			if (oldomod)
 				oldlmod = Utilities::GetLooseMod(oldomod);
 			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
-				return couldntAttachText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::couldntAttachText);
 			PlayEquipSound(*g_player, omod->first, 1, 0);
 			Utilities::RemoveItem(playerActor, omod->first, 1, true);
 			if (oldlmod)
@@ -247,15 +272,15 @@ namespace MSF_Base
 		{
 			auto itKB = MSF_MainData::keybindAPMap.find(omod->second->unkC0);
 			if (itKB == MSF_MainData::keybindAPMap.end())
-				return noAPText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::noAPText);
 			ModData* modData = itKB->second->modData;
 			BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedWeaponStack(playerActor);
 			ModData::Mod* oldMod = MSF_Data::GetOldModForEquip(eqStack, modData, itMod->second);
 			if (!oldMod)
-				return noAPText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::noAPText);
 			TESObjectMISC* oldlmod = Utilities::GetLooseMod(oldMod->mod);
 			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
-				return couldntAttachText;
+				return MSF_Localization::GetTranslation(MSF_Localization::Keys::couldntAttachText);;
 			PlayEquipSound(*g_player, omod->first, 1, 0);
 			Utilities::RemoveItem(playerActor, omod->first, 1, true);
 			if (oldlmod)
@@ -293,8 +318,11 @@ namespace MSF_Base
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData && !(switchData->SwitchFlags & SwitchData::bSwitchingInProgress))
 		{
+			bool success = false;
+			bool isAmmo = switchData->targetAmmo != nullptr;
+			BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 			if (switchData->SwitchFlags & SwitchData::bIgnoreAnimations)
-				MSF_Base::SwitchMod(switchData, true);
+				success = MSF_Base::SwitchMod(switchData, true);
 			else if ((*g_player)->actorState.IsWeaponDrawn() || (switchData->SwitchFlags & ModData::Mod::bNotRequireWeaponToBeDrawn))
 			{
 				if (switchData->SwitchFlags & SwitchData::bReloadNeeded)
@@ -303,7 +331,7 @@ namespace MSF_Base
 					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-						MSF_Base::SwitchMod(switchData, true);
+						success = MSF_Base::SwitchMod(switchData, true);
 					}
 					else
 					{
@@ -312,6 +340,8 @@ namespace MSF_Base
 					}
 					if (!MSF_Base::ReloadWeapon(flags & SwitchData::bReloadFull, flags & SwitchData::bReloadZeroCount))
 						MSF_MainData::modSwitchManager.ClearQueue();
+					else
+						success = true;
 				}
 				else if (switchData->SwitchFlags & SwitchData::bAnimNeeded)
 				{
@@ -320,7 +350,7 @@ namespace MSF_Base
 					if (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode || switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						switchData->SwitchFlags |= SwitchData::bSwitchingInProgress;
-						MSF_Base::SwitchMod(switchData, true);
+						success = MSF_Base::SwitchMod(switchData, true);
 					}
 					else
 					{
@@ -329,14 +359,23 @@ namespace MSF_Base
 					}
 					if (!MSF_Base::PlayAnim(anim))
 						MSF_MainData::modSwitchManager.ClearQueue(); //MSF_Base::SwitchMod(switchData, true);
+					else
+						success = true;
 				}
 			}
 			else if (switchData->SwitchFlags & SwitchData::bDrawEnabled)
 			{
 				switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress);
 				Utilities::DrawWeapon(*g_player);
+				success = true;
 				//delay check draw state
 			}
+			bool playSound = (!isAmmo &&(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail));
+			if (!success)
+				MSF_Base::PlayFeedbackSound((!isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail)), 1, nullptr);
+			//else //SOUND:on anim success?
+			//	MSF_Base::PlayFeedbackSound((!isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod)) || (isAmmo && (MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo)), false, sound);
+
 			//bFinishWithoutAnim
 		}
 	}
@@ -584,10 +623,10 @@ namespace MSF_Base
 
 		//_DEBUG("mod ammo count1: %i", eqData->loadedAmmoCount);
 		MSF_MainData::modSwitchManager.SetModChangeEvent(true);
-		if (updateAnimGraph)
+		//if (updateAnimGraph)
 			MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
-		else
-			MSF_MainData::modSwitchManager.SetIgnoreEquipAction(true);
+		//else
+		//	MSF_MainData::modSwitchManager.SetIgnoreEquipAction(true);
 		MSF_MainData::modSwitchManager.SetDontPutYourGunIn(true);
 		EquipItemInternal(g_ActorEquipManager, actor, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
 		MSF_MainData::modSwitchManager.SetDontPutYourGunIn(false);
@@ -645,9 +684,19 @@ namespace MSF_Base
 		//UnkSub_EFF9D0(actor);
 		//EquipHandler(unk_05AB38D0, actor, idStruct, equipSlotStruct);
 		if (updateAnimGraph)
+		{
+			PlayerCharacter* player = *g_player;
 			UpdateAnimGraph(actor, false);
-		else
-			MSF_MainData::modSwitchManager.SetIgnoreEquipAction(false);
+			InitializeActorInstant(actor, 0);
+			if (player == actor)
+				UpdateAnimation(player, 0.2f);
+		}
+		//else
+		//	MSF_MainData::modSwitchManager.SetIgnoreEquipAction(false);
+
+
+
+
 		//UnkSub_DFE930(actor, false);
 		/*
 		PrintStackData(actor, weapBase);
@@ -1265,6 +1314,7 @@ namespace MSF_Base
 				Utilities::SetAnimationVariableInt(playerActor, "SwitchAmmoTypeReload", 1);
 			MSF_MainData::modSwitchManager.SetForcedReload(forced);
 			bool success = Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionReload);
+			_DEBUG("reloadsuccess: %i", success);
 			if (!success)
 				Utilities::SetAnimationVariableInt(playerActor, "SwitchAmmoTypeReload", 0);
 			return success;
@@ -1275,6 +1325,7 @@ namespace MSF_Base
 			if (isSwitch)
 				Utilities::SetAnimationVariableInt(playerActor, "SwitchAmmoTypeReload", 1);
 			bool success = Utilities::PlayIdle(playerActor, relIdle);
+			_DEBUG("reloadsuccess: %i", success);
 			if (!success)
 				Utilities::SetAnimationVariableInt(playerActor, "SwitchAmmoTypeReload", 0);
 			return true;
@@ -1305,12 +1356,17 @@ namespace MSF_Base
 		return false;
 	}
 
-	bool PlayFeedbackSound(bool play, bool fail, BGSSoundDescriptorForm* success)
+	bool PlayFeedbackSound(bool play, UInt8 type, BGSSoundDescriptorForm* success) // type: 0: success, 1: failGeneral, 2: failQuickkey, 3: failMenu
 	{
 		if (play)
 		{
-			if (fail)
+			_DEBUG("playSound: %i", type);
+			if (type == 1)
 				return Utilities::PlaySoundInternal(MSF_MainData::failSound, *g_player);
+			if (type == 2)
+				return Utilities::PlaySoundInternal(MSF_MainData::failSoundQuickkey, *g_player);
+			if (type == 3)
+				return Utilities::PlaySoundInternal(MSF_MainData::failSoundMenu, *g_player);
 			else if (success)
 				return Utilities::PlaySoundInternal(success, *g_player);
 		}

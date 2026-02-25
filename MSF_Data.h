@@ -173,6 +173,7 @@ class HUDDisplayData
 public:
 	BGSKeyword* keyword;
 	std::string displayString;
+	float priority;
 };
 class HUDFiringModeData : public HUDDisplayData {};
 class HUDScopeData : public HUDDisplayData {};
@@ -186,6 +187,7 @@ public:
 	UInt32 version;
 	MSFCustomMenuData* customMenuData;
 	AnimationData* menuAnimation;
+	BGSSoundDescriptorForm* successSound;
 	enum
 	{
 		kType_Widget = 0,
@@ -194,8 +196,8 @@ public:
 		kType_All = 3,
 		kType_Global = 4
 	};
-	ModSelectionMenu(std::string name, UInt8 menuType){
-		scaleformName = name; type = menuType; version = 0; menuAnimation = nullptr; customMenuData = nullptr;
+	ModSelectionMenu(std::string name, UInt8 menuType, BGSSoundDescriptorForm* sound){
+		scaleformName = name; type = menuType; version = 0; menuAnimation = nullptr; customMenuData = nullptr; successSound = sound;
 	};
 };
 
@@ -410,6 +412,7 @@ private:
 	UInt32 quickSelectIdx;
 	bool quickSelectIsAmmo;
 	bool keyIsDown;
+	BGSSoundDescriptorForm* quickKeySound;
 	SimpleLock quickSelectLock;
 	DelayedExecutor quickKeyTimer;
 	KeybindData* lastQuickKey;
@@ -632,7 +635,7 @@ public:
 	bool SetAmmoSelection(AmmoData* data, AmmoData::AmmoMod* ammoMod, UInt32 selectIdx);
 	bool HandleQuickkey(KeybindData* input);
 	bool HandleQuickkeyTimeout();
-	void ClearQuickSelection(bool doLock = true, bool updateWidget = false);
+	void ClearQuickSelection(bool doLock = true, bool updateWidget = false, bool playFailSound = false, bool onlyRunning = false);
 	void SetQuickkeyUp(KeybindData* input); //should not matter which;
 
 	void Reset()
@@ -719,6 +722,10 @@ public:
 	static Utilities::Timer lowerTmr;
 	static long long lowerDelay;
 	static BGSSoundDescriptorForm* failSound;
+	static BGSSoundDescriptorForm* failSoundQuickkey;
+	static BGSSoundDescriptorForm* failSoundMenu;
+	static BGSSoundDescriptorForm* nextSoundQuickkey;
+	static std::string loc;
 
 	static BurstModeManager* activeBurstManager;
 
@@ -746,6 +753,7 @@ public:
 	static std::vector<TESAmmo*> dontRemoveAmmoOnReload;
 	static std::vector<TESObjectWEAP*> BCRweapons;
 	static std::vector<BGSMod::Attachment::Mod*> equippableMods;
+	static std::unordered_map<std::string, std::string> translationMap;
 
 	//Mandatory Data, filled during mod initialization
 	static KeywordValue ammoAP;
@@ -827,6 +835,8 @@ public:
 		bPlayFeedbackSoundModFail = 0x2000000000,
 		bPlayFeedbackSoundMenuOpen = 0x4000000000,
 		bPlayFeedbackSoundMenuFail = 0x8000000000,
+		bPlayFeedbackSoundQuickkeyFail = 0x1000000000000,
+		bPlayFeedbackSoundQuickkeyNext = 0x2000000000000,
 		bPatchVanillaAVcalculation = 0x10000000000,
 		bRandomizeLoadedAmmoOnSplitStack = 0x20000000000,
 		bRandomizeLoadedAmmoOnNewWeapon = 0x40000000000,
@@ -873,7 +883,7 @@ namespace MSF_Data
 	bool GetNextMod(BGSInventoryItem::Stack* eqStack, ModData* modData, bool isQuickkey = false);
 	ModData::Mod* GetOldModForEquip(BGSInventoryItem::Stack* eqStack, ModData* modData, ModData::Mod* modDataMod);
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove);
-	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove);
+	bool QueueModsToSwitch(ModData::Mod* modToAttach, ModData::Mod* modToRemove, BGSSoundDescriptorForm* sound);
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
 	bool GetChamberData(BGSObjectInstanceExtra* mods, TESObjectWEAP::InstanceData* weapInstance, UInt16* chamberSize, UInt16* flags);
 	bool GetAttachedChildren(BGSObjectInstanceExtra* mods, BGSMod::Attachment::Mod* parent, std::vector<BGSMod::Attachment::Mod*>* children, bool checkIF);
