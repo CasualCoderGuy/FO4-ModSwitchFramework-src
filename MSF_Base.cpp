@@ -687,9 +687,20 @@ namespace MSF_Base
 		{
 			PlayerCharacter* player = *g_player;
 			UpdateAnimGraph(actor, false);
-			InitializeActorInstant(actor, 0);
-			if (player == actor)
-				UpdateAnimation(player, 0.2f);
+			//InitializeActorInstant(actor, 0);
+			//if (player == actor)
+			//{
+				//BGSAction* act = (BGSAction*)LookupFormByID(0x2ADF1);
+				//_MESSAGE("updAnim %p", act);
+			//	UpdateAnimation(player, 0.2f);
+			//}
+			//Utilities::PlayIdleAction(actor, act);
+			//0x18BA8 IdleStop
+			//0x2ADF1 ForceEquip
+			//0x2FFA9 InitGraph
+			//0x5704C InstantInitGraph
+			//0x7F8E3 InstantIdleStop
+			
 		}
 		//else
 		//	MSF_MainData::modSwitchManager.SetIgnoreEquipAction(false);

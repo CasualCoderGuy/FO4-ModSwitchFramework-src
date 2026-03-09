@@ -8,9 +8,9 @@
 class BSAnimationGraphEvent
 {
 public:
-	TESForm* unk00;
-	BSFixedString eventName;
-	//etc
+	std::uint64_t holderID;  // 00
+	BSFixedString eventName;       // 08
+	BSFixedString payload;   // 10
 };
 
 class BGSInventoryListEventData

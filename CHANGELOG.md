@@ -7,7 +7,7 @@ features:
 - localization and priority support for widget display strings (see manual for more information)
 - MSF widget and menus can now request game localization and receive localization and power armor status with the sent menu data
 fixes:
-- animation fixes with a roll back on general animation graph updates introduced in v1.2.2 as it caused several issues
+- roll back on general animation graph updates introduced in v1.2.2 as it caused several issues
 - PlayIdleAction dependent functions (reload, lower weapon, etc.) now properly work in the NG build
 - fixed potential CTDs where OMODs in the objects mod list were not valid
 - fixed potential CTD when casting objects from inventory events
