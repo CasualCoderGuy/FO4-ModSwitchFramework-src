@@ -95,6 +95,11 @@ bool BurstModeManager::HandleModChangeEvent(ExtraDataList* extraDataList)
 }
 
 /*
+
+TaskQueueInterface  Singleton 2698331
+QueueWeaponFire(this, TESObjectWEAP* a_weapon, TESObjectREFR* a_refObject, BGSEquipIndex a_equipIndex, TESAmmo* a_ammo){ 2229186 };
+
+
 	void BurstWaitAndShoot(BurstMode* data)
 	{
 		if (!data)

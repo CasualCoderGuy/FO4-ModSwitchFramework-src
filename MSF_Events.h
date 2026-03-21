@@ -153,20 +153,12 @@ extern _PlayerAnimationEvent PlayerAnimationEvent_Original;
 
 namespace ActorEquipManagerEvent
 {
-	struct EventData
-	{
-		TESBoundObject* equippedItem;
-		TBO_InstanceData* instancedata;
-		BGSEquipSlot* equipSlot; //weaponequipslot //maybe not
-		UInt64 unk18;								//maybe not
-		EquipWeaponData* equippedWeaponData;		//maybe not
-	};
-
 	struct Event
 	{
-		bool equip;
-		EventData* data;
+		bool unequip;
+		BGSObjectInstance* data;
 		Actor* targetActor;
+		UInt32 stackID;
 	};
 }
 
@@ -183,6 +175,12 @@ class ActorEquipManagerEventSink : public BSTEventSink<ActorEquipManagerEvent::E
 public:
 	virtual	EventResult	ReceiveEvent(ActorEquipManagerEvent::Event* evn, void* dispatcher) override;
 };
+
+class ActorEquipManagerEventSourceMSF : public BSTEventDispatcher<ActorEquipManagerEvent::Event>
+{
+
+};
+extern ActorEquipManagerEventSourceMSF actorEquipManagerEventSourceMSF;
 
 struct PlayerWeaponReloadEvent
 {
@@ -559,10 +557,4 @@ template<> inline BSTEventDispatcher<Event> * GetEventDispatcher() \
 	RelocAddr<_GetEventDispatcher> GetDispatcher(address.GetUIntPtr()-RelocationManager::s_baseAddr); \
 	return GetDispatcher(); \
 }
-#define GAME_VM_EVENTS_REG_SIG "E8 ? ? ? ? 49 8B 0F 49 8D 56 10"
-#define InventoryEventHandler_EVENTS_REG_SIG "48 89 5C 24 08 57 48 83 EC 20 33 FF 48 8B D9 48 85 C9 74 ? 48 83 C1 10 EB ?"
-#define InventoryEventHandler_INDIRECTIONS(_offset) { { _offset,1,5 },{ 0x9,1,5 } }
-#define BASIC_EVENT_HANDLER_INDIRECTIONS(_offset) { {0,1,5},{0x14,1,5},{ _offset,1,5 },{ 0x9,1,5 } }
-#define BASIC_EVENT_HANDLER_INDIRECTIONS1(_offset) { {0,1,5},{0x14,1,5},{ _offset,1,5 },{ 0x35,1,5 } }
-#define FRAGMENT_EVENT_HANDLER_INDIRECTIONS(_offset) { {0,1,5},{0x2C,1,5},{ _offset,1,5 },{ 0x9,1,5 } }
 #define REGISTER_EVENT(_event, _sink) GetEventDispatcher<_event>()->AddEventSink(&_sink);

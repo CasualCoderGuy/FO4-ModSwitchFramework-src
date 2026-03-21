@@ -66,104 +66,12 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 			break;
 #ifdef DEBUG
 		case 0x21://PGUP
-		{
-			if ((*g_ui)->numPauseGame == 0)
-			{
-				//MSF_Test::ListModTable(*g_player);
-				//MSF_Test::DumpAttachParent();
-				//MSF_Test::GetWeaponState();
-				//MSF_Test::DumpAttachParent();
-				//MSF_Test::DumpForms();
-				//MSF_Test::SetAmmoTest();
-				//MSF_Scaleform::GetInterfaceVersion();
-				//MSF_Scaleform::UpdateWidgetData(nullptr);
-				//MSF_Scaleform::SetWidgetVisibility(true);
-				//MSFMenu::CloseMenu();
-				//MSFMenu::OpenMenu();
-				//static BSFixedString menuName("MSFMenu");
-				//CALL_MEMBER_FN((*g_uiMessageManager), SendUIMessage)(menuName, kMessage_Open);
-				//MSFAmmoMenu::OpenMenu();
-				//MSFMenu::OpenMenu();
-				//MSF_Test::ListEquippedItemTypes();
-				//MSF_Test::ArmorAttachTest();
-				//MSF_Test::RemapAnimTest(true, false); //sub_141387BE0
-				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x3B248));
-				//Utilities::PlayIdle(*g_player, MSF_MainData::fireIdle1stP);
-				//MSF_Base::BurstTest(nullptr);
-				//MSF_Test::DumpUnknownData((*g_player));
-				//MSF_Test::DumpActorValue();
-				//MSF_Test::DumpExtraDataInfo();
-				//MSF_Test::CallAttachModToInvItem();
-				//MSF_Test::NPCtest();
-				
-				//TESIdleForm* sw = reinterpret_cast<TESIdleForm*>(Utilities::GetFormFromIdentifier("SideAim.esp|1746"));//"VD_SIGMCXVirtus_MSFDemo.esp|2E03"
-				//Utilities::PlayIdle(*g_player, sw);
-
-				//MSF_Test::ExtraDataTest();
-				//MSF_Test::TestIdle(true);
-				//_DEBUG("pa: %02X", IsInPowerArmor(*g_player));
-
-				//MSF_Test::ArmorAttachTest();
-				//MSF_Test::PrintAmmoCount();
-				//MSF_Test::AIM_ZM_MA_testDump();
-				//MSF_Test::ProjectileTest();
-				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13454));
-				//MSF_Test::ModTemplateTest();
-
-				Utilities::PlaySoundInternal(MSF_MainData::failSound, *g_player);
-				//MSF_Test::AttachStackTest(2, true);
-				//MSF_Test::RaiderTest();
-				//ShowNotification("φόσυϊιαϋν", nullptr, 0, 0);
-				_DEBUG("str %s", "φόσυϊιαϋν");
-				_DEBUG("test1");
-			}
-		}
-		break;
 		case 0x22://PGD
-		{
-			if ((*g_ui)->numPauseGame == 0)
-			{
-				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, true);
-				//MSF_Test::AttachModInternalTest(true, 2);
-				//MSF_Test::CreateWeaponState();
-				//MSF_Test::CallAddItem();
-				//MSF_Test::CallPlayAction();
-				//MSF_Test::MenuFlagTest();
-				//MSF_Test::CallAttachModToInvItem();
-				//Utilities::ReloadWeapon(*g_player);
-				//MSF_Test::TestIdle(false);
-				//MSF_Test::DumpActorAnimData();
-				//MSF_Test::TestEquipAmmo();
-				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13455));
-				//MSF_Data::PatchBaseAmmoMods();
-				//MSF_Test::RemapAnimTest(true, true);
-				//MSF_Test::AttachStackTest(0, true);
-				//ShowNotification("test", nullptr, 1, 0);
-				PlaySoundVM((*g_gameVM)->m_virtualMachine, 0, MSF_MainData::failSound, *g_player);
-				_DEBUG("test2");
-			}
-		}
-		break;
 		case 0x23://END
 		{
 			if ((*g_ui)->numPauseGame == 0)
 			{
-				//Utilities::AddRemActorValue((*g_player), MSF_MainData::BurstModeTime, false);
-				//CALL_MEMBER_FN((*g_player), QueueUpdate)(true, 0, true, 0);
-				//MSF_Test::AttachModInternalTest(true, 2);
-				//MSF_Test::CallRemoveModFromInvItem();
-				//MSF_Test::DamageEquippedWeapon(*g_player);
-				//MSF_Test::ListExtraData();
-				//MSF_Test::SplitStackTest(13, false);
-				//Utilities::FireWeapon(*g_player, 1);
-				//MSF_Test::DumpActorAnimData();
-				//MSF_Test::DumpEquippedWeaponIdx();
-				//Utilities::PlayIdleAction(*g_player, (BGSAction*)LookupFormByID(0x13456));
-				//MSF_Test::ProjectileTest();
-				//MSF_Test::RemapAnimTest(false, true);
-				//MSF_Test::AttachStackTest(2, false);
-				ShowNotification("test", nullptr, 1, 0);
-				_DEBUG("test3");
+				MSF_Test::TestKeyDown(keyCode);
 			}
 		}
 		break;

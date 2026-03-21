@@ -336,7 +336,11 @@ class BCRinterface
 public:
 	BCRinterface()
 	{
+#ifndef NEXTGEN
 		_base = reinterpret_cast<uintptr_t>(GetModuleHandle("BulletCountedReload.dll"));
+#else
+		_base = 0;
+#endif
 		_base2 = _base;
 		if (_base)
 			_MESSAGE("BulletCountedReload.dll found at %p", _base);

@@ -98,6 +98,12 @@ public:
 };
 extern RelocPtr<ItemMenuDataManager*> g_itemMenuDataMgr;
 
+
+class PipboyInventoryData
+{
+
+};
+
 class PipboyDataManager
 {
 public:

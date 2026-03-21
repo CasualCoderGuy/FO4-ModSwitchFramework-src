@@ -11,6 +11,7 @@ fixes:
 - PlayIdleAction dependent functions (reload, lower weapon, etc.) now properly work in the NG build
 - fixed potential CTDs where OMODs in the objects mod list were not valid
 - fixed potential CTD when casting objects from inventory events
+- disabled BCR interface for NG that caused CTDs; until BCR RE is done it is not supported on NG
 - replaced F4SE LoadMovie function that was missing an argument which may have caused visual bugs in the NG build
 - some missing MSF widget functions are now properly registered
 - custom projectile overrides now properly update when loading a save or modding a weapon at the workbench

@@ -1,6 +1,7 @@
 #include "MSF_Events.h"
 #include "MSF_Localization.h"
 #include "MSF_WeaponState.h"
+#include "MSF_Test.h"
 
 AttackInputHandler AttackInputHandler_Copied;
 AttackInputHandler AttackInputHandlerSelf_Copied;
@@ -20,6 +21,7 @@ PlayerAmmoCountEventSink playerAmmoCountEventSink;
 MenuOpenCloseSink menuOpenCloseSink;
 _PlayerAnimationEvent PlayerAnimationEvent_Original;
 PipboyLightEventSink pipboyLightEvent;
+ActorEquipManagerEventSourceMSF actorEquipManagerEventSourceMSF;
 
 EventResult	BGSOnPlayerUseWorkBenchEventSink::ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher)
 {
@@ -82,16 +84,16 @@ EventResult	ActorEquipManagerEventSink::ReceiveEvent(ActorEquipManagerEvent::Eve
 	//return kEvent_Continue;
 	if (!evn->data || (evn->targetActor != *g_player))
 		return kEvent_Continue;
-	_DEBUG("equipEvent item: %p, instance: %p, equipslot: %p, data: %p, bEquip: %02X, bPA: %02X", evn->data->equippedItem, evn->data->instancedata, evn->data->equipSlot, evn->data->equippedWeaponData, evn->equip, IsInPowerArmor(*g_player));
+	_DEBUG("equipEvent item: %p, instance: %p, bEquip: %02X, bPA: %02X", evn->data->object, evn->data->instanceData, !evn->unequip, IsInPowerArmor(*g_player));
 	MSF_MainData::modSwitchManager.HandlePAEvent();
-	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->equippedItem, TESBoundObject, TESObjectWEAP);
+	TESObjectWEAP* eventWeapon = DYNAMIC_CAST(evn->data->object, TESBoundObject, TESObjectWEAP);
 	if (!eventWeapon)
 		return kEvent_Continue;
 	if (!MSF_MainData::modSwitchManager.GetModChangeEvent())
 		MSF_MainData::modSwitchManager.ClearQueue();
 	MSF_MainData::modSwitchManager.CloseOpenedMenu();
 	MSF_MainData::modSwitchManager.ClearQuickSelection(true, true);
-	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instancedata, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+	TESObjectWEAP::InstanceData* eventInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(evn->data->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
 	//TESObjectWEAP::InstanceData* equippedInstanceData = Utilities::GetEquippedInstanceData(*g_player);
 	WidgetUpdateTask* updTask = new WidgetUpdateTask();
 	delayTask delayUpd(250, true, g_threading->AddUITask, updTask);
@@ -788,6 +790,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	bool fire = false;
 	UInt8 didSwitch = 0;
 	UInt32 oldLoadedAmmoCount = 0;
+#ifdef DEBUG
+	MSF_Test::TestAnimEvent(arg2);
+#endif
 	if (!_strcmpi("reloadComplete", name))
 	{
 		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
