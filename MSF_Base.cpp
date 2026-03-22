@@ -2,6 +2,7 @@
 #include "MSF_Events.h"
 #include "MSF_WeaponState.h"
 #include "MSF_Localization.h"
+#include "MSF_Test.h"
 
 namespace MSF_Base
 {
@@ -241,7 +242,7 @@ namespace MSF_Base
 		return MSF_Data::GetNthMod(key, eqStack, modData);
 	}
 
-	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip)
+	const char* EquipModPipboy(TESObjectMISC* miscMod, bool bEquip) //FindModsForLooseMod{ 2197524 };
 	{
 		return MSF_Localization::GetTranslation(MSF_Localization::Keys::modText);
 		auto omod = MSF_MainData::miscModMap.find(miscMod);
@@ -261,7 +262,7 @@ namespace MSF_Base
 			TESObjectMISC* oldlmod = nullptr;
 			if (oldomod)
 				oldlmod = Utilities::GetLooseMod(oldomod);
-			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
+			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true, true))
 				return MSF_Localization::GetTranslation(MSF_Localization::Keys::couldntAttachText);
 			PlayEquipSound(*g_player, omod->first, 1, 0);
 			Utilities::RemoveItem(playerActor, omod->first, 1, true);
@@ -279,7 +280,7 @@ namespace MSF_Base
 			if (!oldMod)
 				return MSF_Localization::GetTranslation(MSF_Localization::Keys::noAPText);
 			TESObjectMISC* oldlmod = Utilities::GetLooseMod(oldMod->mod);
-			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true))
+			if (!AttachModToEquippedWeapon(playerActor, omod->second, true, 0, true, true))
 				return MSF_Localization::GetTranslation(MSF_Localization::Keys::couldntAttachText);;
 			PlayEquipSound(*g_player, omod->first, 1, 0);
 			Utilities::RemoveItem(playerActor, omod->first, 1, true);
@@ -409,9 +410,15 @@ namespace MSF_Base
 			//if (!Utilities::HasObjectMod(modData, mod))
 			//	ClearSwitchFlags();
 			bool bUpdateAnimGraph = false;
-			if (!modToAttach && (flags & SwitchData::bUpdateAnimGraph))
-				bUpdateAnimGraph = true;
-			if (!AttachModToEquippedWeapon(playerActor, modToRemove, false, 2, bUpdateAnimGraph))
+			bool bPlayFastEquipAnim = false;
+			if (!modToAttach)
+			{
+				if (flags & SwitchData::bUpdateAnimGraph)
+					bUpdateAnimGraph = true;
+				if (flags & SwitchData::bPlayFastEquipAnim)
+					bPlayFastEquipAnim = true;
+			}
+			if (!AttachModToEquippedWeapon(playerActor, modToRemove, false, 2, bUpdateAnimGraph, bPlayFastEquipAnim))
 			{
 				//_DEBUG("finishing1");
 				MSF_MainData::modSwitchManager.FinishSwitch(switchData);
@@ -425,7 +432,7 @@ namespace MSF_Base
 		{
 			//if (Utilities::HasObjectMod(modData, mod))
 			//	ClearSwitchFlags();
-			if (!AttachModToEquippedWeapon(playerActor, modToAttach, true, 2, (flags & SwitchData::bUpdateAnimGraph) != 0))
+			if (!AttachModToEquippedWeapon(playerActor, modToAttach, true, 2, (flags & SwitchData::bUpdateAnimGraph) != 0, (flags & SwitchData::bPlayFastEquipAnim) != 0))
 			{
 				//_DEBUG("finishing2");
 				MSF_MainData::modSwitchManager.FinishSwitch(switchData);
@@ -498,9 +505,10 @@ namespace MSF_Base
 
 	}
 
-	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modLoadedAmmoCount, bool updateAnimGraph)
+	bool AttachModToEquippedWeapon(Actor* actor, BGSMod::Attachment::Mod* mod, bool bAttach, UInt8 modLoadedAmmoCount, bool updateAnimGraph, bool playFastEquipAnim)
 	{
 		_DEBUG("attach, updAnim: %02X", updateAnimGraph);
+		//MSF_Test::DoLog(actor);
 		//BGSInventoryItem::Stack* stack = Utilities::GetEquippedStack(actor, 41);
 		//BGSInventoryItem::Stack* stack = Utilities::GetEquippedWeaponStack(actor);
 		BGSInventoryItem* eqItem = Utilities::GetEquippedInventoryWeapon(actor);
@@ -621,6 +629,7 @@ namespace MSF_Base
 		idStruct.object = weapBase;
 		idStruct.instanceData = instanceData;
 
+		//MSF_Test::DoLog(actor);
 		//_DEBUG("mod ammo count1: %i", eqData->loadedAmmoCount);
 		MSF_MainData::modSwitchManager.SetModChangeEvent(true);
 		//if (updateAnimGraph)
@@ -683,10 +692,18 @@ namespace MSF_Base
 		//equipSlotStruct.unk18 = 0x10000;
 		//UnkSub_EFF9D0(actor);
 		//EquipHandler(unk_05AB38D0, actor, idStruct, equipSlotStruct);
+		
 		if (updateAnimGraph)
 		{
-			PlayerCharacter* player = *g_player;
+			_DEBUG("UpdateAnimationGraph");
+			//PlayerCharacter* player = *g_player;
+			//MSF_Test::FollowAnimationFor(player, 300, 10);
+			if (!playFastEquipAnim)
+				MSF_MainData::modSwitchManager.SetIgnoreEquipAction(true); //jiggleAfterMoveEffectMedium, playFastEquipSound
 			UpdateAnimGraph(actor, false);
+			//MSF_Test::DoLog(player);
+
+
 			//InitializeActorInstant(actor, 0);
 			//if (player == actor)
 			//{
@@ -772,7 +789,7 @@ namespace MSF_Base
 		return true;
 	}
 
-	bool AttachRemoveModToInventoryStack(TESObjectREFR* owner, BGSInventoryItem* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph)
+	bool AttachRemoveModToInventoryStack(TESObjectREFR* owner, BGSInventoryItem* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph, bool playFastEquipAnim)
 	{
 		if (!owner || !item || !mod || !item->form || !item->stack)
 			return false;
@@ -948,7 +965,7 @@ namespace MSF_Base
 		return true;
 	}
 
-	bool AttachRemoveModToEquippedItem(Actor* actor, UInt8 slotIndex, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph)
+	bool AttachRemoveModToEquippedItem(Actor* actor, UInt8 slotIndex, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph, bool playFastEquipAnim)
 	{
 		if (slotIndex >= BIPOBJECT::BIPED_OBJECT::kTotal)
 			return false;
@@ -973,12 +990,12 @@ namespace MSF_Base
 			for (BGSInventoryItem::Stack* currStack = inventoryItem.stack; currStack; currStack = currStack->next)
 			{
 				if (!hasMultiple || (currStack->flags & BGSInventoryItem::Stack::kFlagEquipped))
-					return AttachRemoveModToInventoryStack(actor, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph);
+					return AttachRemoveModToInventoryStack(actor, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph, playFastEquipAnim);
 				else if (inventoryItem.stack->extraData)
 				{
 					ExtraInstanceData* instance = (ExtraInstanceData*)inventoryItem.stack->extraData->GetByType(ExtraDataType::kExtraData_InstanceData);
 					if (instance && actor->biped.get()->object[slotIndex].parent.instanceData == instance->instanceData)
-						return AttachRemoveModToInventoryStack(actor, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph);
+						return AttachRemoveModToInventoryStack(actor, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph, playFastEquipAnim);
 				}
 				stackID++;
 				_DEBUG("raider stack not equipped");
@@ -987,7 +1004,7 @@ namespace MSF_Base
 		return false;
 	}
 
-	bool AttachRemoveModToInventoryStackPre(TESObjectREFR* owner, TESBoundObject* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph)
+	bool AttachRemoveModToInventoryStackPre(TESObjectREFR* owner, TESBoundObject* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph, bool playFastEquipAnim)
 	{
 		if (!item || !owner || !mod)
 			return false;
@@ -998,7 +1015,7 @@ namespace MSF_Base
 		{
 			owner->inventoryList->items.GetNthItem(i, inventoryItem);
 			if (inventoryItem.form == item && inventoryItem.stack)
-				return AttachRemoveModToInventoryStack(owner, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph);
+				return AttachRemoveModToInventoryStack(owner, &inventoryItem, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph, playFastEquipAnim);
 		}
 		return false;
 	}
@@ -1214,8 +1231,43 @@ namespace MSF_Base
 
 	bool EquipAmmo(BGSInventoryList* invList, TESAmmo* ammo)
 	{
+		/*
+		namespace PipboyDataManager
+		{
+			inline constexpr REL::ID Singleton{ 4796372 };
+		}
+
+		namespace PipboyDataGroup
+		{
+			inline constexpr REL::ID LockDataGroup{ 2225147 };
+			inline constexpr REL::ID UnlockDataGroup{ 2225148 };
+		}
+
+		namespace PipboyInventoryData
+		{
+			inline constexpr REL::ID AddItemCardInfoEntry{ 2225267 };
+			inline constexpr REL::ID BaseAddItemCardInfoEntry{ 2225270 };
+			inline constexpr REL::ID InitializeItem{ 2225264 };
+			inline constexpr REL::ID PopulateItemCardInfo{ 2225266 };
+			inline constexpr REL::ID QueueItemCardRepopulate{ 2225311 };
+			inline constexpr REL::ID RepopulateItemCardOnSection{ 2225279 };
+			namespace PipboyInventoryMenu
+			{
+				PipboyInventoryMenu UpdateData(this){ 2224143 };
+
+
+				PipboyInventoryData
+				virtual BSEventNotifyControl ProcessEvent(const ActorEquipManagerEvent::Event& a_event, BSTEventSource<ActorEquipManagerEvent::Event>* a_source);                            // 03
+
+				*/
+
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowEquippedAmmo))
 			return true;
+		_DEBUG("ammoEq");
+		uintptr_t** pipboyInventoryData = (uintptr_t**)((uintptr_t)*g_pipboyDataMgr + 0x358);
+		typedef EventResult(*_EquipEventProcess)(void* pipboyInventoryData, ActorEquipManagerEvent::Event* evn, BSTEventDispatcher<ActorEquipManagerEvent::Event>* a_source);
+		_EquipEventProcess PipboyEquipProcessEvnFn = (_EquipEventProcess)*(*pipboyInventoryData + 3);
+		_DEBUG("pipDataMgr: %p, pipInvMenu: %p, pipEqProcFn: %p, ", *g_pipboyDataMgr, pipboyInventoryData, *(*pipboyInventoryData + 3)); //BFB0
 		for (UInt32 i = 0; i < invList->items.count; i++)
 		{
 			BGSInventoryItem inventoryItem;
@@ -1229,18 +1281,54 @@ namespace MSF_Base
 				continue;
 			if (inventoryItem.form == ammo)
 			{
+				UInt32 stackID = 0;
 				for (BGSInventoryItem::Stack* stack = inventoryItem.stack; stack; stack = stack->next)
+				{
 					InterlockedExchange16((volatile short*)&stack->flags, 1);
+					//ActorEquipManagerEvent::Event evn;
+					//BGSObjectInstance obj;
+					//obj.object = ammo;
+					//evn.data = &obj;
+					//evn.stackID = stackID;
+					//evn.unequip = false;
+					//_DEBUG("ammoEq2: %s", ammo->GetFullName());
+					//PipboyEquipProcessEvnFn(pipboyInventoryData, &evn, &actorEquipManagerEventSourceMSF);
+					//_DEBUG("ammoEqOK");
+					//stackID++;
+				}
 			}
 			else
 			{
+				UInt32 stackID = 0;
 				for (BGSInventoryItem::Stack* stack = inventoryItem.stack; stack; stack = stack->next)
 				{
 					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped) //&& not fusioncore
+					{
 						InterlockedExchange16((volatile short*)&stack->flags, 0);
+						//ActorEquipManagerEvent::Event evn;
+						//BGSObjectInstance obj;
+						//obj.object = inventoryItem.form;
+						//evn.data = &obj;
+						//evn.stackID = stackID;
+						//evn.unequip = false;
+						//_DEBUG("ammoUEq2: %s", inventoryItem.form->GetFullName());
+						//PipboyEquipProcessEvnFn(pipboyInventoryData, &evn, &actorEquipManagerEventSourceMSF);
+						//_DEBUG("ammoUEqOK");
+						//stackID++;
+					}
 				}
 			}
 		}
+		//typedef void* (*_PipboyInventoryMenu_UpdateData)(void* pipboyInventoryMenu);
+		//RelocAddr <_PipboyInventoryMenu_UpdateData> PipboyInventoryMenu_UpdateData(0xB8D5C0); //0xADEF10
+		//uintptr_t pipboyInventoryMenu = (uintptr_t)(*g_ui)->GetMenu(BSFixedString("PipboyMenu"));
+		//if (pipboyInventoryMenu)
+		//{
+		//	pipboyInventoryMenu += 0x160;
+		//	_DEBUG("ammoUpd");
+		//	PipboyInventoryMenu_UpdateData((void*)pipboyInventoryMenu);
+		//	_DEBUG("ammoUpdOK");
+		//}
 		return true;
 	}
 

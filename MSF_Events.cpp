@@ -433,8 +433,8 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 		MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(false);
 	else
 	{
-		if (MSF_MainData::modSwitchManager.GetIgnoreEquipAction())
-			unk_rdx = false;
+		//if (MSF_MainData::modSwitchManager.GetIgnoreEquipAction())
+		//	unk_rdx = false;
 		return EquipHandler_UpdateAnimGraph_Copied(actor, unk_rdx);
 		//return UpdateAnimGraph(actor, unk_rdx);
 	}
@@ -443,8 +443,8 @@ void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
 
 void EquipHandler_PlayEquipAction_Hook(Actor* actor, bool unk_rdx)
 {
-	if (MSF_MainData::modSwitchManager.GetIgnoreEquipAction())
-		return;
+	//if (MSF_MainData::modSwitchManager.GetIgnoreEquipAction())
+	//	return;
 	return EquipHandler_PlayEquipAction_Copied(actor, unk_rdx);
 }
 
@@ -1057,6 +1057,13 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	}
 	else if (!_strcmpi("initiateStart", name))
 	{
+		if (MSF_MainData::modSwitchManager.GetIgnoreEquipAction())
+		{
+			MSF_MainData::modSwitchManager.SetIgnoreEquipAction(false);
+			PlayerCharacter* player = *g_player;
+			InitializeActorInstant(player, 0);
+			UpdateAnimation(player, 0.2f);
+		}
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
 			Actor* playerActor = *g_player;
@@ -1068,6 +1075,12 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			}
 		}
 	}
+	//else if (!_strcmpi("playFastEquipSound", name))
+	//{ 
+	//}
+	//else if (!_strcmpi("FootRight", name))
+	//{
+	//}
 	//else if (!_strcmpi("uncullBone", name))
 	//{
 	//	_DEBUG("uncullBone");

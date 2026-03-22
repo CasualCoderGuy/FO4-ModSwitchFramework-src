@@ -267,24 +267,24 @@ namespace MSF_Papyrus
 	}
 
 
-	bool AttachRemoveModToEquippedWeapon(StaticFunctionTag*, Actor* owner, BGSMod::Attachment::Mod* mod, bool bAttach, bool bUpdateAnimGraph)
+	bool AttachRemoveModToEquippedWeapon(StaticFunctionTag*, Actor* owner, BGSMod::Attachment::Mod* mod, bool bAttach, bool bUpdateAnimGraph, bool bPlayFastEquipAnim)
 	{
 		if (!owner || !mod)
 			return false;
 		
 		_DEBUG("attach, updAnim: %02X", bUpdateAnimGraph);
-		return MSF_Base::AttachModToEquippedWeapon(owner, mod, bAttach, 2, bUpdateAnimGraph);
+		return MSF_Base::AttachModToEquippedWeapon(owner, mod, bAttach, 2, bUpdateAnimGraph, bPlayFastEquipAnim);
 	}
 
-	bool AttachRemoveModToEquippedItemPapyrus(StaticFunctionTag*, Actor* actor, UInt32 slotIndex, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph)
+	bool AttachRemoveModToEquippedItemPapyrus(StaticFunctionTag*, Actor* actor, UInt32 slotIndex, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph, bool playFastEquipAnim)
 	{
-		return MSF_Base::AttachRemoveModToEquippedItem(actor, slotIndex, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph);
+		return MSF_Base::AttachRemoveModToEquippedItem(actor, slotIndex, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph, playFastEquipAnim);
 	}
 
-	bool AttachRemoveModToInventoryStackPapyrus(StaticFunctionTag*, TESObjectREFR* owner, TESForm* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph)
+	bool AttachRemoveModToInventoryStackPapyrus(StaticFunctionTag*, TESObjectREFR* owner, TESForm* item, UInt32 stackID, BGSMod::Attachment::Mod* mod, bool bAttach, bool shouldSplitStacks, bool transferEquippedToSplitStack, bool updateAnimGraph, bool playFastEquipAnim)
 	{
 		TESBoundObject* tbo = DYNAMIC_CAST(item, TESForm, TESBoundObject);
-		return MSF_Base::AttachRemoveModToInventoryStackPre(owner, tbo, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph);
+		return MSF_Base::AttachRemoveModToInventoryStackPre(owner, tbo, stackID, mod, bAttach, shouldSplitStacks, transferEquippedToSplitStack, updateAnimGraph, playFastEquipAnim);
 	}
 
 	VMArray<TESForm*> GetAllInventoryItem(StaticFunctionTag*, TESObjectREFR* owner)
@@ -576,11 +576,11 @@ void MSF_Papyrus::RegisterFuncs(VirtualMachine* vm)
 	vm->RegisterFunction(
 		new NativeFunction3 <StaticFunctionTag, bool, Actor*, BGSKeyword*, UInt32>("EquippedItemHasKeyword", SCRIPTNAME, EquippedItemHasKeyword, vm));
 	vm->RegisterFunction(
-		new NativeFunction4 <StaticFunctionTag, bool, Actor*, BGSMod::Attachment::Mod*, bool, bool>("AttachRemoveModToEquippedWeapon", SCRIPTNAME, AttachRemoveModToEquippedWeapon, vm));
+		new NativeFunction5 <StaticFunctionTag, bool, Actor*, BGSMod::Attachment::Mod*, bool, bool, bool>("AttachRemoveModToEquippedWeapon", SCRIPTNAME, AttachRemoveModToEquippedWeapon, vm));
 	vm->RegisterFunction(
-		new NativeFunction7 <StaticFunctionTag, bool, Actor*, UInt32, BGSMod::Attachment::Mod*, bool, bool, bool, bool>("AttachRemoveModToEquippedItem", SCRIPTNAME, AttachRemoveModToEquippedItemPapyrus, vm));
+		new NativeFunction8 <StaticFunctionTag, bool, Actor*, UInt32, BGSMod::Attachment::Mod*, bool, bool, bool, bool, bool>("AttachRemoveModToEquippedItem", SCRIPTNAME, AttachRemoveModToEquippedItemPapyrus, vm));
 	vm->RegisterFunction(
-		new NativeFunction8 <StaticFunctionTag, bool, TESObjectREFR*, TESForm*, UInt32, BGSMod::Attachment::Mod*, bool, bool, bool, bool>("AttachRemoveModToInventoryStack", SCRIPTNAME, AttachRemoveModToInventoryStackPapyrus, vm));
+		new NativeFunction9 <StaticFunctionTag, bool, TESObjectREFR*, TESForm*, UInt32, BGSMod::Attachment::Mod*, bool, bool, bool, bool, bool>("AttachRemoveModToInventoryStack", SCRIPTNAME, AttachRemoveModToInventoryStackPapyrus, vm));
 	vm->RegisterFunction(
 		new NativeFunction1 <StaticFunctionTag, VMArray<TESForm*>, TESObjectREFR*>("GetAllInventoryItem", SCRIPTNAME, GetAllInventoryItem, vm));
 	vm->RegisterFunction(

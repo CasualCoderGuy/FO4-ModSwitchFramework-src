@@ -84,12 +84,13 @@ public:
 			bHasSecondaryAmmo = 0x0004,
 			bHasUniqueState = 0x0008,
 			bCanBeEquippedByMiscMod = 0x0010,
+			bPlayFastEquipAnim = 0x0400,
 			bDoSwitchBeforeAnimations = 0x0800,
 			bNotRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,
-			mBitTransferMask = 0xF800UL,
+			mBitTransferMask = 0xFC00UL,
 			bShouldNotStopIdle = 0x10000
 		};
 		class AttachRequirements
@@ -345,7 +346,9 @@ public:
 		bDrawEnabled = 0x00001000,
 		bSetLooseMods = 0x00002000,
 		bUpdateAnimGraph = 0x00004000,
-		bIgnoreAnimations = 0x00008000
+		bIgnoreAnimations = 0x00008000,
+		bPlayFastEquipAnim = 0x00000400
+
 		//bDoSwitchBeforeAnimations
 	};
 	UInt32 SwitchFlags;

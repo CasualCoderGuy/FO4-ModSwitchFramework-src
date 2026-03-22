@@ -1,4 +1,8 @@
 ---
+v1.2.5
+features:
+- fast equip animations are now disabled by default when using animation graph update (bUpdateAnimGraph); if the animation needs to be played use the bPlayFastEquipAnim OMOD flag or pass it as a Papyrus argument (Papyrus scripts have to be updated) 
+---
 v1.2.4
 features:
 - added melee and unarmed support for MSF widgets
