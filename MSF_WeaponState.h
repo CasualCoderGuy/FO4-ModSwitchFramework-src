@@ -336,11 +336,7 @@ class BCRinterface
 public:
 	BCRinterface()
 	{
-#ifndef NEXTGEN
 		_base = reinterpret_cast<uintptr_t>(GetModuleHandle("BulletCountedReload.dll"));
-#else
-		_base = 0;
-#endif
 		_base2 = _base;
 		if (_base)
 			_MESSAGE("BulletCountedReload.dll found at %p", _base);
@@ -349,19 +345,19 @@ public:
 		//BulletCountedReload.dll+8785
 		//73004
 		//730B8
-		BCR_ammoCount = RelocModuleAddr<UInt32>(_base, 0x79B24);
-		BCR_ammoCapacity = RelocModuleAddr<UInt32>(_base, 0x79B20);
-		BCR_instanceData = RelocModuleAddr<TESObjectWEAP::InstanceData*>(_base, 0x79B10);
-		BCR_totalAmmo = RelocModuleAddr<UInt32>(_base, 0x79B04);
-		reloadEnded = RelocModuleAddr<bool>(_base, 0x73CA8);
-		reloadStarted = RelocModuleAddr<bool>(_base, 0x79AD2);
-		incrementer = RelocModuleAddr<UInt32>(_base, 0x79AD4);
-		toAdd = RelocModuleAddr<UInt32>(_base, 0x79B00);
-		stopPressed = RelocModuleAddr<bool>(_base, 0x79AD1);
-		animWillPlay = RelocModuleAddr<bool>(_base, 0x73CA9);
-		uncull = RelocModuleAddr<bool>(_base, 0x79AD3);
-		readyToStop = RelocModuleAddr<bool>(_base, 0x79AD0);
-		animDone = RelocModuleAddr<UInt32>(_base, 0x79AE0);
+		BCR_ammoCount = RelocModuleAddr<UInt32>(_base, 0x79B24, 0x485CC);
+		BCR_ammoCapacity = RelocModuleAddr<UInt32>(_base, 0x79B20, 0x485C8);
+		BCR_instanceData = RelocModuleAddr<TESObjectWEAP::InstanceData*>(_base, 0x79B10, 0x485A8);
+		BCR_totalAmmo = RelocModuleAddr<UInt32>(_base, 0x79B04, 0x485B4);
+		reloadEnded = RelocModuleAddr<bool>(_base, 0x73CA8, 0x45B60);
+		reloadStarted = RelocModuleAddr<bool>(_base, 0x79AD2, 0x48572);
+		incrementer = RelocModuleAddr<UInt32>(_base, 0x79AD4, 0x48574);
+		toAdd = RelocModuleAddr<UInt32>(_base, 0x79B00, 0x4857C);
+		stopPressed = RelocModuleAddr<bool>(_base, 0x79AD1, 0x48571);
+		animWillPlay = RelocModuleAddr<bool>(_base, 0x73CA9, 0x45B61);
+		uncull = RelocModuleAddr<bool>(_base, 0x79AD3, 0x48573);
+		readyToStop = RelocModuleAddr<bool>(_base, 0x79AD0, 0x48570);
+		animDone = RelocModuleAddr<UInt32>(_base, 0x79AE0, 0x48578);
 	};
 	bool SetBCRammoCap(UInt32 ammoCap)
 	{

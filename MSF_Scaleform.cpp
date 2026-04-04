@@ -307,17 +307,17 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 	{
 		_DEBUG("args ok");
 		SInt32 selectedIndex = args->args[0].GetInt();
-		PipboyObject* pHandlerData = nullptr;
-		if (selectedIndex >= 0 && selectedIndex < (*g_pipboyDataMgr)->itemData.count)
-			pHandlerData = (*g_pipboyDataMgr)->itemData[selectedIndex];
+		PipboyObjectEx* pHandlerData = nullptr;
+		if (selectedIndex >= 0 && selectedIndex < (*g_pipboyDataMgr)->itemData.sortedItems.count)
+			pHandlerData = (*g_pipboyDataMgr)->itemData.sortedItems[selectedIndex];
 		_DEBUG("handler ok");
 		if (pHandlerData != nullptr)
 		{
 			static BSFixedString handleName("handleID");
 			static BSFixedString stackName("StackID");
 
-			auto* pipboyValueHandle = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->table.Find(&handleName)->value);
-			auto* pipboyValueStack = static_cast<PipboyArray*>(pHandlerData->table.Find(&stackName)->value);
+			auto* pipboyValueHandle = static_cast<PipboyPrimitiveValueEx<UInt32>*>((*pHandlerData->memberMap.find(handleName)).second);
+			auto* pipboyValueStack = static_cast<PipboyArray*>((*pHandlerData->memberMap.find(stackName)).second);
 			_DEBUG("values ok");
 			//auto* pipboyValue = static_cast<PipboyPrimitiveValue<UInt32>*>(pHandlerData->GetMemberValue(memberName));
 			if (pipboyValueHandle != nullptr)
@@ -330,7 +330,7 @@ void PipboyMenuInvoke_Hook(PipboyMenu* menu, PipboyMenu::ScaleformArgs* args)
 				_DEBUG("selected: %p, %p", pSelectedData, pSelectedForm);
 				if (pipboyValueStack != nullptr && pipboyValueStack->values.entries)
 				{
-					auto* pipboyStackIDholder = static_cast<PipboyPrimitiveValue<UInt32>*>(*pipboyValueStack->values.entries);
+					auto* pipboyStackIDholder = static_cast<PipboyPrimitiveValueEx<UInt32>*>(*pipboyValueStack->values.entries);
 					stackID = pipboyStackIDholder->value;
 					_DEBUG("stack ok");
 				}

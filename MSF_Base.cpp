@@ -1262,7 +1262,12 @@ namespace MSF_Base
 				*/
 
 		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowEquippedAmmo))
-			return true;
+		{
+			if (!MSF_MainData::HadEquippedAmmo)
+				return true;
+			ammo = nullptr;
+		}
+		MSF_MainData::HadEquippedAmmo = false;
 		_DEBUG("ammoEq");
 		uintptr_t** pipboyInventoryData = (uintptr_t**)((uintptr_t)*g_pipboyDataMgr + 0x358);
 		typedef EventResult(*_EquipEventProcess)(void* pipboyInventoryData, ActorEquipManagerEvent::Event* evn, BSTEventDispatcher<ActorEquipManagerEvent::Event>* a_source);
@@ -1282,6 +1287,7 @@ namespace MSF_Base
 			if (inventoryItem.form == ammo)
 			{
 				UInt32 stackID = 0;
+				MSF_MainData::HadEquippedAmmo = true;
 				for (BGSInventoryItem::Stack* stack = inventoryItem.stack; stack; stack = stack->next)
 				{
 					InterlockedExchange16((volatile short*)&stack->flags, 1);
@@ -1296,15 +1302,48 @@ namespace MSF_Base
 					//_DEBUG("ammoEqOK");
 					//stackID++;
 				}
+				//EnterCriticalSection(&(*g_pipboyDataMgr)->itemData.pipboyDataMutex);
+
+				//auto pipboyEntry = (*g_pipboyDataMgr)->itemData.itemEntries.find(inventoryItem.form->formID);
+				//if (pipboyEntry == (*g_pipboyDataMgr)->itemData.itemEntries.end())
+				//	continue;
+				//_DEBUG("tList: %p", &(*pipboyEntry).second);
+
+				auto ammoArray = (*g_pipboyDataMgr)->itemData.inventoryObject->GetMember<PipboyArray*>("44");
+				if (!ammoArray)
+					continue;
+				for (UInt32 i = 0; i < ammoArray->values.count; i++) //for (UInt32 i = 0; i < (*g_pipboyDataMgr)->itemData.sortedItems.count; i++)
+				{
+					PipboyObjectEx* obj = (PipboyObjectEx*)ammoArray->values[i]; //(*g_pipboyDataMgr)->itemData.sortedItems[i];
+					if (!obj)
+						continue;
+					auto formIDval = obj->GetMember<PipboyPrimitiveValueEx<UInt32>*>("formID");
+					if (!formIDval)
+						continue;
+					UInt32 formID = formIDval->value;
+					if (inventoryItem.form->formID != formID)
+						continue;
+					const auto it = obj->memberMap.find("equipState");
+					if (it == obj->memberMap.end() || !it->second)
+						continue; //break;
+					auto equipState = reinterpret_cast<PipboyPrimitiveValueEx<UInt32>*>(it->second);
+					if (!equipState)
+						continue;
+					equipState->value = 1;
+					//break;
+				}
+				//LeaveCriticalSection(&(*g_pipboyDataMgr)->itemData.pipboyDataMutex);
 			}
 			else
 			{
 				UInt32 stackID = 0;
+				bool wasEquipped = false;
 				for (BGSInventoryItem::Stack* stack = inventoryItem.stack; stack; stack = stack->next)
 				{
 					if (stack->flags & BGSInventoryItem::Stack::kFlagEquipped) //&& not fusioncore
 					{
 						InterlockedExchange16((volatile short*)&stack->flags, 0);
+						wasEquipped = true;
 						//ActorEquipManagerEvent::Event evn;
 						//BGSObjectInstance obj;
 						//obj.object = inventoryItem.form;
@@ -1316,6 +1355,40 @@ namespace MSF_Base
 						//_DEBUG("ammoUEqOK");
 						//stackID++;
 					}
+				}
+				if (wasEquipped)
+				{
+					//EnterCriticalSection(&(*g_pipboyDataMgr)->itemData.pipboyDataMutex);
+					
+					//auto pipboyEntry = (*g_pipboyDataMgr)->itemData.itemEntries.find(inventoryItem.form->formID);
+					//if (pipboyEntry == (*g_pipboyDataMgr)->itemData.itemEntries.end())
+					//	continue;
+					//_DEBUG("tList: %p", &(*pipboyEntry).second);
+
+					auto ammoArray = (*g_pipboyDataMgr)->itemData.inventoryObject->GetMember<PipboyArray*>("44");
+					if (!ammoArray)
+						continue;
+					for (UInt32 i = 0; i < ammoArray->values.count; i++) //for (UInt32 i = 0; i < (*g_pipboyDataMgr)->itemData.sortedItems.count; i++)
+					{
+						PipboyObjectEx* obj = (PipboyObjectEx*)ammoArray->values[i]; //(*g_pipboyDataMgr)->itemData.sortedItems[i];
+						if (!obj)
+							continue;
+						auto formIDval = obj->GetMember<PipboyPrimitiveValueEx<UInt32>*>("formID");
+						if (!formIDval)
+							continue;
+						UInt32 formID = formIDval->value;
+						if (inventoryItem.form->formID != formID)
+							continue;
+						const auto it = obj->memberMap.find("equipState");
+						if (it == obj->memberMap.end() || !it->second)
+							continue; //break;
+						auto equipState = reinterpret_cast<PipboyPrimitiveValueEx<UInt32>*>(it->second);
+						if (!equipState)
+							continue;
+						equipState->value = 0;
+						//break;
+					}
+					//LeaveCriticalSection(&(*g_pipboyDataMgr)->itemData.pipboyDataMutex);
 				}
 			}
 		}

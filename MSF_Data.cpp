@@ -58,6 +58,7 @@ BGSAction* MSF_MainData::ActionGunDown;
 BGSAction* MSF_MainData::ActionRightRelease;
 bool MSF_MainData::GameIsLoading = true;
 bool MSF_MainData::IsInitialized = false;
+bool MSF_MainData::HadEquippedAmmo = false;
 bool MSF_MainData::PutYourGunInCompatibility = false;
 bool MSF_MainData::BAKACompatibility = false;
 int MSF_MainData::iCheckDelayMS = 10;
@@ -1327,7 +1328,22 @@ namespace MSF_Data
 			else if (settingName == "bDisplayChamberInPipboy")
 				flag = MSF_MainData::bDisplayChamberInPipboy;
 			else if (settingName == "bShowEquippedAmmo")
+			{
 				flag = MSF_MainData::bShowEquippedAmmo;
+				if (MSF_MainData::IsInitialized && *g_player)
+				{
+					if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bShowEquippedAmmo) && flagValue)
+					{
+						TESAmmo* ammo = nullptr;
+						EquipWeaponData* eqWeapData = Utilities::GetEquippedWeaponData(*g_player);
+						if (eqWeapData)
+							ammo = eqWeapData->ammo;
+						MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
+					}
+					else if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bShowEquippedAmmo) && !flagValue)
+						MSF_Base::EquipAmmo((*g_player)->inventoryList, nullptr);
+				}
+			}
 			else if (settingName == "bLowerWeaponAfterSprint")
 				flag = MSF_MainData::bLowerWeaponAfterSprint;
 
