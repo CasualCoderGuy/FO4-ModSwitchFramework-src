@@ -346,6 +346,7 @@ void UpdateEquipData_Hook(BipedAnim* equipData, BGSObjectInstance instance, UInt
 		TESObjectWEAP* eqWeap = DYNAMIC_CAST(instance.object, TESBoundObject, TESObjectWEAP);
 		if (eqWeap)
 		{
+			MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 			if (MSF_MainData::modSwitchManager.GetIsBCRreload() != ExtraWeaponState::bEventTypeReloadSwitchBCR)
 				MSF_MainData::modSwitchManager.SetIsBCRreload(0);
 			else
@@ -795,6 +796,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 #endif
 	if (!_strcmpi("reloadComplete", name))
 	{
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
 		if (eqData)
 			oldLoadedAmmoCount = eqData->loadedAmmoCount;
@@ -834,9 +836,10 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload); //BCR!!
 
 	}
-	else if (!_strcmpi("reloadEnd", name))
+	else if (!_strcmpi("reloadStateExit", name)) //reloadEnd
 	{
 		_DEBUG("reloadEnd");
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		MSF_MainData::modSwitchManager.SetIsBCRreload(0);
 		if (MSF_MainData::modSwitchManager.GetState() & ModSwitchManager::bState_ReloadNotFinished)
 		{
@@ -932,6 +935,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	}
 	else if (!_strcmpi("IdleStop", name))
 	{
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		if (MSF_MainData::modSwitchManager.GetShouldBlendAnimation())
 		{
 			MSF_MainData::modSwitchManager.SetShouldBlendAnimation(false);
@@ -956,6 +960,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	}
 	else if (!_strcmpi("switchMod", name))
 	{
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();
 		if (switchData && !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimCompatibilityMode))
 		{
@@ -991,6 +996,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	else if (!_strcmpi("Event00", name))
 	{
 		_DEBUG("BCR Event00");
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
 		if (eqData)
 			oldLoadedAmmoCount = eqData->loadedAmmoCount;
@@ -1062,7 +1068,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			MSF_MainData::modSwitchManager.SetIgnoreEquipAction(false);
 			PlayerCharacter* player = *g_player;
 			InitializeActorInstant(player, 0);
-			UpdateAnimation(player, 0.2f);
+			UpdateAnimation(player, 0.0f); //0.2f
 		}
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
@@ -1074,6 +1080,14 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 				MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 			}
 		}
+	}
+	else if (!_strcmpi("reloadStateEnter", name))
+	{
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
+	}
+	else if (!_strcmpi("customAnimStart", name))
+	{
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
 	}
 	//else if (!_strcmpi("playFastEquipSound", name))
 	//{ 

@@ -53,16 +53,6 @@ namespace InventoryInterface
 		std::int32_t oldCount;           // 0C
 	};
 	STATIC_ASSERT(sizeof(CountChangedEvent) == 0x10);
-
-	struct FavoriteChangedEvent
-	{
-	public:
-		~FavoriteChangedEvent() noexcept {}  // intentional
-
-		// members
-		BGSInventoryItem* itemAffected;  // 0
-	};
-	STATIC_ASSERT(sizeof(FavoriteChangedEvent) == 0x8);
 }
 
 class BGSInventoryInterface
@@ -630,7 +620,7 @@ namespace Utilities
 	UInt32 PlaySoundInternal(BGSSoundDescriptorForm* sound, TESObjectREFR* target);
 	bool PlayIdle(Actor* actor, TESIdleForm* idle);
 	bool PlayIdleAction(Actor* actor, BGSAction* action);
-	void DrawWeapon(Actor* actor);
+	void DrawWeapon(Actor* actor, bool shouldDelay = false);
 	void FireWeapon(Actor* actor, UInt32 shots);
 	void ReloadWeapon(Actor* actor);
 	void SetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName, bool newVal);
@@ -639,6 +629,7 @@ namespace Utilities
 	bool GetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName);
 	SInt32 GetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName);
 	float GetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName);
+	void GetClipInfo(Actor* actor, float& currentTime, float& duration, std::string& clipName);
 	void SendNotification(std::string asNotificationText);
 	//void ShowMessagebox(std::string asText);
 	void AddItem(TESObjectREFR* target, TESForm* form, SInt32 count, bool bSilent);

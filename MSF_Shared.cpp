@@ -1,4 +1,5 @@
 #include "MSF_Shared.h"
+#include "MSF_Events.h"
 
 
 BSExtraData::~BSExtraData() {};
@@ -1140,8 +1141,13 @@ namespace Utilities
 #endif
 	}
 
-	void DrawWeapon(Actor* actor)
+	void DrawWeapon(Actor* actor, bool shouldDelay)
 	{
+		if (shouldDelay)
+		{
+			SelfDelayedFunctionTask* drawTask = new SelfDelayedFunctionTask(MSF_MainData::iCancelDelayMS, true, false, DrawWeapon, actor, false);
+			return;
+		}
 		return DrawWeaponInternal((*g_gameVM)->m_virtualMachine, 0, actor);
 	}
 
@@ -1177,6 +1183,43 @@ namespace Utilities
 		idStruct.object = extraInstanceData->baseForm;
 		idStruct.instanceData = extraInstanceData->instanceData;
 		ReloadWeaponInternal(actor, idStruct, 41);
+	}
+
+	void GetClipInfo(Actor* actor, float& currentTime, float& duration, std::string& clipName)
+	{
+		if (actor->middleProcess)
+		{
+			MiddleHighProcessData* midProc = (MiddleHighProcessData*)actor->middleProcess->unk08;
+			BSAnimationGraphManager* graphManager = (BSAnimationGraphManager*)midProc->animationGraphManager;
+			if (graphManager) {
+				BShkbAnimationGraph* graph = graphManager->variableCache.graphToCacheFor.get();
+				if (graph) {
+					void* hkGraph = *(void**)((uintptr_t)graph + 0x378);
+					typedef hkArray<void**, struct hkContainerHeapAllocator> nodeArray;
+					nodeArray* activeNodes = *(nodeArray**)((uintptr_t)hkGraph + 0xE0);
+					if (activeNodes && activeNodes->_size > 0) {
+						void** generatorArray = *activeNodes->_data;
+						while (*generatorArray) {
+							uintptr_t clip = (uintptr_t)(*generatorArray);
+							if (*(uint32_t*)(clip + 0x8)) {
+								currentTime = *(float*)(clip + 0x140);
+								clipName = std::string(*(const char**)(clip + 0x38));
+								if (currentTime) {
+									uintptr_t animCtrl = *(uintptr_t*)(clip + 0xD0);
+									if (animCtrl) {
+										uintptr_t animBinding = *(uintptr_t*)(animCtrl + 0x38);
+										uintptr_t anim = *(uintptr_t*)(animBinding + 0x18);
+										duration = *(float*)(anim + 0x14);
+										return;
+									}
+								}
+							}
+							generatorArray = (void**)((uintptr_t)generatorArray + 0x8);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	bool ModActorValue(Actor* actor, ActorValueInfo* av, float val)

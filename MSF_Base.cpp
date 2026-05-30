@@ -106,15 +106,27 @@ namespace MSF_Base
 			return true;
 		}
 
-		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || MSF_MainData::modSwitchManager.GetState() != 0)
+		if (MSF_MainData::modSwitchManager.GetState() != 0)
 		{
 			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 			delete switchData;
 			return false;
 		}
+		Actor* playerActor = *g_player;
+		bool needsCancelAnimDelay = false;
+		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || ((playerActor->actorState.flags >> 14) & 0xF) == 0x4)
+		{
+			if (!MSF_Base::CancelAnim(!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowNonSwitchReloadCancel)))
+			{
+				_DEBUG("CancelAnim false");
+				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
+				delete switchData;
+				return false;
+			}
+			needsCancelAnimDelay = true;
+		}
 		_DEBUG("queue/stateOK");
 
-		Actor* playerActor = *g_player;
 		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
 		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
 		bool isTR = MSF_Data::InstanceHasTRSupport(instance) || MSF_WeaponState::EquippedWeaponHasTRSupport(playerActor);
@@ -140,7 +152,7 @@ namespace MSF_Base
 				else
 					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
 				if (targetAmmoCount && playerActor->actorState.IsWeaponDrawn() && MSF_MainData::MCMSettingFlags & MSF_MainData::bReloadEnabled)
-					MSF_Base::ReloadWeapon(false, true);
+					MSF_Base::ReloadWeapon(false, true, true, true, needsCancelAnimDelay); //should not needsCancelAnimDelay
 				return true;
 			}
 		}
@@ -157,7 +169,7 @@ namespace MSF_Base
 					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound);
 				else
 					PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
-				MSF_Base::ReloadWeapon(isTR && !isBCR, isBCR);
+				MSF_Base::ReloadWeapon(isTR && !isBCR, isBCR, true, true, needsCancelAnimDelay); //needsCancelAnimDelay
 				return true;
 			}
 			_DEBUG("toReload");
@@ -166,7 +178,7 @@ namespace MSF_Base
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			UInt64 invammo = Utilities::GetInventoryItemCount(playerActor->inventoryList, switchData->targetAmmo);
 			Utilities::SetAnimationVariableInt(playerActor, "NextReloadAmmoCount", invammo > instance->ammoCapacity ? instance->ammoCapacity : invammo);
-			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount))
+			if (!MSF_Base::ReloadWeapon(switchData->SwitchFlags & SwitchData::bReloadFull, switchData->SwitchFlags & SwitchData::bReloadZeroCount, true, true, needsCancelAnimDelay)) //needsCancelAnimDelay
 			{
 				MSF_MainData::modSwitchManager.ClearQueue();
 				PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
@@ -181,7 +193,7 @@ namespace MSF_Base
 			switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bDrawInProgress | SwitchData::bReloadNeeded);
 			BGSSoundDescriptorForm* sound = switchData->soundToPlay;
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
-			Utilities::DrawWeapon(playerActor);
+			Utilities::DrawWeapon(playerActor, needsCancelAnimDelay); //needsCancelAnimDelay
 			PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmo, false, sound); //SOUND:ondraw?
 			//delay check draw state
 			return true;
@@ -295,21 +307,39 @@ namespace MSF_Base
 		Actor* playerActor = *g_player;
 		SInt32 state = (*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState);
 		UInt32 weaponActivity = playerActor->actorState.flags & ActorStateFlags0C::mWeaponActivityMask;
+#ifdef DEBUG
 		//bool is3rdPersonModelShown : 1;    //player:: DFE:4
 		MiddleHighProcessData* highProc = (MiddleHighProcessData*)playerActor->middleProcess->unk08;
 		TESIdleForm* lastAnim = highProc->lastIdlePlayed;
 		TESIdleForm* currAnim = highProc->currentIdle;
-		_DEBUG("currAnim: %p, lastAnim: %p", currAnim, lastAnim);               
+		_DEBUG("currAnim: %p, lastAnim: %p", currAnim, lastAnim);   
 		_DEBUG("ActorState: %p %08X %08X %08X", playerActor, playerActor->actorState.unk08, playerActor->actorState.flags, state);
+#endif
 		if (state != 0 && state != 8)
 			return false;
 		if ((playerActor->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing)) || // | ActorStateFlags08::kActorState_Sprint
 			(playerActor->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Sheathing)) ||
-			(weaponActivity == ActorStateFlags0C::kWeaponState_Reloading || weaponActivity == ActorStateFlags0C::kWeaponState_Firing) ||
+			(weaponActivity == ActorStateFlags0C::kWeaponState_Firing) || //weaponActivity == ActorStateFlags0C::kWeaponState_Reloading ||
 			(!(playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && (playerActor->actorState.flags & ActorStateFlags0C::kWeaponState_Draw)))
 		{
 			return false;
 		}
+
+		float time, dur;
+		std::string clipName = "";
+		Utilities::GetClipInfo(playerActor, time, dur, clipName);
+		_DEBUG("currClip: %s", clipName.c_str());
+
+		bool reload = weaponActivity == ActorStateFlags0C::kWeaponState_Reloading; //(((*g_player)->actorState.flags >> 14) & 0xF) == 0x4; //weaponActivity == ActorStateFlags0C::kWeaponState_Reloading ||
+		if ((MSF_MainData::modSwitchManager.IsAnimPastCancelPoint() && (clipName.find("WPNReload") != std::string::npos || clipName.find("DynamicIdle") != std::string::npos)) || 
+			(reload && (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelReload) || (MSF_MainData::modSwitchManager.GetIsBCRreload() != 0)) || 
+			(!reload && (MSF_MainData::modSwitchManager.GetQueueCount() > 0) && !(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelModSwitch))))
+		{
+			return false;
+		}
+
+		//if (clipName.find("WPNReload") != std::string::npos || clipName.find("DynamicIdle") != std::string::npos) // more animations to check: 
+		//	return false;
 		return true;
 	}
 
@@ -1204,11 +1234,19 @@ namespace MSF_Base
 					TESAmmo* baseAmmo = randomActor->middleProcess->unk08->equipData[0].equippedData->ammo;
 					TESAmmo* ammo = baseAmmo;
 					std::vector<BGSMod::Attachment::Mod*> mods;
+					BGSMod::Attachment::Mod* ammoMod = nullptr;
 					UInt32 count = 0;
-					MSF_Data::PickRandomMods(&mods, &ammo, &count);
+					MSF_Data::PickRandomMods(&mods, &ammoMod, &ammo, &count);
 					_DEBUG("picked ammo: %p, %i", ammo, count);
-					if (ammo)
+					if (ammoMod && ammo)
 					{
+						BGSInventoryItem* invItem = Utilities::GetEquippedInventoryWeapon(randomActor);
+						if (!invItem || !invItem->stack || invItem->stack->next || !invItem->stack->extraData || invItem->stack->count != 1)
+							continue;
+						BGSObjectInstanceExtra* modData = (BGSObjectInstanceExtra*)invItem->stack->extraData->GetByType(kExtraData_ObjectInstance);
+						Utilities::AttachModToInventoryItem(randomActor, firearm, ammoMod);
+						if (!Utilities::HasObjectMod(modData, ammoMod))
+							continue;
 						if (MSF_MainData::MCMSettingFlags & MSF_MainData::bReplaceAmmoWithSpawned)
 						{
 							count = Utilities::GetInventoryItemCount(randomActor->inventoryList, baseAmmo);
@@ -1463,8 +1501,16 @@ namespace MSF_Base
 
 	//========================== Animation Functions ===========================
 
-	bool ReloadWeapon(bool full, bool clearAmmoCount, bool forced, bool isSwitch)
+	bool ReloadWeapon(bool full, bool clearAmmoCount, bool forced, bool isSwitch, bool shouldDelay)
 	{
+		_DEBUG("ReloadWeapon");
+		if (shouldDelay)
+		{
+			_DEBUG("Cancel ReloadWeapon delay: %i ", MSF_MainData::iCancelDelayMS);
+			ReloadTask* reloadTask = new ReloadTask(full, clearAmmoCount, forced, isSwitch);
+			delayTask delayReload(MSF_MainData::iCancelDelayMS, true, g_threading->AddTask, reloadTask);
+			return true;
+		}
 		Actor* playerActor = *g_player;
 		if (isSwitch)
 		{
@@ -1514,10 +1560,16 @@ namespace MSF_Base
 		return true;
 	}
 
-	bool PlayAnim(AnimationData* animData)
+	bool PlayAnim(AnimationData* animData, bool shouldDelay)
 	{
 		if (!animData)
 			return false;
+		if (shouldDelay)
+		{
+			AnimTask* animTask = new AnimTask(animData);
+			delayTask delayAnim(MSF_MainData::iCancelDelayMS, true, g_threading->AddTask, animTask);
+			return true;
+		}
 		TESIdleForm* anim = animData->GetAnimation();
 		if (anim)
 		{
@@ -1526,6 +1578,54 @@ namespace MSF_Base
 			return true;
 		}
 		return false;
+	}
+
+	bool CancelAnim(bool bOnlySwitch, bool forceCancel)
+	{
+		//return false;
+		//static BSFixedString reloadEndAnimEvent("reloadEnd");
+		//static BSFixedString reloadEndAnimEvent2("reloadEndSlave");
+		bool reload = (((*g_player)->actorState.flags >> 14) & 0xF) == 0x4;
+		if (!forceCancel && (MSF_MainData::modSwitchManager.IsAnimPastCancelPoint() || (reload && (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelReload) || (MSF_MainData::modSwitchManager.GetIsBCRreload() != 0)) || (!reload && !(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelModSwitch)))))
+			return false;
+		if ((!reload && (MSF_MainData::modSwitchManager.GetQueueCount() == 0)) || (bOnlySwitch && reload && (MSF_MainData::modSwitchManager.GetQueueCount() == 0)))
+			return true;
+
+		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
+		bool res = false;
+		AnimationGraphManagerHolder* animGraphHolder = (AnimationGraphManagerHolder*)&(*g_player)->animGraphHolder;
+		if (reload)
+		{
+			MSF_MainData::modSwitchManager.ClearQueue();
+			if (forceCancel)
+			{
+				float time, dur;
+				std::string clipName = "";
+				Utilities::GetClipInfo(*g_player, time, dur, clipName);
+				if (clipName.find("WPNReload") == std::string::npos)
+					return true;
+			}
+			res = animGraphHolder->NotifyAnimationGraphImpl("reloadEnd");
+			bool res2 = animGraphHolder->NotifyAnimationGraphImpl("reloadEndSlave");
+		}
+		else
+		{
+			SwitchData* nextSwitch = MSF_MainData::modSwitchManager.GetNextSwitch();
+			if (!forceCancel && (nextSwitch->SwitchFlags & SwitchData::bCannotCancelAnim))
+				return false;
+			MSF_MainData::modSwitchManager.ClearQueue();
+			if (forceCancel)
+			{
+				float time, dur;
+				std::string clipName = "";
+				Utilities::GetClipInfo(*g_player, time, dur, clipName);
+				if (clipName.find("DynamicIdle") == std::string::npos)
+					return true;
+			}
+			res = animGraphHolder->NotifyAnimationGraphImpl("customAnimCancel"); //  IdleStop  UncullWeapons  InitiateStart
+		}
+
+		return res;
 	}
 
 	bool PlayFeedbackSound(bool play, UInt8 type, BGSSoundDescriptorForm* success) // type: 0: success, 1: failGeneral, 2: failQuickkey, 3: failMenu

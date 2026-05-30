@@ -341,6 +341,70 @@ struct ReloadJumpReplace {
 };
 extern ReloadJumpReplace ReloadJumpOverwriteCode;
 
+class SelfDelayedTask : public ITaskDelegate
+{
+private:
+	SelfDelayedTask(int delay, bool async, bool isUI)
+	{
+		if (async)
+		{
+			std::thread([delay, this, isUI]() {
+				std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+				if (isUI)
+					g_threading->AddUITask(this);
+				else
+					g_threading->AddTask(this);
+				}).detach();
+		}
+		else
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+			if (isUI)
+				g_threading->AddUITask(this);
+			else
+				g_threading->AddTask(this);
+		}
+	}
+	virtual void Run() override
+	{
+	}
+};
+
+class SelfDelayedFunctionTask : public ITaskDelegate
+{
+public:
+	template <class callable, class... arguments>
+	SelfDelayedFunctionTask(int delay, bool async, bool isUI, callable&& f, arguments&&... args)
+	{
+		func = std::bind(std::forward<callable>(f), std::forward<arguments>(args)...);
+		if (async)
+		{
+			std::thread([delay, this, isUI]() {
+				std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+				if (isUI)
+					g_threading->AddUITask(this);
+				else
+					g_threading->AddTask(this);
+				}).detach();
+		}
+		else
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+			if (isUI)
+				g_threading->AddUITask(this);
+			else
+				g_threading->AddTask(this);
+		}
+	}
+	virtual void Run() final
+	{
+		if (func)
+			func();
+	}
+private:
+	std::function<void()> func;
+};
+
 class WidgetUpdateTask : public ITaskDelegate
 {
 public:
@@ -382,8 +446,11 @@ public:
 
 	static void StartUpdate(TESBoundObject* changeditem)
 	{
-		if (!changeditem)
+		
+		if (!changeditem || (((uintptr_t)changeditem) & 0xFFFFFFFF) == 0)
 			return;
+		//if (IsBadReadPtr((uintptr_t)changeditem+0x1A, 0x1))
+		//	return;
 		if (changeditem->formType == FormType::kFormType_AMMO)
 		{
 			TESAmmo* ammo = DYNAMIC_CAST(changeditem, TESBoundObject, TESAmmo);

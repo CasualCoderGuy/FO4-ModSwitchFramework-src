@@ -1,4 +1,14 @@
 ---
+v1.2.6
+features:
+- support for Fallout 4 1.11.221 with F4SE 0.7.8
+- BCR support for NextGen
+- added options to cancel pending mod switches with the attack key, ready key, mod switch hotkeys, and the repurposed debug cancel mod switch key
+fixes:
+- equipped ammo is now displayed in the pipboy correctly and reliably (this feature is now enabled by default)
+- NPC ammo type spawn will only occur if the mod switch succeeded preventing missing equipped ammo in case of failure
+- fixed a possible CTD during widget update
+---
 v1.2.5
 features:
 - fast equip animations are now disabled by default when using animation graph update (bUpdateAnimGraph); if the animation needs to be played use the bPlayFastEquipAnim OMOD flag or pass it as a Papyrus argument (Papyrus scripts have to be updated) 

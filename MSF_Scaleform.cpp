@@ -45,6 +45,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 
 	if (isDown)
 	{
+		if ((MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowAttackKeyToCancel) && (!_strcmpi(control.c_str(), "PrimaryAttack")) || ((MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowReadyKeyToCancel) && (!_strcmpi(control.c_str(), "ReadyWeapon"))))
+			MSF_Base::CancelAnim(!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowNonSwitchReloadCancel));
 		switch (keyCode) 
 		{
 		case 160:
@@ -101,7 +103,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 				if (key == MSF_MainData::cancelSwitchHotkey)
 				{
 					MSF_MainData::modSwitchManager.ClearQuickSelection(true, true, true);
-					MSF_MainData::modSwitchManager.ClearQueue();
+					MSF_Base::CancelAnim(true, true);
+					//MSF_MainData::modSwitchManager.ClearQueue();
 					break;
 				}
 				if (key == MSF_MainData::patchBaseAmmoHotkey)

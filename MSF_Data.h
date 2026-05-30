@@ -84,13 +84,14 @@ public:
 			bHasSecondaryAmmo = 0x0004,
 			bHasUniqueState = 0x0008,
 			bCanBeEquippedByMiscMod = 0x0010,
+			bCannotCancelAnim = 0x0200,
 			bPlayFastEquipAnim = 0x0400,
 			bDoSwitchBeforeAnimations = 0x0800,
 			bNotRequireWeaponToBeDrawn = 0x1000,
 			bRequireLooseMod = 0x2000,
 			bUpdateAnimGraph = 0x4000,
 			bIgnoreAnimations = 0x8000,
-			mBitTransferMask = 0xFC00UL,
+			mBitTransferMask = 0xFF00UL,
 			bShouldNotStopIdle = 0x10000
 		};
 		class AttachRequirements
@@ -347,7 +348,8 @@ public:
 		bSetLooseMods = 0x00002000,
 		bUpdateAnimGraph = 0x00004000,
 		bIgnoreAnimations = 0x00008000,
-		bPlayFastEquipAnim = 0x00000400
+		bPlayFastEquipAnim = 0x00000400,
+		bCannotCancelAnim = 0x00000200
 
 		//bDoSwitchBeforeAnimations
 	};
@@ -385,6 +387,7 @@ private:
 	volatile UInt16 switchState;
 	volatile UInt16 forcedReload;
 	volatile UInt16 changeAmmo;
+	volatile UInt16 animCantBeCancelled;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
 
@@ -442,6 +445,7 @@ public:
 		InterlockedExchange16((volatile short*)&forcedReload, 0);
 		InterlockedExchange16((volatile short*)&dontPutYourGunIn, 0);
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
+		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 	};
@@ -469,6 +473,8 @@ public:
 	void SetDontPutYourGunIn(bool bEquip) { InterlockedExchange16((volatile short*)&dontPutYourGunIn, bEquip); };
 	bool GetDontPutYourGunIn() { return dontPutYourGunIn; };
 	UInt8 GetSetChangeAmmo(UInt16 doChangeAmmo) { return InterlockedExchange16((volatile short*)&changeAmmo, doChangeAmmo); };
+	void SetAnimCanBeCancelled(bool bCanCancel) { InterlockedExchange16((volatile short*)&animCantBeCancelled, !bCanCancel); };
+	bool IsAnimPastCancelPoint() { return animCantBeCancelled == 1; };
 	TESObjectWEAP::InstanceData* GetCurrentWeapon() { return equippedInstanceData; };
 	void SetCurrentWeapon(TESObjectWEAP::InstanceData* weaponInstance) { InterlockedExchangePointer((void* volatile*)&equippedInstanceData, weaponInstance); };
 	void IncOpenedMenus() { InterlockedIncrement16((volatile short*)&numberOfOpenedMenus); };
@@ -659,6 +665,7 @@ public:
 		InterlockedExchange16((volatile short*)&forcedReload, 0);
 		InterlockedExchange16((volatile short*)&dontPutYourGunIn, 0);
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
+		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 		quickKeyTimer.cancel();
@@ -707,6 +714,7 @@ public:
 	static RandomNumber rng;
 	static int iCheckDelayMS;
 	static int quickKeyTimeoutMS;
+	static int iCancelDelayMS;
 	static float fBaseChanceMultiplier;
 
 	static GFxMovieRoot* MSFMenuRoot;
@@ -848,6 +856,11 @@ public:
 		bSwitchToNewAmmoTypeWhenDepleted = 0x100000000000,
 		bStartDepletedSwitchFromBaseAmmo = 0x200000000000,
 		bAllowChangingMSFMenus = 0x400000000000,
+		bAllowCancelReload = 0x800000000000,
+		bAllowCancelModSwitch = 0x1000000000000,
+		bAllowAttackKeyToCancel = 0x2000000000000,
+		bAllowReadyKeyToCancel = 0x4000000000000,
+		bAllowNonSwitchReloadCancel = 0x8000000000000,
 		mMakeExtraRankMask = bEnableExtraWeaponState //| bEnableTacticalReloadAll | bEnableTacticalReloadAnim | bEnableBCRSupport
 	};
 	static UInt64 MCMSettingFlags;
@@ -891,7 +904,7 @@ namespace MSF_Data
 	TESAmmo* GetBaseCaliber(BGSObjectInstanceExtra* objectModData, TESObjectWEAP* weapBase);
 	bool GetChamberData(BGSObjectInstanceExtra* mods, TESObjectWEAP::InstanceData* weapInstance, UInt16* chamberSize, UInt16* flags);
 	bool GetAttachedChildren(BGSObjectInstanceExtra* mods, BGSMod::Attachment::Mod* parent, std::vector<BGSMod::Attachment::Mod*>* children, bool checkIF);
-	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count);
+	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, BGSMod::Attachment::Mod** ammoMod, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);
 	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance);

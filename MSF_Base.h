@@ -31,9 +31,10 @@ namespace MSF_Base
 	void PatchActorValues(TESObjectREFR* ref, TESObjectWEAP::InstanceData* newInstance, std::vector<TBO_InstanceData::ValueModifier>* avifValues);
 	void GetActorValues(TESObjectWEAP::InstanceData* instance, std::vector<TBO_InstanceData::ValueModifier>* avifValues);
 
-	bool ReloadWeapon(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true);
+	bool ReloadWeapon(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true, bool shouldDelay = false);
 	bool DrawWeapon();
-	bool PlayAnim(AnimationData* animData);
+	bool PlayAnim(AnimationData* animData, bool shouldDelay = false);
+	bool CancelAnim(bool bOnlySwitch = false, bool forceCancel = false);
 	bool PlayFeedbackSound(bool play, UInt8 type, BGSSoundDescriptorForm* success);
 }
 

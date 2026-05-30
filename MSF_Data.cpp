@@ -63,6 +63,7 @@ bool MSF_MainData::PutYourGunInCompatibility = false;
 bool MSF_MainData::BAKACompatibility = false;
 int MSF_MainData::iCheckDelayMS = 10;
 int MSF_MainData::quickKeyTimeoutMS = 300;
+int MSF_MainData::iCancelDelayMS = 500;
 UInt64 MSF_MainData::MCMSettingFlags = 0;
 UInt16 MSF_MainData::iMinRandomAmmo = 5;
 UInt16 MSF_MainData::iMaxRandomAmmo = 50;
@@ -842,7 +843,7 @@ namespace MSF_Data
 			| MSF_MainData::bShowMuzzleIcon | MSF_MainData::bShowAmmoName | MSF_MainData::bShowMuzzleName | MSF_MainData::bShowFiringMode | MSF_MainData::bShowScopeData | MSF_MainData::bShowUnavailableMods \
 			| MSF_MainData::bEnableMetadataSaving | MSF_MainData::bEnableExtraWeaponState | MSF_MainData::bEnableTacticalReloadChamber | MSF_MainData::bEnableTacticalReloadAnim | MSF_MainData::bEnableBCRSupport \
 			| MSF_MainData::bDisplayChamberedAmmoOnHUD | MSF_MainData::bDisplayMagInPipboy | MSF_MainData::bDisplayChamberInPipboy | MSF_MainData::bShowQuickkeySelection | MSF_MainData::bPatchVanillaAVcalculation \
-			| MSF_MainData::bDontAutolowerWeaponWithFlashlightOn | MSF_MainData::bStartDepletedSwitchFromBaseAmmo \
+			| MSF_MainData::bDontAutolowerWeaponWithFlashlightOn | MSF_MainData::bStartDepletedSwitchFromBaseAmmo | MSF_MainData::bShowEquippedAmmo \
 			| MSF_MainData::bPlayFeedbackSoundAmmoFail | MSF_MainData::bPlayFeedbackSoundModFail | MSF_MainData::bPlayFeedbackSoundMenuFail | MSF_MainData::bPlayFeedbackSoundQuickkeyFail | MSF_MainData::bPlayFeedbackSoundQuickkeyNext \
 			);
 
@@ -1394,6 +1395,16 @@ namespace MSF_Data
 				flag = MSF_MainData::bSwitchToNewAmmoTypeWhenDepleted; 
 			else if (settingName == "bStartDepletedSwitchFromBaseAmmo")
 				flag = MSF_MainData::bStartDepletedSwitchFromBaseAmmo;
+			else if (settingName == "bAllowCancelReload")
+				flag = MSF_MainData::bAllowCancelReload;
+			else if (settingName == "bAllowCancelModSwitch")
+				flag = MSF_MainData::bAllowCancelModSwitch;
+			else if (settingName == "bAllowAttackKeyToCancel")
+				flag = MSF_MainData::bAllowAttackKeyToCancel;
+			else if (settingName == "bAllowReadyKeyToCancel")
+				flag = MSF_MainData::bAllowReadyKeyToCancel;
+			else if (settingName == "bAllowNonSwitchReloadCancel")
+				flag = MSF_MainData::bAllowNonSwitchReloadCancel;
 			else
 				return false;
 
@@ -1418,6 +1429,8 @@ namespace MSF_Data
 				MSF_MainData::iDrawAnimEndEventDelayMS = std::stoi(settingValue);
 			else if (settingName == "iQuickkeyTimeoutMS")
 				MSF_MainData::quickKeyTimeoutMS = std::stoi(settingValue);
+			else if (settingName == "iCancelDelayMS")
+				MSF_MainData::iCancelDelayMS = std::stoi(settingValue);
 			else if (settingName == "iColorR")
 				MSF_MainData::widgetSettings.iColorR = std::stoi(settingValue);
 			else if (settingName == "iColorG")
@@ -3327,13 +3340,13 @@ namespace MSF_Data
 		return true;
 	}
 
-	inline bool SwitchModWithSoundAnim(SwitchData* data, bool updWidget, BGSSoundDescriptorForm* sound, AnimationData* anim)
+	inline bool SwitchModWithSoundAnim(SwitchData* data, bool updWidget, BGSSoundDescriptorForm* sound, AnimationData* anim, bool needsCancelAnimDelay)
 	{
 		bool success = MSF_Base::SwitchMod(data, updWidget);
 		if (success)
 		{
 			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound);
-			MSF_Base::PlayAnim(anim);
+			MSF_Base::PlayAnim(anim, needsCancelAnimDelay); //needsCancelAnimDelay
 		}
 		else
 			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
@@ -3410,16 +3423,27 @@ namespace MSF_Data
 			if (modToAttach->animData)
 				switchAttach->animData = modToAttach->animData;
 		}
-
+		bool needsCancelAnimDelay = false;
 		if (switchRemove && (!switchRemove->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
 		{
 			BGSSoundDescriptorForm* sound = switchRemove->soundToPlay;
-			if ((MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0) && switchAttach && switchAttach->animData && (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
+			if ((MSF_MainData::modSwitchManager.GetState() != 0) && switchAttach && switchAttach->animData && (MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
 			{
 				MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 				delete switchRemove;
 				delete switchAttach;
 				return false;
+			}
+			if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || (((*g_player)->actorState.flags >> 14) & 0xF) == 0x4)
+			{
+				if (!MSF_Base::CancelAnim(!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowNonSwitchReloadCancel)))
+				{
+					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
+					delete switchRemove;
+					delete switchAttach;
+					return false;
+				}
+				needsCancelAnimDelay = true;
 			}
 			if (!MSF_Base::SwitchMod(switchRemove, true))
 			{
@@ -3433,17 +3457,28 @@ namespace MSF_Data
 				return true;
 			}
 			if (!switchAttach->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled))
-				return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr);
+				return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr, needsCancelAnimDelay);
 		}
 		else if (switchAttach && ((!switchRemove && !switchAttach->animData) || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))
-			return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr);
+			return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr, needsCancelAnimDelay);
 
-		if (MSF_MainData::modSwitchManager.GetState() != 0 || MSF_MainData::modSwitchManager.GetQueueCount() > 0)
+		if (MSF_MainData::modSwitchManager.GetState() != 0)
 		{
 			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundModFail, 1, nullptr);
 			delete switchRemove;
 			delete switchAttach;
 			return false;
+		}
+		if (MSF_MainData::modSwitchManager.GetQueueCount() > 0 || (((*g_player)->actorState.flags >> 14) & 0xF) == 0x4)
+		{
+			if (!MSF_Base::CancelAnim(!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowNonSwitchReloadCancel)))
+			{
+				MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundAmmoFail, 1, nullptr);
+				delete switchRemove;
+				delete switchAttach;
+				return false;
+			}
+			needsCancelAnimDelay = true;
 		}
 
 		SwitchData* switchData = nullptr;
@@ -3467,9 +3502,9 @@ namespace MSF_Data
 			if (switchData->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 			{
 				AnimationData* anim = switchData->animData;
-				return SwitchModWithSoundAnim(switchData, true, sound, anim);
+				return SwitchModWithSoundAnim(switchData, true, sound, anim, needsCancelAnimDelay);
 			}
-			if (!MSF_Base::PlayAnim(switchData->animData))
+			if (!MSF_Base::PlayAnim(switchData->animData, needsCancelAnimDelay)) //needsCancelAnimDelay
 			{
 				bool success = MSF_Base::SwitchMod(switchData, true);
 				if (QueueAttach)
@@ -3478,10 +3513,10 @@ namespace MSF_Data
 					if (switchAttach->SwitchFlags & SwitchData::bDoSwitchBeforeAnimations)
 					{
 						AnimationData* anim = switchAttach->animData;
-						return SwitchModWithSoundAnim(switchAttach, true, sound, anim);
+						return SwitchModWithSoundAnim(switchAttach, true, sound, anim, needsCancelAnimDelay);
 					}
-					if (!MSF_Base::PlayAnim(switchAttach->animData))
-						return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr); //SOUND:onplayanim?
+					if (!MSF_Base::PlayAnim(switchAttach->animData, needsCancelAnimDelay)) //needsCancelAnimDelay
+						return SwitchModWithSoundAnim(switchAttach, true, sound, nullptr, needsCancelAnimDelay); //SOUND:onplayanim?
 				}
 				if (success)
 					MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags & MSF_MainData::bPlayFeedbackSoundMod, 0, sound); //SOUND:onplayanim?
@@ -3498,7 +3533,7 @@ namespace MSF_Data
 			MSF_MainData::modSwitchManager.QueueSwitch(switchData);
 			if (QueueAttach)
 				MSF_MainData::modSwitchManager.QueueSwitch(switchAttach);
-			Utilities::DrawWeapon(*g_player);
+			Utilities::DrawWeapon(*g_player, needsCancelAnimDelay); //needsCancelAnimDelay
 			MSF_Base::PlayFeedbackSound(MSF_MainData::MCMSettingFlags& MSF_MainData::bPlayFeedbackSoundMod, 0, sound); //SOUND:ondraw?
 			//delay check draw state
 			return true;
@@ -3638,7 +3673,7 @@ namespace MSF_Data
 		return true;
 	}
 
-	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, TESAmmo** ammo, UInt32* count)
+	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, BGSMod::Attachment::Mod** ammoMod, TESAmmo** ammo, UInt32* count)
 	{
 		TESAmmo* baseAmmo = *ammo;
 		*ammo = nullptr;
@@ -3669,7 +3704,8 @@ namespace MSF_Data
 					idx--;
 					AmmoData::AmmoMod* chosenAmmoMod = &ammoData->ammoMods[idx];
 
-					mods->push_back(chosenAmmoMod->mod);
+					//mods->push_back(chosenAmmoMod->mod);
+					*ammoMod = chosenAmmoMod->mod;
 					*ammo = chosenAmmoMod->ammo;
 					UInt32 minRandomAmmo = MSF_MainData::iMinRandomAmmo * chosenAmmoMod->spawnMinAmountMultiplier;
 					UInt32 maxRandomAmmo = MSF_MainData::iMaxRandomAmmo * chosenAmmoMod->spawnMaxAmountMultiplier;
