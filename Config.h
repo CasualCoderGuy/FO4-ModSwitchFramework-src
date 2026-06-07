@@ -1,17 +1,6 @@
 #pragma once
-#include "f4se_common/f4se_version.h"
-#include "f4se/GameData.h"
-#include "f4se/GameExtraData.h"
-#include "f4se/GameFormComponents.h"
-#include "f4se/GameObjects.h"
-#include "f4se/GameReferences.h"
-#include "f4se/GameRTTI.h"
-#include "f4se/PapyrusNativeFunctions.h"
-#include "f4se/PapyrusUtilities.h"
-#include "f4se/GameCamera.h"
-#include "rva/RVA.h"
-#include  <thread>
-#include  <chrono>
+#include "Src.h"
+#include VER_SRC
 
 //-----------------------
 // Plugin Information
@@ -19,17 +8,25 @@
 
 //#define DEBUG "DevMode"
 
+#define STRINGIZE2(s) #s
+#define STRINGIZE(s) STRINGIZE2(s)
+
 #define MSF_VERSION_INTEGER_MAJOR	1
 #define MSF_VERSION_INTEGER_MINOR	2
-#define MSF_VERSION_INTEGER_PATCH	6
-#define MSF_VERSION_INTEGER_BETA	1
+#define MSF_VERSION_INTEGER_PATCH	7
+#define MSF_VERSION_INTEGER_BETA	0
 #define MSF_VERSION_RELEASEID		0
 
 #ifdef DEBUG
-#define MSF_VERSION_STRING		"1.2.6.1" 
+#define MSF_VERSION_STRING		STRINGIZE(MSF_VERSION_INTEGER_MAJOR)        \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_MINOR)    \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_PATCH) \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_BETA)
 #define MSF_VERSION				MAKE_EXE_VERSION_EX(MSF_VERSION_INTEGER_MAJOR, MSF_VERSION_INTEGER_MINOR, MSF_VERSION_INTEGER_PATCH, MSF_VERSION_INTEGER_BETA)
 #else
-#define MSF_VERSION_STRING		"1.2.6"
+#define MSF_VERSION_STRING		STRINGIZE(MSF_VERSION_INTEGER_MAJOR)        \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_MINOR)    \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_PATCH)
 #define MSF_VERSION				MAKE_EXE_VERSION_EX(MSF_VERSION_INTEGER_MAJOR, MSF_VERSION_INTEGER_MINOR, MSF_VERSION_INTEGER_PATCH, 0)
 #endif
 
@@ -44,11 +41,41 @@
 #define SUPPORTED_RUNTIME_VERSION			CURRENT_RELEASE_RUNTIME
 #define COMPATIBLE(runtimeVersion)			(runtimeVersion == SUPPORTED_RUNTIME_VERSION)
 
+#ifdef NEXTGEN 
+#define FILENAME_SUFFIX "_NG"
+#else
+#define FILENAME_SUFFIX ""
+#endif
+
 #define PLUGIN_NAME_SHORT		"MSF"
 #define PLUGIN_NAME_LONG		"Mod Switch Framework"
 #define SCRIPTNAME				"ModSwitchFramework"
 #define MODNAME					"ModSwitchFramework.esl"
 #define AUTHOR_NAME				"CasualCoderGuy"
+
+#define VER_FILE_DESCRIPTION_STR    "for Fallout 4 with F4SE v" CURRENT_RELEASE_F4SE_STR
+#define VER_FILE_VERSION       MSF_VERSION_INTEGER_MAJOR, MSF_VERSION_INTEGER_MINOR, MSF_VERSION_INTEGER_PATCH, MSF_VERSION_INTEGER_BETA
+#define VER_FILE_VERSION_STR   STRINGIZE(MSF_VERSION_INTEGER_MAJOR)        \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_MINOR)    \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_PATCH) \
+                                    "." STRINGIZE(MSF_VERSION_INTEGER_BETA)
+#define VER_PRODUCTNAME_STR         PLUGIN_NAME_LONG
+#define VER_PRODUCT_VERSION         VER_FILE_VERSION
+#define VER_PRODUCT_VERSION_STR     VER_FILE_VERSION_STR
+#define VER_ORIGINAL_FILENAME_STR   SCRIPTNAME FILENAME_SUFFIX ".dll"
+#define VER_INTERNAL_NAME_STR       VER_ORIGINAL_FILENAME_STR
+#define VER_COPYRIGHT_STR           ""//"Copyright (C) 2026"
+
+#ifdef DEBUG
+#define VER_VER_DEBUG             VS_FF_DEBUG
+#else
+#define VER_VER_DEBUG             0
+#endif
+
+#define VER_FILEOS                  VOS_NT_WINDOWS32
+#define VER_FILEFLAGS               VER_VER_DEBUG
+#define VER_FILETYPE                VFT_DLL
+
 
 class VersionData
 {
@@ -58,18 +85,3 @@ public:
 	UInt32 msfVersion;
 };
 
-#ifdef DEBUG
-inline void _DEBUG(const char* fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	gLog.Log(IDebugLog::kLevel_Message, fmt, args);
-	va_end(args);
-}
-#else
-inline void _DEBUG(const char* fmt, ...)
-{
-
-}
-#endif

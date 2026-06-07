@@ -409,7 +409,7 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	UInt16 chamberSize = 0;
 	UInt16 flags = 0;
 	MSF_Data::GetChamberData(Utilities::GetEquippedModData(target), instanceData, &chamberSize, &flags);
-	if ((MSF_Data::InstanceHasTRSupport(instanceData) || flags & ExtraWeaponState::WeaponState::bHasTacticalReload) && MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber)
+	if ((MSF_Data::InstanceHasTRSupport(instanceData) || flags & ExtraWeaponState::WeaponState::bHasTacticalReload) && MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber && !MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(instanceData))
 	{
 		return (loadedAmmo < (ammoCap+chamberSize) && loadedAmmo < ammoReserve);
 	}
@@ -816,6 +816,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 					MSF_MainData::modSwitchManager.SetState(ModSwitchManager::bState_ReloadNotFinished);
 				if (MSF_MainData::modSwitchManager.GetIsBCRreload())
 				{
+					_DEBUG("BCRReload");
 					MSF_MainData::BCRinterfaceHolder.StoreBCRvariables();
 					MSF_MainData::modSwitchManager.SetIsBCRreload(ExtraWeaponState::bEventTypeReloadSwitchBCR);
 				}
@@ -993,16 +994,16 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
-	else if (!_strcmpi("Event00", name))
-	{
-		_DEBUG("BCR Event00");
-		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
-		EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
-		if (eqData)
-			oldLoadedAmmoCount = eqData->loadedAmmoCount;
-		UInt16 BCRtype = oldLoadedAmmoCount ? ExtraWeaponState::bEventTypeReloadBCR : ExtraWeaponState::bEventTypeReloadFullBCR;
-		MSF_MainData::modSwitchManager.SetIsBCRreload(BCRtype);
-	}
+	//else if (!_strcmpi("Event00", name))
+	//{
+		//_DEBUG("BCR Event00");
+		//MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
+		//EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
+		//if (eqData)
+		//	oldLoadedAmmoCount = eqData->loadedAmmoCount;
+		//UInt16 BCRtype = oldLoadedAmmoCount ? ExtraWeaponState::bEventTypeReloadBCR : ExtraWeaponState::bEventTypeReloadFullBCR;
+		//MSF_MainData::modSwitchManager.SetIsBCRreload(BCRtype);
+	//}
 	else if (!_strcmpi("emptyMag", name))
 	{
 		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEmptyMag);
@@ -1083,12 +1084,31 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	}
 	else if (!_strcmpi("reloadStateEnter", name))
 	{
-		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
+		TESObjectWEAP::InstanceData* currInstanceData = Utilities::GetEquippedWeaponInstanceData(*g_player);
+		if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData))
+		{
+			MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
+			EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(*g_player);
+			if (eqData)
+				oldLoadedAmmoCount = eqData->loadedAmmoCount;
+			UInt16 BCRtype = oldLoadedAmmoCount ? ExtraWeaponState::bEventTypeReloadBCR : ExtraWeaponState::bEventTypeReloadFullBCR;
+			MSF_MainData::modSwitchManager.SetIsBCRreload(BCRtype);
+		}
+		else
+			MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
 	}
 	else if (!_strcmpi("customAnimStart", name))
 	{
 		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
 	}
+
+	//if (_stricmp("pipboyOpened", tag) == 0 || _stricmp("weaponSwing", tag) == 0 || _stricmp("throwEnd", tag) == 0 ||
+	//	_stricmp("weaponDraw", tag) == 0 || _stricmp("impactLandEnd", tag) == 0)
+	//{
+	//	Reload interrupted
+	//}
+
+
 	//else if (!_strcmpi("playFastEquipSound", name))
 	//{ 
 	//}

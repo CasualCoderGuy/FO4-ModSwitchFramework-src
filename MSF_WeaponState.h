@@ -1,6 +1,7 @@
 #pragma once
 #include "MSF_Shared.h"
 #include "MSF_Data.h"
+#include "old\HaBCR.h"
 #include "rva\ModuleRelocation.h"
 //#include "MSF_Serialization.h"
 
@@ -333,15 +334,44 @@ private:
 
 class BCRinterface
 {
+private:
+	typedef UInt32(*HaBCR_GetCurrentReloadMode_t)();
+	typedef bool (*HaBCR_BeginAmmoSwitch_t)();
+	typedef bool (*HaBCR_EndAmmoSwitch_t)();
+	typedef bool (*HaBCR_SetAmmoCapacity_t)(UInt32 a_capacity);
+	typedef bool (*HaBCR_UpdateAmmoStateAfterSwitch_t)(UInt32 a_loadedAmmoCount, UInt32 a_ammoCapacity, UInt32 a_totalAmmoCount);
 public:
+
 	BCRinterface()
 	{
+		
 		_base = reinterpret_cast<uintptr_t>(GetModuleHandle("BulletCountedReload.dll"));
-		_base2 = _base;
+		_HaBCRmodule = GetModuleHandle("HaBCR.dll");
+		_baseH = reinterpret_cast<uintptr_t>(_HaBCRmodule);
 		if (_base)
 			_MESSAGE("BulletCountedReload.dll found at %p", _base);
 		else
 			_MESSAGE("BulletCountedReload.dll not found");
+		if (_baseH)
+		{
+			_MESSAGE("HaBCR.dll found at %p", _base);
+			HaBCR_BeginAmmoSwitch = (HaBCR_BeginAmmoSwitch_t)GetProcAddress(_HaBCRmodule, "HaBCR_BeginAmmoSwitch"); // MAKEINTRESOURCE(4)
+			HaBCR_EndAmmoSwitch = (HaBCR_EndAmmoSwitch_t)GetProcAddress(_HaBCRmodule, "HaBCR_EndAmmoSwitch");
+			HaBCR_SetAmmoCapacity = (HaBCR_SetAmmoCapacity_t)GetProcAddress(_HaBCRmodule, "HaBCR_SetAmmoCapacity");
+			HaBCR_UpdateAmmoStateAfterSwitch = (HaBCR_UpdateAmmoStateAfterSwitch_t)GetProcAddress(_HaBCRmodule, "HaBCR_UpdateAmmoStateAfterSwitch");
+			HaBCR_GetCurrentReloadMode = (HaBCR_GetCurrentReloadMode_t)GetProcAddress(_HaBCRmodule, "HaBCR_GetCurrentReloadMode");
+			if (!HaBCR_BeginAmmoSwitch || !HaBCR_EndAmmoSwitch || !HaBCR_SetAmmoCapacity || !HaBCR_UpdateAmmoStateAfterSwitch || !HaBCR_GetCurrentReloadMode)
+			{
+				_baseH = 0;
+				_MESSAGE("Dllexports in HaBCR.dll could not be found. Updating HaBCR to the latest version might fix this issue.");
+			}
+		}
+		else
+			_MESSAGE("HaBCR.dll not found");
+		if (_base || _baseH)
+			enabled = true;
+		else
+			enabled = false;
 		//BulletCountedReload.dll+8785
 		//73004
 		//730B8
@@ -358,21 +388,49 @@ public:
 		uncull = RelocModuleAddr<bool>(_base, 0x79AD3, 0x48573);
 		readyToStop = RelocModuleAddr<bool>(_base, 0x79AD0, 0x48570);
 		animDone = RelocModuleAddr<UInt32>(_base, 0x79AE0, 0x48578);
+
+		HaBCR_reloadState = RelocModuleAddr<HaBCR::ReloadState>(_baseH, 0x151690, 0x151690);
+		HaBCR_settings = RelocModuleAddr<HaBCR::Settings>(_base, 0x151218, 0x151218);
+		HaBCR_avif = RelocModuleAddr<ActorValueInfo*>(_base, 0x155908, 0x155908);
 	};
+
+	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance)
+	{
+		if (!enabled)
+			return false;
+		if (!instance)
+			return false;
+		auto eqInstance = Utilities::GetEquippedWeaponInstanceData(*g_player);
+		if (eqInstance && eqInstance == instance && _baseH && HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+			return true;
+		return _base && ((MSF_MainData::BCR_AVIF && instance->skill == MSF_MainData::BCR_AVIF) || (MSF_MainData::BCR_AVIF2 && instance->skill == MSF_MainData::BCR_AVIF2));
+	}
+
 	bool SetBCRammoCap(UInt32 ammoCap)
 	{
+		if (!enabled)
+			return false;
+		if (_baseH && HaBCR_SetAmmoCapacity && HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+			return HaBCR_SetAmmoCapacity(ammoCap);
 		if (!_base)
 			return false;
 		return (*(UInt32*)BCR_ammoCapacity.GetUIntPtr()) = ammoCap;
 	}
+
 	bool SetBCRloadedAmmo(UInt32 loadedAmmo)
 	{
+		if (!enabled)
+			return false;
 		if (!_base)
 			return false;
 		return (*(UInt32*)BCR_ammoCount.GetUIntPtr()) = loadedAmmo;
 	}
 	bool StoreBCRvariables()
 	{
+		if (!enabled)
+			return false;
+		if (_baseH && HaBCR_BeginAmmoSwitch && HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+			return HaBCR_BeginAmmoSwitch();
 		if (!_base)
 			return false;
 		stored_BCR_ammoCount = *(UInt32*)BCR_ammoCount.GetUIntPtr();
@@ -391,6 +449,10 @@ public:
 	}
 	bool RestoreBCRvariables()
 	{
+		if (!enabled)
+			return false;
+		if (_baseH && HaBCR_EndAmmoSwitch && HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+			return HaBCR_EndAmmoSwitch();
 		if (!_base)
 			return false;
 		 (*(UInt32*)BCR_ammoCount.GetUIntPtr()) = stored_BCR_ammoCount;
@@ -409,6 +471,10 @@ public:
 	}
 	bool UpdateBCRvariables(UInt32 ammoCount, UInt32 ammoCapacity, UInt32 totalAmmoCount)
 	{
+		if (!enabled)
+			return false;
+		if (_baseH && HaBCR_UpdateAmmoStateAfterSwitch && HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+			return HaBCR_UpdateAmmoStateAfterSwitch(ammoCount, ammoCapacity, totalAmmoCount);
 		if (!_base)
 			return false;
 		UInt32 ammoCap = *(UInt32*)BCR_ammoCapacity.GetUIntPtr();
@@ -431,12 +497,14 @@ public:
 		_MESSAGE("%08X, %08X, %08X, %02X, %02X, %08X, %08X, %02X, %02X, %02X, %02X", stored_BCR_ammoCount, stored_BCR_ammoCapacity, stored_BCR_totalAmmo, stored_reloadEnded, stored_reloadStarted, stored_incrementer, stored_toAdd, stored_stopPressed, stored_animWillPlay, stored_uncull, stored_readyToStop);
 	}
 
-	bool IsLoaded() { return _base ? true : false; }
-	void Disable() { _base = 0; }
-	void Enable() { _base = _base2; }
+	bool IsLoaded() { return enabled; }
+	void Disable() { enabled = false; }
+	void Enable() { (_base || _baseH) ? enabled = true : enabled = false; }
 private:
+	bool enabled;
 	uintptr_t _base;
-	uintptr_t _base2;
+	uintptr_t _baseH;
+	HMODULE _HaBCRmodule;
 	RelocModuleAddr<TESObjectWEAP::InstanceData*> BCR_instanceData;
 	RelocModuleAddr<UInt32> BCR_ammoCount;
 	RelocModuleAddr<UInt32> BCR_ammoCapacity;
@@ -462,6 +530,19 @@ private:
 	bool stored_uncull;
 	bool stored_readyToStop;
 	UInt32 stored_animDone;
+
+	RelocModuleAddr<ActorValueInfo*> HaBCR_avif;
+	RelocModuleAddr<HaBCR::ReloadState> HaBCR_reloadState;
+	RelocModuleAddr<HaBCR::Settings> HaBCR_settings;
+	HaBCR::ReloadState stored_HaBCR_reloadState;
+	static const std::uint32_t kHaBCRMarkerFormID = 0x00FFFFF0;
+
+	HaBCR_BeginAmmoSwitch_t HaBCR_BeginAmmoSwitch;
+	HaBCR_EndAmmoSwitch_t HaBCR_EndAmmoSwitch;
+	HaBCR_SetAmmoCapacity_t HaBCR_SetAmmoCapacity;
+	HaBCR_UpdateAmmoStateAfterSwitch_t HaBCR_UpdateAmmoStateAfterSwitch;
+	HaBCR_GetCurrentReloadMode_t HaBCR_GetCurrentReloadMode;
+
 };
 
 namespace MSF_WeaponState

@@ -192,15 +192,16 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 		if (eventType == ExtraWeaponState::kEventTypeCreate && MSF_MainData::MCMSettingFlags & MSF_MainData::bRandomizeLoadedAmmoOnNewWeapon)
 			this->loadedAmmo = rand() % (this->ammoCapacity + 1);
 		this->chamberedCount = this->loadedAmmo < this->chamberSize ? this->loadedAmmo : this->chamberSize;
-		if (MSF_Data::InstanceHasTRSupport(currInstanceData))
-			this->flags |= bHasTacticalReload;
-		if (MSF_Data::InstanceHasBCRSupport(currInstanceData))
+
+		
+		bit_set<UInt16>(this->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData));
+		if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData))
 		{
-			this->flags |= bHasBCR;
+			bit_set<UInt16>(this->flags, 5, true);
 			for (UInt32 ammoIdx = 0; ammoIdx < this->loadedAmmo; ammoIdx++)
 				this->BCRammo.push_back(this->equippedAmmo);
 		}
-		this->flags |= (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & mAmmoMask);
+		this->flags = (this->flags & ~WeaponState::mAmmoMask) | (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & mAmmoMask);
 	}
 
 	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
@@ -351,7 +352,7 @@ bool ExtraWeaponState::WeaponState::UpdateAmmoState(ExtraDataList* extraDataList
 	if (!weapon || !instanceData || !instanceData->ammo)
 		return false;
 	UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(instanceData->ammo) & WeaponState::mAmmoMask);
-	this->flags |= notSupportedAmmo;
+	this->flags = (this->flags & ~WeaponState::mAmmoMask) | notSupportedAmmo;
 	if (notSupportedAmmo)
 		return false;
 
@@ -363,7 +364,7 @@ bool ExtraWeaponState::WeaponState::UpdateAmmoState(ExtraDataList* extraDataList
 		//	statechange.second->loadedAmmo = statechange.second->ammoCapacity;
 	}
 	TESAmmo* targetAmmo = nullptr;
-	bool hasBCR = MSF_Data::InstanceHasBCRSupport(instanceData);
+	bool hasBCR = MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(instanceData);
 	if (!hasBCR)
 	{
 		if (this->BCRammo.size() > 0 && (eventType != kEventTypeModdedWorkbench))
@@ -484,7 +485,7 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 			return true;
 		_DEBUG("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
 		UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & WeaponState::mAmmoMask);
-		this->currentState->flags |= notSupportedAmmo;
+		this->currentState->flags = (this->currentState->flags & ~WeaponState::mAmmoMask) | notSupportedAmmo;
 		if (notSupportedAmmo)
 		{
 			this->currentState->loadedAmmo = equipData->loadedAmmoCount;
@@ -500,8 +501,10 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		}
 		else
 			equipData->loadedAmmoCount = this->currentState->loadedAmmo;
-		this->currentState->flags |= MSF_Data::InstanceHasBCRSupport(currInstanceData) << 5;
-		this->currentState->flags |= MSF_Data::InstanceHasTRSupport(currInstanceData) << 4;
+		//this->currentState->flags |= MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData) << 5;
+		//this->currentState->flags |= MSF_Data::InstanceHasTRSupport(currInstanceData) << 4;
+		bit_set<UInt16>(this->currentState->flags, 5, MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData));
+		bit_set<UInt16>(this->currentState->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData));
 		if ((this->currentState->flags & WeaponState::bHasBCR) && (this->currentState->flags & WeaponState::bHasTacticalReload) && (MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber))
 			MSF_MainData::BCRinterfaceHolder.SetBCRammoCap(this->currentState->ammoCapacity + 1);
 		//set BCR ammoCount?
@@ -584,7 +587,7 @@ bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeap
 		if (!currInstanceData->ammo)
 			return true;
 		UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & WeaponState::mAmmoMask);
-		this->currentState->flags |= notSupportedAmmo;
+		this->currentState->flags = (this->currentState->flags & ~WeaponState::mAmmoMask) | notSupportedAmmo;
 		if (notSupportedAmmo)
 		{
 			this->currentState->loadedAmmo = equipData->loadedAmmoCount;
@@ -599,7 +602,7 @@ bool ExtraWeaponState::HandleReloadEvent(ExtraDataList* extraDataList, EquipWeap
 			equipData->loadedAmmoCount = ammoToUse;
 			this->currentState->loadedAmmo = ammoToUse;
 			this->currentState->chamberedCount = equipData->loadedAmmoCount < this->currentState->chamberSize ? equipData->loadedAmmoCount : this->currentState->chamberSize;
-			if (MSF_Data::InstanceHasBCRSupport(currInstanceData))
+			if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData))
 			{
 				this->currentState->BCRammo.clear();
 				for (UInt32 ammoIdx = 0; ammoIdx < this->currentState->loadedAmmo; ammoIdx++)

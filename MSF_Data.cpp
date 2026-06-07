@@ -3810,20 +3810,6 @@ namespace MSF_Data
 		return nullptr;
 	}
 
-	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance)
-	{
-		if (!instance || !MSF_MainData::BCR_AVIF || !MSF_MainData::BCR_AVIF2)
-			return false;
-		return instance->skill == MSF_MainData::BCR_AVIF || instance->skill == MSF_MainData::BCR_AVIF2;
-	}
-
-	bool WeaponHasBCRSupport(TESObjectWEAP* weapon)
-	{
-		if (!weapon || !MSF_MainData::BCR_AVIF || !MSF_MainData::BCR_AVIF2)
-			return false;
-		return weapon->weapData.skill == MSF_MainData::BCR_AVIF || weapon->weapData.skill == MSF_MainData::BCR_AVIF2;
-	}
-
 	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance)
 	{
 		if (!instance || !MSF_MainData::tacticalReloadKW)

@@ -37,8 +37,29 @@ UInt32 inttover(UInt32 input);
 BGSObjectInstanceExtra* CreateObjectInstanceExtra(BGSObjectInstanceExtra::Data* data);
 ExtraUniqueID* CreateExtraUniqueID(UInt16 id, UInt32 form);
 
+template<typename T>
+inline void bit_set(T& number, UInt8 n, bool value) {
+	number = (number & ~((T)1 << n)) | ((T)value << n);
+};
+
 typedef unsigned short KeywordValue;
 typedef UInt32 ObjectRefHandle;
+
+#ifdef DEBUG
+inline void _DEBUG(const char* fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	gLog.Log(IDebugLog::kLevel_Message, fmt, args);
+	va_end(args);
+}
+#else
+inline void _DEBUG(const char* fmt, ...)
+{
+
+}
+#endif
 
 
 namespace InventoryInterface

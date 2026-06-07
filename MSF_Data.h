@@ -907,8 +907,6 @@ namespace MSF_Data
 	bool PickRandomMods(std::vector<BGSMod::Attachment::Mod*>* mods, BGSMod::Attachment::Mod** ammoMod, TESAmmo** ammo, UInt32* count);
 	TESIdleForm* GetReloadAnimation(Actor* actor);
 	TESIdleForm* GetFireAnimation(Actor* actor);
-	bool InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance);
-	bool WeaponHasBCRSupport(TESObjectWEAP* weapon);
 	bool InstanceHasTRSupport(TESObjectWEAP::InstanceData* instance);
 	std::string GetFMString(TESObjectWEAP::InstanceData* instanceData);
 	std::string GetScopeString(TESObjectWEAP::InstanceData* instanceData);

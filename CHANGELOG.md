@@ -1,4 +1,10 @@
 ---
+v1.2.7
+features:
+- future HaBCR support; 1.9.1 and below is not supported
+fixes:
+- stability and performance improvements
+---
 v1.2.6
 features:
 - support for Fallout 4 1.11.221 with F4SE 0.7.8

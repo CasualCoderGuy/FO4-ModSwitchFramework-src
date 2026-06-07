@@ -128,7 +128,7 @@ namespace MSF_Base
 		_DEBUG("queue/stateOK");
 
 		TESObjectWEAP::InstanceData* instance = Utilities::GetEquippedInstanceData(playerActor);
-		bool isBCR = MSF_Data::InstanceHasBCRSupport(instance);
+		bool isBCR = MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(instance);
 		bool isTR = MSF_Data::InstanceHasTRSupport(instance) || MSF_WeaponState::EquippedWeaponHasTRSupport(playerActor);
 		if (isBCR)
 		{
@@ -366,7 +366,7 @@ namespace MSF_Base
 					}
 					else
 					{
-						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress | ~SwitchData::bReloadNeeded); // | SwitchData::bReloadNotFinished
+						switchData->SwitchFlags = (switchData->SwitchFlags | (SwitchData::bSwitchingInProgress | SwitchData::bReloadInProgress)) & ~SwitchData::bReloadNeeded; // | SwitchData::bReloadNotFinished
 						flags = switchData->SwitchFlags;
 					}
 					if (!MSF_Base::ReloadWeapon(flags & SwitchData::bReloadFull, flags & SwitchData::bReloadZeroCount))
@@ -385,7 +385,7 @@ namespace MSF_Base
 					}
 					else
 					{
-						switchData->SwitchFlags |= (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress | ~SwitchData::bAnimNeeded);
+						switchData->SwitchFlags = (switchData->SwitchFlags | (SwitchData::bSwitchingInProgress | SwitchData::bAnimInProgress)) & ~SwitchData::bAnimNeeded;
 						flags = switchData->SwitchFlags;
 					}
 					if (!MSF_Base::PlayAnim(anim))
