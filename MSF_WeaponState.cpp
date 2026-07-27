@@ -194,7 +194,7 @@ bool ExtraWeaponState::WeaponState::FillData(ExtraDataList* extraDataList, Equip
 		this->chamberedCount = this->loadedAmmo < this->chamberSize ? this->loadedAmmo : this->chamberSize;
 
 		
-		bit_set<UInt16>(this->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData));
+		bit_set<UInt16>(this->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData) || ((this->flags & bHasTacticalReload) != 0));
 		if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData))
 		{
 			bit_set<UInt16>(this->flags, 5, true);
@@ -484,6 +484,8 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		if (!currInstanceData->ammo)
 			return true;
 		_DEBUG("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
+		UInt16 flags;
+		MSF_Data::GetChamberData((TESObjectWEAP*)extraInstanceData->baseForm, attachedMods, currInstanceData, &this->currentState->chamberSize, &flags);
 		UInt8 notSupportedAmmo = (MSF_Base::IsNotSupportedAmmo(currInstanceData->ammo) & WeaponState::mAmmoMask);
 		this->currentState->flags = (this->currentState->flags & ~WeaponState::mAmmoMask) | notSupportedAmmo;
 		if (notSupportedAmmo)
@@ -501,14 +503,15 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		}
 		else
 			equipData->loadedAmmoCount = this->currentState->loadedAmmo;
-		this->currentState->flags |= MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData) << 5;
+		
+		this->currentState->flags |= (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData) << 5) | (flags & WeaponState::bHasBCR);
 		//this->currentState->flags |= MSF_Data::InstanceHasTRSupport(currInstanceData) << 4;
 		//bit_set<UInt16>(this->currentState->flags, 5, MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData));
-		bit_set<UInt16>(this->currentState->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData));
+		bit_set<UInt16>(this->currentState->flags, 4, MSF_Data::InstanceHasTRSupport(currInstanceData) || ((flags & WeaponState::bHasTacticalReload) != 0));
 		if ((this->currentState->flags & WeaponState::bHasBCR) && (this->currentState->flags & WeaponState::bHasTacticalReload) && (MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber))
 			MSF_MainData::BCRinterfaceHolder.SetBCRammoCap(this->currentState->ammoCapacity + this->currentState->chamberSize);
 		//set BCR ammoCount?
-		_DEBUG("eq: %i, stored: %i", equipData->loadedAmmoCount, this->currentState->loadedAmmo);
+		_DEBUG("eq: %i, stored: %i, loadedAmmoPtr: %p", equipData->loadedAmmoCount, this->currentState->loadedAmmo, &equipData->loadedAmmoCount);
 		//if (!Utilities::HasObjectMod(attachedMods, this->currentState->currentSwitchedAmmo->mod))//validate
 		//{
 		//	//attach
@@ -856,6 +859,7 @@ bool ExtraWeaponState::HasBCRsupport()
 {
 	if (!this->currentState)
 		return false;
+	_DEBUG("DBG hasBCR: %02X", (this->currentState->flags & WeaponState::bHasBCR) != 0);
 	return (this->currentState->flags & WeaponState::bHasBCR) != 0;
 }
 
@@ -895,10 +899,10 @@ namespace MSF_WeaponState
 	{
 		BGSInventoryItem::Stack * eqStack = Utilities::GetEquippedStack(owner, 41);
 		if (!eqStack)
-			return nullptr;
+			return false;
 		ExtraDataList* dataList = eqStack->extraData;
 		if (!dataList)
-			return nullptr;
+			return false;
 		return ExtraWeaponState::HasTRSupport(dataList);
 	}
 };
@@ -970,6 +974,9 @@ bool BCRinterface::Init()
 	HaBCR_settings = RelocModuleAddr<HaBCR::Settings>(_baseH, 0x151218, 0x151218);
 	HaBCR_avif = RelocModuleAddr<ActorValueInfo*>(_baseH, 0x155908, 0x155908);
 
+	if (!_base && _baseH)
+		BCR::MarkSupportedWeapons();
+
 	return enabled;
 };
 
@@ -988,8 +995,12 @@ bool BCRinterface::InstanceHasBCRSupport(TESObjectWEAP::InstanceData* instance) 
 	if (!instance)
 		return false;
 	auto eqInstance = Utilities::GetEquippedWeaponInstanceData(*g_player);
-	if (_baseH && ((uintptr_t)HaBCR_GetCurrentReloadMode && ((eqInstance && eqInstance == instance && HaBCR_GetCurrentReloadMode()) || ((uintptr_t)HaBCR_IsBCRcompatible && HaBCR_IsBCRcompatible() && ((MSF_MainData::BCR_AVIF && instance->skill == MSF_MainData::BCR_AVIF) || (MSF_MainData::BCR_AVIF2 && instance->skill == MSF_MainData::BCR_AVIF2))))))
+	_DEBUG("DBG InstanceHasBCRSupport: %02X, %02X, %02X, %02X, %02X, %02X, %08X", _baseH != 0, eqInstance == instance, _baseH && HaBCR_GetCurrentReloadMode(), _baseH && HaBCR_IsBCRcompatible(), instance->skill == MSF_MainData::BCR_AVIF, instance->skill == MSF_MainData::BCR_AVIF2, instance->skill ? instance->skill->formID : 0);
+	if (_baseH && (eqInstance && eqInstance == instance && (HaBCR_GetCurrentReloadMode() )))//|| (HaBCR_IsBCRcompatible() && ((MSF_MainData::BCR_AVIF && instance->skill == MSF_MainData::BCR_AVIF) || (MSF_MainData::BCR_AVIF2 && instance->skill == MSF_MainData::BCR_AVIF2))))))
+	{
+		_DEBUG("DBG yes:HaBCR");
 		return true;
+	}
 	return _base && ((MSF_MainData::BCR_AVIF && instance->skill == MSF_MainData::BCR_AVIF) || (MSF_MainData::BCR_AVIF2 && instance->skill == MSF_MainData::BCR_AVIF2));
 }
 
@@ -997,8 +1008,11 @@ bool BCRinterface::SetBCRammoCap(UInt32 ammoCap)
 {
 	if (!enabled)
 		return false;
-	if (_baseH && (uintptr_t)HaBCR_SetAmmoCapacity && (uintptr_t)HaBCR_GetCurrentReloadMode && (HaBCR_GetCurrentReloadMode() || !_base))
+	if (_baseH)// && HaBCR_IsBCRcompatible())
+	{
+		_DEBUG("DBG HaBCR_SetAmmoCapacity: %08X", ammoCap);
 		return HaBCR_SetAmmoCapacity(ammoCap);
+	}
 	if (!_base)
 		return false;
 	return (*(UInt32*)BCR_ammoCapacity.GetUIntPtr()) = ammoCap;
@@ -1017,8 +1031,11 @@ bool BCRinterface::StoreBCRvariables()
 {
 	if (!enabled)
 		return false;
-	if (_baseH && (uintptr_t)HaBCR_BeginAmmoSwitch && (uintptr_t)HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+	if (_baseH && HaBCR_GetCurrentReloadMode())
+	{
+		_DEBUG("DBG HaBCR_BeginAmmoSwitch");
 		return HaBCR_BeginAmmoSwitch();
+	}
 	if (!_base)
 		return false;
 	stored_BCR_ammoCount = *(UInt32*)BCR_ammoCount.GetUIntPtr();
@@ -1039,8 +1056,11 @@ bool BCRinterface::RestoreBCRvariables()
 {
 	if (!enabled)
 		return false;
-	if (_baseH && (uintptr_t)HaBCR_EndAmmoSwitch && (uintptr_t)HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+	if (_baseH && HaBCR_GetCurrentReloadMode())
+	{
+		_DEBUG("DBG HaBCR_EndAmmoSwitch");
 		return HaBCR_EndAmmoSwitch();
+	}
 	if (!_base)
 		return false;
 	(*(UInt32*)BCR_ammoCount.GetUIntPtr()) = stored_BCR_ammoCount;
@@ -1061,8 +1081,11 @@ bool BCRinterface::UpdateBCRvariables(UInt32 ammoCount, UInt32 ammoCapacity, UIn
 {
 	if (!enabled)
 		return false;
-	if (_baseH && (uintptr_t)HaBCR_UpdateAmmoStateAfterSwitch && (uintptr_t)HaBCR_GetCurrentReloadMode && HaBCR_GetCurrentReloadMode())
+	if (_baseH && HaBCR_GetCurrentReloadMode())
+	{
+		_DEBUG("DBG HaBCR_UpdateAmmoStateAfterSwitch: %08X, totalAmmoCount: %08X, ammoCap: %08X", ammoCount, totalAmmoCount, ammoCapacity);
 		return HaBCR_UpdateAmmoStateAfterSwitch(ammoCount, ammoCapacity, totalAmmoCount);
+	}
 	if (!_base)
 		return false;
 	UInt32 ammoCap = *(UInt32*)BCR_ammoCapacity.GetUIntPtr();
@@ -1071,7 +1094,7 @@ bool BCRinterface::UpdateBCRvariables(UInt32 ammoCount, UInt32 ammoCapacity, UIn
 		add = totalAmmoCount;
 	if (add != ammoCap && ammoCount)
 		(*(UInt32*)incrementer.GetUIntPtr()) = ammoCount - 1;
-	_DEBUG("ammoCount: %08X, add: %08X, totalAmmoCount: %08X, ammoCap: %08X", ammoCount, add, totalAmmoCount, ammoCap);
+	_DEBUG("DBG ammoCount: %08X, add: %08X, totalAmmoCount: %08X, ammoCap: %08X", ammoCount, add, totalAmmoCount, ammoCap);
 	(*(UInt32*)BCR_ammoCount.GetUIntPtr()) = ammoCount;
 	//*(UInt32*)BCR_ammoCapacity.GetUIntPtr() = stored_BCR_ammoCapacity;
 	(*(UInt32*)BCR_totalAmmo.GetUIntPtr()) = totalAmmoCount - ammoCount;

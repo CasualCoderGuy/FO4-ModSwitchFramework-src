@@ -406,6 +406,11 @@ private:
 
 };
 
+namespace BCR
+{
+	void MarkSupportedWeapons();
+}
+
 namespace MSF_WeaponState
 {
 	bool EquippedWeaponHasTRSupport(Actor* owner);

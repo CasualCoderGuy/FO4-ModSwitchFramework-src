@@ -222,13 +222,6 @@ public:
 			delete MSF_MainData::ammoDisplay;
 			MSF_MainData::ammoDisplay = HUDMenuAmmoDisplay::Init();
 
-			TESAmmo* ammo = nullptr;
-			ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
-			EquipWeaponData* eqWeapData = Utilities::GetEquippedWeaponData(*g_player);
-			if (eqWeapData)
-				ammo = eqWeapData->ammo;
-			MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
-
 			TESObjectWEAP* weapBase = Utilities::GetEquippedGun(*g_player);
 			TESObjectWEAP::InstanceData* instanceData = Utilities::GetEquippedInstanceData(*g_player);
 			if (weapBase && instanceData)
@@ -239,9 +232,16 @@ public:
 				//MSF_MainData::modSwitchManager.SetIgnoreEquipAction(true);
 				MSF_MainData::modSwitchManager.SetIgnoreAnimGraph(true);
 				MSF_MainData::modSwitchManager.SetDontPutYourGunIn(true);
-				EquipItemInternal(g_ActorEquipManager, *g_player, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0);
+				EquipItemInternal(g_ActorEquipManager, *g_player, idStruct, 0, 1, nullptr, 0, 0, 0, 1, 0); //max ammo set: 0xD31B40+0x28
 				MSF_MainData::modSwitchManager.SetDontPutYourGunIn(false);
 			}
+
+			TESAmmo* ammo = nullptr;
+			ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeEquip);
+			EquipWeaponData* eqWeapData = Utilities::GetEquippedWeaponData(*g_player);
+			if (eqWeapData)
+				ammo = eqWeapData->ammo;
+			MSF_Base::EquipAmmo((*g_player)->inventoryList, ammo);
 
 			if (MSF_MainData::iAutolowerTimeMS)
 			{

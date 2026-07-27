@@ -1089,6 +1089,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	else if (!_strcmpi("reloadStateEnter", name))
 	{
 		reloadStart = true;
+		MSF_MainData::modSwitchManager.SetReloadStarted(true);
 	}
 	else if (!_strcmpi("customAnimStart", name))
 	{
@@ -1139,12 +1140,14 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		if (eqData && eqData->loadedAmmoCount == 0 && Utilities::GetInventoryItemCount((*g_player)->inventoryList, eqData->ammo) == 0)
 			MSF_Base::SwitchAmmoHotkey(KeybindData::bToggle, nullptr, true, true);
 	}
-	else if (reloadStart)
+	else if (!reloadStart && MSF_MainData::modSwitchManager.GetReloadStarted())
 	{
+		MSF_MainData::modSwitchManager.SetReloadStarted(false);
 		Actor* playerActor = *g_player;
 		TESObjectWEAP::InstanceData* currInstanceData = Utilities::GetEquippedWeaponInstanceData(playerActor);
 		if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(currInstanceData))
 		{
+			_DEBUG("HasBCRreload");
 			MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 			EquipWeaponData* eqData = Utilities::GetEquippedWeaponData(playerActor);
 			if (eqData)

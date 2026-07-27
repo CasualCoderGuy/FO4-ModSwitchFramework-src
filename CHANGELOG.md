@@ -1,8 +1,11 @@
 ---
 v1.2.8
 fixes:
-- followers and unique NPCs no longer get ammo/mod spawned in their inventory (with an option to enable spawn for unique NPCs)
+- followers and unique NPCs no longer get ammo/mod spawned in their inventory (with an option to enable spawn for unique NPCs in the MCM)
 - ammo/mod spawns are more reliable with this update
+- fixed an issue where loaded ammo count was not properly restored when loading a save
+- fixed HaBCR support, which now should work with HaBCR versions 1.10.0 and above (added BCR ini parsing for maximum compatibility - see Compatibility section)
+- fixed an inconsistency between the description in the manual and parsed chamber data
 ---
 v1.2.7
 features:

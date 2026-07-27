@@ -384,6 +384,7 @@ private:
 	volatile UInt16 modChangeEvent;
 	volatile UInt16 isInPA;
 	volatile UInt16 isBCRreload;
+	volatile UInt16 reloadStarted;
 	volatile UInt16 switchState;
 	volatile UInt16 forcedReload;
 	volatile UInt16 changeAmmo;
@@ -446,6 +447,7 @@ public:
 		InterlockedExchange16((volatile short*)&dontPutYourGunIn, 0);
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
 		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
+		InterlockedExchange16((volatile short*)&reloadStarted, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 	};
@@ -468,6 +470,8 @@ public:
 	bool GetModChangeEvent() { return modChangeEvent; };
 	void SetIsBCRreload(UInt16 bBCRreload) { InterlockedExchange16((volatile short*)&isBCRreload, bBCRreload); };
 	UInt16 GetIsBCRreload() { return isBCRreload; };
+	void SetReloadStarted(UInt16 bStarted) { InterlockedExchange16((volatile short*)&reloadStarted, bStarted); };
+	UInt16 GetReloadStarted() { return reloadStarted; };
 	bool GetSetForcedReload() { return InterlockedCompareExchange16((volatile short*)&forcedReload, 0, 1); };
 	bool SetForcedReload(bool bForce) { return InterlockedExchange16((volatile short*)&forcedReload, bForce); };
 	void SetDontPutYourGunIn(bool bEquip) { InterlockedExchange16((volatile short*)&dontPutYourGunIn, bEquip); };
@@ -666,6 +670,7 @@ public:
 		InterlockedExchange16((volatile short*)&dontPutYourGunIn, 0);
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
 		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
+		InterlockedExchange16((volatile short*)&reloadStarted, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 		quickKeyTimer.cancel();

@@ -2421,7 +2421,7 @@ namespace MSF_Data
 								continue;
 
 							UInt16 flags = chamberSize["flags"].asInt();
-							flags = (flags << 4) & ExtraWeaponState::WeaponState::mChamberMask;
+							flags = flags & ExtraWeaponState::WeaponState::mChamberMask;
 							UInt16 size = chamberSize["chamberSize"].asInt();
 							auto itChamberWeap = MSF_MainData::weapChamberMap.find(weap);
 							if (itChamberWeap != MSF_MainData::weapChamberMap.end())
@@ -2434,7 +2434,7 @@ namespace MSF_Data
 							continue;
 						}
 						UInt16 flags = chamberSize["flags"].asInt();
-						flags = (flags << 4) & ExtraWeaponState::WeaponState::mChamberMask;
+						flags = flags & ExtraWeaponState::WeaponState::mChamberMask;
 						UInt16 size = chamberSize["chamberSize"].asInt();
 
 						auto itChamberMod = MSF_MainData::modChamberMap.find(mod);
@@ -2871,6 +2871,11 @@ namespace MSF_Data
 					_MESSAGE("----target: %i; op: %i, value: f", itData.target, itData.op, itData.value.f.v1);
 			}
 		}
+
+		for (auto itMod : MSF_MainData::modChamberMap)
+			_MESSAGE("chamberMod: %08X; flags: %08X; size: %i", itMod.first->formID, itMod.second.flags, itMod.second.chamberSize);
+		for (auto itWeap : MSF_MainData::weapChamberMap)
+			_MESSAGE("chamberWeap: %08X; flags: %08X; size: %i", itWeap.first->formID, itWeap.second.flags, itWeap.second.chamberSize);
 
 		//_MESSAGE("MCM float Settings:");
 		//for (std::unordered_map<std::string, float>::iterator itSettings = MSF_MainData::MCMfloatSettingMap.begin(); itSettings != MSF_MainData::MCMfloatSettingMap.end(); itSettings++)
@@ -3629,6 +3634,7 @@ namespace MSF_Data
 		auto itweapdata = MSF_MainData::weapChamberMap.find(weapon);
 		if (itweapdata != MSF_MainData::weapChamberMap.end())
 			currChamberData = &itweapdata->second;
+		_DEBUG("chamber flags: %04X", currChamberData ? currChamberData->flags : 0xFFFF);
 		if (mods)
 		{
 			auto data = mods->data;
