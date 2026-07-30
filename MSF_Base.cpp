@@ -955,7 +955,9 @@ namespace MSF_Base
 				PrintStackData((Actor*)owner, (TESObjectWEAP*)extraInstanceData->baseForm);
 				PatchActorValues(ownerActor, (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData), &avifValues);
 
-				EquipWeaponData* newEqData = (EquipWeaponData*)ownerActor->middleProcess->unk08->equipData[0].equippedData;
+				EquipWeaponData* newEqData = nullptr;
+				if (ownerActor->middleProcess && ownerActor->middleProcess->unk08 && ownerActor->middleProcess->unk08->equipData.count > 0)
+					newEqData = (EquipWeaponData*)ownerActor->middleProcess->unk08->equipData[0].equippedData;
 				ExtraWeaponState* weaponState = ExtraWeaponState::Init(newList, nullptr);
 				if (weaponState)
 					weaponState->HandleEquipEvent(newList, newEqData);
