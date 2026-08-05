@@ -3,6 +3,7 @@
 #include "MSF_WeaponState.h"
 #include "MSF_BurstMode.h"
 #include "MSF_Localization.h"
+#include "MSF_Events.h"
 #include "f4se\GameSettings.h"
 
 _LoadCustomMenu LoadCustomMenu_F4SEHook;
@@ -176,8 +177,8 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 	{
 		if (keyCode == 256) 
 		{
-			if (MSF_MainData::activeBurstManager && (MSF_MainData::activeBurstManager->flags & BurstModeData::bActive))
-				MSF_MainData::activeBurstManager->HandleReleaseEvent();
+			if (MSF_MainData::playerBurstManager && (MSF_MainData::playerBurstManager->flags & BurstModeData::bActive))
+				MSF_MainData::playerBurstManager->HandleReleaseEvent();
 		}
 		else
 		{
@@ -670,6 +671,19 @@ namespace MSF_Scaleform
 		Setting* setting = GetINISetting("sLanguage:General");
 		std::string loc = (setting && setting->GetType() == Setting::kType_String) ? setting->data.s : "en";
 
+		MSF::WidgetUpdate::SettingsData data;
+		data.MSFsettingsInMCM = MSF_MainData::MCMSettingFlags;
+		data.fontType = MSF_MainData::widgetSettings.iFont;
+		data.RGBcolor = MSF_MainData::widgetSettings.GetRGBcolor();
+		data.fSliderMainX = MSF_MainData::widgetSettings.fSliderMainX;
+		data.fSliderMainY = MSF_MainData::widgetSettings.fSliderMainY;
+		data.fPowerArmorOffsetX = MSF_MainData::widgetSettings.fPowerArmorOffsetX;
+		data.fPowerArmorOffsetY = MSF_MainData::widgetSettings.fPowerArmorOffsetY;
+		data.fSliderAlpha = MSF_MainData::widgetSettings.fSliderAlpha;
+		data.fSliderScale = MSF_MainData::widgetSettings.fSliderScale;
+		data.localization = loc.c_str();
+		MSFwidgetSettingsDataUpdateSource.SendEvent(data);
+
 		GFxValue arrArgs[10];
 		arrArgs[0].SetUInt(MSF_MainData::MCMSettingFlags);
 		arrArgs[1].SetUInt(MSF_MainData::widgetSettings.iFont);
@@ -712,6 +726,13 @@ namespace MSF_Scaleform
 			modName = nullModName.c_str();
 		else
 			modName = MSF_Localization::GetTranslation(MSF_Localization::Keys::menuNoneText); //"None"
+
+		MSF::WidgetUpdate::QuickkeyData data;
+		data.APname = apName;
+		data.modName = modName;
+		data.isAmmo = isAmmo;
+		MSFwidgetQuickkeyDataUpdateSource.SendEvent(data);
+
 		GFxValue arrArgs[3]; //obj?
 		arrArgs[0].SetString(apName);
 		arrArgs[1].SetString(modName);
@@ -729,6 +750,10 @@ namespace MSF_Scaleform
 		GFxMovieRoot* movieRoot = widgetMenu->movie->movieRoot;
 		if (!movieRoot)
 			return false;
+
+		MSF::WidgetUpdate::ClearQuickkeyMod data;
+		MSFwidgetClearQuickkeySource.SendEvent(data);
+
 		//GFxValue arrArgs[2]; //obj?
 		//arrArgs[0].SetString(nameForm->GetFullName());
 		//arrArgs[1].SetBool(isAmmo);
@@ -760,6 +785,16 @@ namespace MSF_Scaleform
 			ammoName = instanceData->ammo->GetFullName();
 		bool isInPA = IsInPowerArmor(playerActor);
 		_DEBUG("updWidget: %02X", isInPA);
+
+		MSF::WidgetUpdate::DisplayData data;
+		data.ammoName = ammoName;
+		data.firingMode = firingMode;
+		data.muzzleName = muzzleName;
+		data.scopeName = scopeName;
+		data.shapeID = shapeID;
+		data.isInPA = isInPA;
+		MSFwidgetDisplayDataUpdateSource.SendEvent(data);
+
 		//BSTEventSink_ExitPowerArmor__Event_ /BSTEventSink_PreloadPowerArmor__Event_
 		GFxValue arrArgs[6];
 		arrArgs[0].SetString(ammoName);

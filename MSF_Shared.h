@@ -864,7 +864,7 @@ typedef bool(*_PlayIdleAction)(VirtualMachine* vm, UInt32 stackId, Actor* actor,
 #endif
 typedef void(*_PlaySubgraphAnimation)(VirtualMachine* vm, UInt32 stackId, Actor* target, BSFixedString asEventName);
 typedef bool(*_InitializeActorInstant)(Actor* actor, UInt32 edx);
-typedef void(*_UpdateAnimation)(PlayerCharacter* player, float delta);
+typedef void(*_UpdateAnimation)(Actor* actor, float delta);
 typedef void (*_PlayEquipSound)(Actor* target, TESBoundObject* a_boundObj, bool a_pickUp, bool a_use);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef void(*_ChangeAnimArchetype)(Actor* target, BGSKeyword* archetypeKW);
@@ -898,6 +898,8 @@ extern RelocAddr <uintptr_t> s_ExtraUniqueIDVtbl;
 extern RelocAddr <uintptr_t> s_ExtraModRankVtbl;
 extern RelocAddr <uintptr_t> s_ExtraRankVtbl; 
 extern RelocAddr <uintptr_t> s_ExtraAmmoVtbl;
+extern RelocAddr <uintptr_t> s_ActorVtbl;
+extern RelocAddr <uintptr_t> s_PlayerVtbl;
 extern RelocAddr <_EquipItem> EquipItemInternal;
 extern RelocAddr <_UnEquipItem> UnequipItemInternal;
 extern RelocAddr <_HasPerkInternal> HasPerkInternal;

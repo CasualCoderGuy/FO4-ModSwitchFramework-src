@@ -17,7 +17,9 @@ public:
 		bResetShotCountOnRelease = 0x02, //If TRUE, upon releasing the trigger the shot count will reset; if FALSE, the shot count will not reset(only applies if bOnePullBurst is FALSE)
 		bResetShotCountOnReload = 0x04,
 		bTypeAuto = 0x08,
-		bActive = 0x10
+		bBinaryTrigger = 0x10,
+		bIgnoreFireRateCheck = 0x40,
+		bActive = 0x80
 	};
 	UInt32 delayTime; //Interval between two shots in a single burst(in milliseconds)
 	UInt8 flags;
@@ -30,7 +32,20 @@ class BurstModeManager : public BurstModeData
 {
 public:
 	//BurstModeManager(BurstModeData* templateData, UInt8 bActive) : BurstModeData(templateData->delayTime, templateData->flags, templateData->numOfTotalShots) { numOfShotsFired = 0; SetState(bActive); }
-	BurstModeManager(BurstModeData* templateData, bool bActive) { delayTime = templateData->delayTime; flags = templateData->flags; numOfTotalShots = templateData->numOfTotalShots;  numOfShotsFired = 0; SetState(bActive << 4); };
+	BurstModeManager(BurstModeData* templateData, bool bActive) 
+	{ 
+		delayTime = templateData->delayTime; 
+		flags = templateData->flags;
+		numOfTotalShots = templateData->numOfTotalShots;
+		if (flags & bBinaryTrigger)
+		{
+			flags = (flags & ~bTypeAuto) | bOnePullBurst | bResetShotCountOnRelease;
+			numOfTotalShots = 2;
+		} 
+		numOfShotsFired = 0;
+		waitingForBinaryRelease = 0;
+		SetState(bActive << 4); 
+	};
 	bool HandleFireEvent();
 	bool HandleReleaseEvent();
 	bool ResetShotsOnReload();
@@ -38,8 +53,14 @@ public:
 	bool HandleEquipEvent(TESObjectWEAP::InstanceData* weaponInstance); //ExtraDataList* extraDataList
 	bool HandleModChangeEvent(ExtraDataList* extraDataList);
 	bool SetState(UInt8 bActive);
+	bool ValidateFireRate(TESObjectWEAP::InstanceData* instance, bool logWarn = true);
+	static BurstModeManager* Init(Actor* owner);
+	static BurstModeManager* Init(ExtraDataList* extraList);
+	static BurstModeManager* Init(BGSObjectInstanceExtra* modList, TESObjectWEAP::InstanceData* weaponInstance);
 private:
+	Utilities::Timer burstTimer;
 	volatile short numOfShotsFired;
+	volatile short waitingForBinaryRelease;
 };
 
 class FireBurstTask : public ITaskDelegate

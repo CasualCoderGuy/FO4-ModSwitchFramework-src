@@ -1,4 +1,8 @@
 ---
+v1.2.9
+features:
+- added MSF API for widget data, settings, and quickkey (see MSF_API.h)
+---
 v1.2.8
 fixes:
 - followers and unique NPCs no longer get ammo/mod spawned in their inventory (with an option to enable spawn for unique NPCs in the MCM)

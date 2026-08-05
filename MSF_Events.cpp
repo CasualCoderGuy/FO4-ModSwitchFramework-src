@@ -22,6 +22,13 @@ MenuOpenCloseSink menuOpenCloseSink;
 _PlayerAnimationEvent PlayerAnimationEvent_Original;
 PipboyLightEventSink pipboyLightEvent;
 ActorEquipManagerEventSourceMSF actorEquipManagerEventSourceMSF;
+_UpdateAnimation UpdateAnimationPlayer_Copied;
+_UpdateAnimation UpdateAnimationActor_Copied;
+
+MSF_EventSource<MSF::WidgetUpdate::SettingsData> MSFwidgetSettingsDataUpdateSource;
+MSF_EventSource<MSF::WidgetUpdate::DisplayData> MSFwidgetDisplayDataUpdateSource;
+MSF_EventSource<MSF::WidgetUpdate::QuickkeyData> MSFwidgetQuickkeyDataUpdateSource;
+MSF_EventSource<MSF::WidgetUpdate::ClearQuickkeyMod> MSFwidgetClearQuickkeySource;
 
 EventResult	BGSOnPlayerUseWorkBenchEventSink::ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher)
 {
@@ -428,6 +435,16 @@ const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 un
 	if (item->formType == kFormType_MISC)
 		return MSF_Base::EquipModPipboy((TESObjectMISC*)item, !unequip);
 	return type == 2 ? MSF_Localization::GetTranslation(MSF_Localization::Keys::modText) : MSF_Localization::GetTranslation(MSF_Localization::Keys::itemText);
+}
+
+void PlayerUpdateAnimation_Hook(Actor* player, float delta)
+{
+	return UpdateAnimationPlayer_Copied(player, delta);
+}
+
+void ActorUpdateAnimation_Hook(Actor* actor, float delta)
+{
+	return UpdateAnimationActor_Copied(actor, delta);
 }
 
 void* EquipHandler_UpdateAnimGraph_Hook(Actor* actor, bool unk_rdx)
@@ -963,7 +980,7 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			}
 		}
 	}
-	else if (!_strcmpi("switchMod", name))
+	else if (!_strcmpi("switchMod", name)) //DynamicIdle
 	{
 		MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(false);
 		SwitchData* switchData = MSF_MainData::modSwitchManager.GetNextSwitch();

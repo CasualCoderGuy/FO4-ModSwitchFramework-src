@@ -1,18 +1,52 @@
 #include "MSF_BurstMode.h"
 #include "MSF_Data.h"
 
+float CalculateMSperShot(float attackDelay, float speed, bool bAuto)
+{
+	if (speed == 0)
+		return 0;
+	float shotsPer10s = 0;
+	if (bAuto)
+		shotsPer10s = 1 / speed;
+	else if (attackDelay != 0)
+		shotsPer10s = attackDelay / speed;
+	else
+		return 0;
+	return 10 / shotsPer10s;
+}
+
 bool BurstModeManager::SetState(UInt8 bActive)
 {
 	flags ^= (-(bActive & BurstModeManager::bActive) ^ flags) & BurstModeManager::bActive;
 	return true;
 }
 
+//test fire rate ingame. LOG weaponFire event timesta,ps while spamming mouse
+//ingame delay timer RE::Calendar    4796378     00000000030DDA28 v191
+//poll player/actor updateanimation delta
+bool BurstModeManager::ValidateFireRate(TESObjectWEAP::InstanceData* instance, bool logWarn) //or block fire input
+{
+	if (!instance)
+		return false;
+	float shotTime = CalculateMSperShot(instance->attackDelay, instance->speed, (instance->flags & (TESObjectWEAP::InstanceData::kFlag_Automatic | TESObjectWEAP::InstanceData::kFlag_BoltAction)) != 0);
+	//float shotTimeNoDelay = CalculateMSperShot(instance->attackDelay, instance->speed, true);
+	if (shotTime < numOfTotalShots*delayTime)
+	{
+		if (logWarn)
+			_MESSAGE("WARNING: Burst Mode fire rate validation failed.");
+		return false;
+	}
+	return true;
+}
+
 bool BurstModeManager::HandleFireEvent()
 {
+	if ((flags & BurstModeData::bActive) == 0)
+		return false;
 	InterlockedIncrement16(&numOfShotsFired);
 	if (numOfShotsFired < numOfTotalShots)
 	{
-		if (!(flags & BurstModeData::bTypeAuto))
+		if (!(flags & (BurstModeData::bTypeAuto | BurstModeData::bBinaryTrigger)))
 		{
 			FireBurstTask* burstTask = new FireBurstTask(this);
 			delayTask delayBurst(delayTime, true, g_threading->AddTask, burstTask);
@@ -37,13 +71,31 @@ bool BurstModeManager::ResetShotsOnReload()
 
 bool BurstModeManager::HandleReleaseEvent()
 {
+	if ((flags & BurstModeData::bActive) == 0)
+		return false;
 	if ((flags & BurstModeData::bResetShotCountOnRelease) && (flags & BurstModeData::bTypeAuto))
 		InterlockedExchange16(&numOfShotsFired, 0);
+	if (InterlockedExchange16(&waitingForBinaryRelease, 0))
+	{
+		auto elapsed = burstTimer.stop();
+		if (elapsed < delayTime)
+		{
+			FireBurstTask* burstTask = new FireBurstTask(this);
+			delayTask delayBurst(delayTime-elapsed, true, g_threading->AddTask, burstTask);
+		}
+		else
+		{
+			FireBurstTask* burstTask = new FireBurstTask(this);
+			g_threading->AddTask(burstTask);
+		}
+	}
 	return true;
 }
 
 bool BurstModeManager::FireWeapon()
 {
+	if (flags & BurstModeData::bTypeAuto)
+		return true;
 	if (!(flags & BurstModeData::bOnePullBurst))
 	{
 		if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
@@ -54,9 +106,10 @@ bool BurstModeManager::FireWeapon()
 		}
 	}
 	Actor* player = *g_player;
-	TESIdleForm* fireIdle = MSF_Data::GetFireAnimation(player);
-	if (fireIdle)
-		return Utilities::PlayIdle(player, fireIdle);
+	//TESIdleForm* fireIdle = MSF_Data::GetFireAnimation(player);
+	//if (fireIdle)
+	//	return Utilities::PlayIdle(player, fireIdle);
+	Utilities::PlayIdleAction(*g_player, MSF_MainData::ActionFireSingle);
 	return false;
 }
 

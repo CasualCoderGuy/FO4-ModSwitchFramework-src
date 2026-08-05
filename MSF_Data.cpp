@@ -77,7 +77,8 @@ ModSelectionMenu* MSF_MainData::widgetMenu = nullptr;
 HUDMenuAmmoDisplay* MSF_MainData::ammoDisplay = nullptr;
 std::string MSF_MainData::loc = "";
 
-BurstModeManager* MSF_MainData::activeBurstManager = nullptr;
+BurstModeManager* MSF_MainData::playerBurstManager = nullptr;
+std::unordered_map<Actor*, BurstModeManager*> MSF_MainData::npcBurstManagers;
 
 BCRinterface MSF_MainData::BCRinterfaceHolder;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
@@ -99,7 +100,8 @@ BGSSoundDescriptorForm* MSF_MainData::failSound = nullptr;
 BGSSoundDescriptorForm* MSF_MainData::failSoundQuickkey = nullptr;
 BGSSoundDescriptorForm* MSF_MainData::failSoundMenu = nullptr;
 BGSSoundDescriptorForm* MSF_MainData::nextSoundQuickkey = nullptr;
-std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeData;
+std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*>  MSF_MainData::burstModeModData;
+std::unordered_map<TESObjectWEAP*, BurstModeData*>  MSF_MainData::burstModeWeapData;
 std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDataMap;
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
 //std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;

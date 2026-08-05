@@ -535,6 +535,8 @@ bool WriteHooks()
 	ExtraRankCompare_Copied = (uintptr_t)HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr()+8, &ExtraRankCompare_Hook);
 	ExtraRankDestructor_Copied = HookUtil::SafeWrite64(s_ExtraRankVtbl.GetUIntPtr(), &ExtraRankDestructor_Hook);
 	PipboyMenuInvoke_Copied = HookUtil::SafeWrite64(PipboyMenuInvoke_HookAddress.GetUIntPtr(), &PipboyMenuInvoke_Hook);
+	UpdateAnimationPlayer_Copied = HookUtil::SafeWrite64(s_PlayerVtbl.GetUIntPtr() + 0x4F8, &PlayerUpdateAnimation_Hook);
+	UpdateAnimationActor_Copied = HookUtil::SafeWrite64(s_ActorVtbl.GetUIntPtr() + 0x4F8, &ActorUpdateAnimation_Hook);
 	if (!PlayerAnimationEvent_Original || !ExtraRankCompare_Copied || !PipboyMenuInvoke_Copied)
 	{
 		_MESSAGE("Hook SafeWrite64 failed.");

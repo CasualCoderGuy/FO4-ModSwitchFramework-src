@@ -744,7 +744,8 @@ public:
 	static BGSSoundDescriptorForm* nextSoundQuickkey;
 	static std::string loc;
 
-	static BurstModeManager* activeBurstManager;
+	static BurstModeManager* playerBurstManager;
+	static std::unordered_map<Actor*, BurstModeManager*> npcBurstManagers;
 
 	//Data added by plugins
 	static std::unordered_map<UInt64, KeybindData*> keybindMap;
@@ -758,7 +759,8 @@ public:
 	static std::vector<HUDMuzzleData> muzzleDisplayData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> compatibilityEdits;
 	static std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> instantiationRequirements;
-	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeData;
+	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeModData;
+	static std::unordered_map<TESObjectWEAP*, BurstModeData*> burstModeWeapData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 	//static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;

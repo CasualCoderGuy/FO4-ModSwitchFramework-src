@@ -2,7 +2,71 @@
 #include "MSF_Data.h"
 #include "MSF_Base.h"
 #include "MSF_Addresses.h"
+#include "MSF_API.h"
 #include "f4se\GameThreads.h"
+
+template <class EventData>
+class MSF_EventSource
+{
+private:
+	std::mutex eventLock;
+	std::vector<MSF::EventSink<EventData>*> registeredSinks;
+public:
+	bool SendEvent(const EventData& eventData)
+	{
+		bool success = true;
+		if (!eventLock.try_lock())
+			_MESSAGE("WARNING: MSF event sent while mutex lock was active.");
+		for (auto sink : registeredSinks)
+			sink->ReceiveEvent(eventData);
+		eventLock.unlock();
+		return success;
+	}
+	bool RegisterSink(MSF::EventSink<EventData>* sink)
+	{
+		if (!sink)
+			return false;
+		if (eventLock.try_lock())
+		{
+			if (std::find(registeredSinks.begin(), registeredSinks.end(), sink) == registeredSinks.end())
+				registeredSinks.push_back(sink);
+			else
+			{
+				eventLock.unlock();
+				return false;
+			}
+			eventLock.unlock();
+		}
+		else
+			return false;
+		return true;
+	}
+	bool UnregisterSink(MSF::EventSink<EventData>* sink)
+	{
+		if (!sink)
+			return false;
+		if (eventLock.try_lock())
+		{
+			auto foundSinkIt = std::find(registeredSinks.begin(), registeredSinks.end(), sink);
+			if (foundSinkIt != registeredSinks.end())
+				registeredSinks.erase(foundSinkIt);
+			else
+			{
+				eventLock.unlock();
+				return false;
+			}
+			eventLock.unlock();
+		}
+		else
+			return false;
+		return true;
+	}
+};
+
+extern MSF_EventSource<MSF::WidgetUpdate::SettingsData> MSFwidgetSettingsDataUpdateSource;
+extern MSF_EventSource<MSF::WidgetUpdate::DisplayData> MSFwidgetDisplayDataUpdateSource;
+extern MSF_EventSource<MSF::WidgetUpdate::QuickkeyData> MSFwidgetQuickkeyDataUpdateSource;
+extern MSF_EventSource<MSF::WidgetUpdate::ClearQuickkeyMod> MSFwidgetClearQuickkeySource;
 
 //Anim Event
 class BSAnimationGraphEvent
@@ -291,6 +355,8 @@ extern _UpdateEquippedWeaponData UpdateEquippedWeaponData_Copied;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_ReturnJumpAddr;
 extern uintptr_t LoadBuffer_ExtraDataList_ExtraRank_BranchCode;
 extern uintptr_t ExtraRankCompare_Copied;
+extern _UpdateAnimation UpdateAnimationPlayer_Copied;
+extern _UpdateAnimation UpdateAnimationActor_Copied;
 extern RelocAddr <uintptr_t> AmmoReserveCalcAddr;
 extern RelocAddr <_RemoveItem_Virtual> RemoveItem_ConsumeAmmo_HookTarget;
 extern _EjectShellCasing EjectShellCasing_Copied1;
@@ -591,6 +657,8 @@ public:
 
 UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** arg3);
 UInt64 HUDShowAmmoCounter_Hook(HUDAmmoCounter* ammoCounter, UInt32 visibleTime);
+void PlayerUpdateAnimation_Hook(Actor* player, float delta);
+void ActorUpdateAnimation_Hook(Actor* actor, float delta);
 void* AttackBlockHandler_Hook(void* handler);
 bool AttackInputHandler_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d);
 bool AttackInputHandlerReload_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d); 

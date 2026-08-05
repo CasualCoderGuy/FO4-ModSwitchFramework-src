@@ -1692,6 +1692,9 @@ namespace MSF_Base
 		if (anim)
 		{
 			MSF_MainData::modSwitchManager.SetShouldBlendAnimation(animData->shouldBlendAnim);
+#ifdef DEBUG
+			MSF_Test::FollowAnimationFor(*g_player, 2000);
+#endif
 			Utilities::PlayIdle(*g_player, anim);
 			return true;
 		}
