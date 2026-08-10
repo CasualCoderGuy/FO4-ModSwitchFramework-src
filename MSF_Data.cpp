@@ -56,6 +56,7 @@ BGSAction* MSF_MainData::ActionReload;
 BGSAction* MSF_MainData::ActionDraw;
 BGSAction* MSF_MainData::ActionGunDown;
 BGSAction* MSF_MainData::ActionRightRelease;
+BGSPerk* MSF_MainData::AnimPerk;
 bool MSF_MainData::GameIsLoading = true;
 bool MSF_MainData::IsInitialized = false;
 bool MSF_MainData::HadEquippedAmmo = false;
@@ -738,6 +739,14 @@ namespace MSF_Data
 		MSF_MainData::failSound = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x003EC24));
 		MSF_MainData::failSoundQuickkey = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x00C8C6E));
 		MSF_MainData::failSoundMenu = reinterpret_cast<BGSSoundDescriptorForm*>(LookupFormByID((UInt32)0x00C6D13));
+		MSF_MainData::AnimPerk = reinterpret_cast<BGSPerk*>(LookupFormByID(formIDbase | (UInt32)0x0000FFF));
+
+		if (MSF_MainData::AnimPerk)
+		{
+			TESNPC* actorBase = (TESNPC*)(*g_player)->baseForm;
+			//if (actorBase && !actorBase->GetPerkIndex(MSF_MainData::AnimPerk))
+			//	player->AddPerk(MSF_MainData::AnimPerk, 0);
+		}
 
 		UInt8 tacticalReloadModIndex = (*g_dataHandler)->GetLoadedModIndex("TacticalReload.esm");
 		if (tacticalReloadModIndex != 0xFF)

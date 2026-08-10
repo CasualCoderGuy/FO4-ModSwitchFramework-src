@@ -389,6 +389,7 @@ private:
 	volatile UInt16 forcedReload;
 	volatile UInt16 changeAmmo;
 	volatile UInt16 animCantBeCancelled;
+	volatile UInt16 blockLoweredFire;
 	SimpleLock queueLock;
 	std::vector<SwitchData*> switchDataQueue;
 
@@ -448,6 +449,7 @@ public:
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
 		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
 		InterlockedExchange16((volatile short*)&reloadStarted, 0);
+		InterlockedExchange16((volatile short*)&blockLoweredFire, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 	};
@@ -472,6 +474,8 @@ public:
 	UInt16 GetIsBCRreload() { return isBCRreload; };
 	void SetReloadStarted(UInt16 bStarted) { InterlockedExchange16((volatile short*)&reloadStarted, bStarted); };
 	UInt16 GetReloadStarted() { return reloadStarted; };
+	void SetBlockLoweredFire(bool bBlock) { InterlockedExchange16((volatile short*)&blockLoweredFire, bBlock); };
+	bool GetBlockLoweredFire() { return blockLoweredFire; };
 	bool GetSetForcedReload() { return InterlockedCompareExchange16((volatile short*)&forcedReload, 0, 1); };
 	bool SetForcedReload(bool bForce) { return InterlockedExchange16((volatile short*)&forcedReload, bForce); };
 	void SetDontPutYourGunIn(bool bEquip) { InterlockedExchange16((volatile short*)&dontPutYourGunIn, bEquip); };
@@ -671,6 +675,7 @@ public:
 		InterlockedExchange16((volatile short*)&changeAmmo, 0);
 		InterlockedExchange16((volatile short*)&animCantBeCancelled, 0);
 		InterlockedExchange16((volatile short*)&reloadStarted, 0);
+		InterlockedExchange16((volatile short*)&blockLoweredFire, 0);
 		ClearQuickSelection();
 		ClearSelectMenu();
 		quickKeyTimer.cancel();
@@ -811,6 +816,7 @@ public:
 	static BGSAction* ActionRightRelease;
 	static BGSAction* ActionDraw;
 	static BGSAction* ActionGunDown;
+	static BGSPerk* AnimPerk;
 
 	//MCM data (read on init and on update)
 	enum : UInt64

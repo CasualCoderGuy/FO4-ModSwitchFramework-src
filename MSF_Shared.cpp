@@ -1154,6 +1154,7 @@ namespace Utilities
 
 	bool PlayIdleAction(Actor* actor, BGSAction* action)
 	{
+		_MESSAGE("Playaction");
 #ifndef NEXTGEN
 		return PlayIdleActionInternal(actor, action, nullptr, (*g_gameVM)->m_virtualMachine, 0);
 #else
@@ -1205,9 +1206,9 @@ namespace Utilities
 		ReloadWeaponInternal(actor, idStruct, 41);
 	}
 
-	void GetClipInfo(Actor* actor, float& currentTime, float& duration, std::string& clipName)
+	void GetClipInfo(Actor* actor, ClipInfo& clipInfo, std::string clipName)
 	{
-		if (actor->middleProcess)
+		if (actor->middleProcess && actor->middleProcess->unk08)
 		{
 			MiddleHighProcessData* midProc = (MiddleHighProcessData*)actor->middleProcess->unk08;
 			BSAnimationGraphManager* graphManager = (BSAnimationGraphManager*)midProc->animationGraphManager;
@@ -1219,27 +1220,192 @@ namespace Utilities
 					nodeArray* activeNodes = *(nodeArray**)((uintptr_t)hkGraph + 0xE0);
 					if (activeNodes && activeNodes->_size > 0) {
 						void** generatorArray = *activeNodes->_data;
-						while (*generatorArray) {
-							uintptr_t clip = (uintptr_t)(*generatorArray);
-							if (*(uint32_t*)(clip + 0x8)) {
-								currentTime = *(float*)(clip + 0x140);
-								clipName = std::string(*(const char**)(clip + 0x38));
-								if (currentTime) {
+						for (UInt32 i = 0; i < activeNodes->_size; i++) {
+							uintptr_t clip = (uintptr_t)(*(generatorArray + 1));
+							//if (*(uint32_t*)(clip + 0x8)) {
+							if (clip && *(uintptr_t*)(clip) == s_hkbClipGeneratorVtbl.GetUIntPtr()) {
+								float currentTime = *(float*)(clip + 0x140);
+								if (currentTime)
+								{
 									uintptr_t animCtrl = *(uintptr_t*)(clip + 0xD0);
-									if (animCtrl) {
-										uintptr_t animBinding = *(uintptr_t*)(animCtrl + 0x38);
-										uintptr_t anim = *(uintptr_t*)(animBinding + 0x18);
-										duration = *(float*)(anim + 0x14);
-										return;
+									if (animCtrl)
+									{
+										std::string currClipName = std::string(*(const char**)(clip + 0x38));
+										if (clipName == "" || currClipName == clipName)
+										{
+											clipInfo.clipGen = clip;
+											clipInfo.clipName = currClipName;
+											uintptr_t animBinding = *(uintptr_t*)(animCtrl + 0x38);
+											uintptr_t anim = *(uintptr_t*)(animBinding + 0x18);
+											clipInfo.duration = *(float*)(anim + 0x14);
+											clipInfo.currentTime = currentTime;
+											clipInfo.frameNo = *(UInt32*)(anim + 0x38);
+											clipInfo.frameDur = *(float*)(anim + 0x50);
+											return;
+										}
 									}
 								}
 							}
-							generatorArray = (void**)((uintptr_t)generatorArray + 0x8);
+							generatorArray = *(activeNodes->_data + 1);
 						}
 					}
 				}
 			}
 		}
+	}
+
+	float GetWaitTimeForEvent(Actor* actor, std::string clipName, std::string eventName)
+	{
+		if (actor->middleProcess && actor->middleProcess->unk08)
+		{
+			MiddleHighProcessData* midProc = (MiddleHighProcessData*)actor->middleProcess->unk08;
+			BSAnimationGraphManager* graphManager = (BSAnimationGraphManager*)midProc->animationGraphManager;
+			if (graphManager) {
+				BShkbAnimationGraph* graph = graphManager->variableCache.graphToCacheFor.get();
+				if (graph) {
+					void* hkGraph = *(void**)((uintptr_t)graph + 0x378);
+					typedef hkArray<void**, struct hkContainerHeapAllocator> nodeArray;
+					nodeArray* activeNodes = *(nodeArray**)((uintptr_t)hkGraph + 0xE0);
+					if (activeNodes && activeNodes->_size > 0) {
+						void** generatorArray = *activeNodes->_data;
+						for (UInt32 i = 0; i < activeNodes->_size; i++) {
+							uintptr_t clip = (uintptr_t)(*(generatorArray + 1));
+							//if (*(uint32_t*)(clip + 0x8)) {
+							if (clip && *(uintptr_t*)(clip) == s_hkbClipGeneratorVtbl.GetUIntPtr()) {
+								float currentTime = *(float*)(clip + 0x140);
+								if (currentTime)
+								{
+									uintptr_t animCtrl = *(uintptr_t*)(clip + 0xD0);
+									if (animCtrl)
+									{
+										std::string currClipName = std::string(*(const char**)(clip + 0x38));
+										if (clipName == "")
+										{
+											float res = ScanAnimAnnotationsForEvent(animCtrl, eventName);
+											if (res != -1.f)
+												return res;
+										}
+										else if (currClipName == clipName)
+											return ScanAnimAnnotationsForEvent(animCtrl, eventName);
+									}
+								}
+							}
+							generatorArray = *(activeNodes->_data + 1);
+						}
+					}
+				}
+			}
+		}
+		return -1.f;
+	}
+
+	bool IsClipPlaying(Actor* actor, std::string clipName)
+	{
+		if (actor->middleProcess && actor->middleProcess->unk08)
+		{
+			MiddleHighProcessData* midProc = (MiddleHighProcessData*)actor->middleProcess->unk08;
+			BSAnimationGraphManager* graphManager = (BSAnimationGraphManager*)midProc->animationGraphManager;
+			if (graphManager) {
+				BShkbAnimationGraph* graph = graphManager->variableCache.graphToCacheFor.get();
+				if (graph) {
+					void* hkGraph = *(void**)((uintptr_t)graph + 0x378);
+					typedef hkArray<void**, struct hkContainerHeapAllocator> nodeArray;
+					nodeArray* activeNodes = *(nodeArray**)((uintptr_t)hkGraph + 0xE0);
+					if (activeNodes && activeNodes->_size > 0) {
+						void** generatorArray = *activeNodes->_data;
+						for (UInt32 i = 0; i < activeNodes->_size; i++) {
+							uintptr_t clip = (uintptr_t)(*(generatorArray+1));
+							//if (*(uint32_t*)(clip + 0x8)) {
+							if (clip && *(uintptr_t*)(clip) == s_hkbClipGeneratorVtbl.GetUIntPtr()) {
+								float currentTime = *(float*)(clip + 0x140);
+								if (currentTime)
+								{
+									uintptr_t animCtrl = *(uintptr_t*)(clip + 0xD0);
+									if (animCtrl)
+									{
+										std::string currClipName = std::string(*(const char**)(clip + 0x38));
+										if (currClipName == clipName)
+											return true;
+									}
+								}
+							}
+							generatorArray = *(activeNodes->_data+1);
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	UInt32 GetCurrentClipState(Actor* actor)
+	{
+		if (actor->middleProcess && actor->middleProcess->unk08)
+		{
+			MiddleHighProcessData* midProc = (MiddleHighProcessData*)actor->middleProcess->unk08;
+			BSAnimationGraphManager* graphManager = (BSAnimationGraphManager*)midProc->animationGraphManager;
+			if (graphManager) {
+				BShkbAnimationGraph* graph = graphManager->variableCache.graphToCacheFor.get();
+				if (graph) {
+					void* hkGraph = *(void**)((uintptr_t)graph + 0x378);
+					typedef hkArray<void**, struct hkContainerHeapAllocator> nodeArray;
+					nodeArray* activeNodes = *(nodeArray**)((uintptr_t)hkGraph + 0xE0);
+					if (activeNodes && activeNodes->_size > 0) {
+						void** generatorArray = *activeNodes->_data;
+						for (UInt32 i = 0; i < activeNodes->_size; i++) {
+							uintptr_t clip = (uintptr_t)(*(generatorArray + 1));
+							//if (*(uint32_t*)(clip + 0x8))
+							if (clip && *(uintptr_t*)(clip) == s_hkbStateMachineVtbl.GetUIntPtr())
+								return *reinterpret_cast<const std::int32_t*>(clip + 0xC0);
+							generatorArray = *(activeNodes->_data + 1);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	float ScanAnimAnnotationsForEvent(uintptr_t anim, std::string animEvent)
+	{
+		float result = -1.f;
+
+		if (!anim)
+			return result;
+		typedef hkArray<void**, struct hkContainerHeapAllocator> trackArray;
+		trackArray* tracks = *(trackArray**)((uintptr_t)anim + 0x28);
+		if (!tracks || tracks->_size == 0)
+			return result;
+		void*** track = tracks->_data;
+		for (UInt32 i = 0; i < tracks->_size; i++) {
+			//std::string trackName = std::string(*(const char**)((uintptr_t)track));
+			typedef hkArray<void**, struct hkContainerHeapAllocator> annotationArray;
+			annotationArray* annotations = *(annotationArray**)((uintptr_t)*track + 0x8);
+			if (!annotations || annotations->_size == 0)
+				continue;
+			void*** annotation = annotations->_data;
+			for (UInt32 j = 0; j < annotations->_size; j++) {
+				std::string annotationText = std::string(*(const char**)((uintptr_t)*annotation+0x8));
+				float annotationTime = *(float*)((uintptr_t)annotation);
+
+				if (annotationText == animEvent)
+					return annotationTime;
+
+				annotation = (void***)((uintptr_t)annotation + 0x10);
+			}
+			track = (void***)((uintptr_t)track + 0x18);
+		}
+		return result;
+	}
+
+	bool OverwriteClipLocalTime(uintptr_t clipGen, float time)
+	{
+		if (!clipGen)
+			return false;
+		*(float*)(clipGen + 0x140) = time;
+		uintptr_t animCtrl = *(uintptr_t*)(clipGen + 0xD0);
+		if (animCtrl)
+			*reinterpret_cast<float*>(animCtrl + 0x10) = time;
+		*reinterpret_cast<uint8_t*>(clipGen + 0x151) = 1;
 	}
 
 	bool ModActorValue(Actor* actor, ActorValueInfo* av, float val)

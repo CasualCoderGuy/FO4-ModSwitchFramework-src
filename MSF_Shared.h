@@ -70,6 +70,61 @@ inline void _DEBUG(const char* fmt, ...)
 #endif
 
 
+class PlayerCoverData
+{
+public:
+	// members
+	NiPoint3                                coverLocation;  // 00
+	NiPoint3                                peekLocation;   // 0C
+	float                                   peekTimer;      // 18
+	float                                   updateTimer;    // 2C
+	float                                   blockedTimer;   // 20
+	UInt32									peekState;      // 24
+	bool                                    gunBlocked;     // 28
+};
+STATIC_ASSERT(sizeof(PlayerCoverData) == 0x2C);
+
+class AITimer
+{
+public:
+	// members
+	float startTime;   // 00
+	float targetTime;  // 04
+};
+STATIC_ASSERT(sizeof(AITimer) == 0x8);
+extern RelocPtr <AITimer> g_AITimer;
+
+class BSTimer
+{
+public:
+	// members
+	UInt64		  highPrecisionInitTime;          // 00
+	float         clamp;                          // 08
+	float         clampRemainder;                 // 0C
+	float         delta;                          // 10
+	float         realTimeDelta;                  // 14
+	UInt64		  lastTime;                       // 18
+	UInt8		  unk20[0x10];                    // 20
+	UInt64		  firstTime;                      // 30
+	UInt64		  disabledLastTime;               // 38
+	UInt64		  disabledFirstTime;              // 40
+	UInt32		  disableCounter;                 // 48
+	bool          useGlobalTimeMultiplierTarget;  // 4C
+};
+STATIC_ASSERT(sizeof(BSTimer) == 0x50);
+extern RelocPtr <BSTimer> g_BSTimer;
+
+class ClipInfo
+{
+public:
+	uintptr_t clipGen;
+	std::string clipName;
+	float duration;
+	float currentTime;
+	float frameDur;
+	UInt32 frameNo;
+};
+
 namespace InventoryInterface
 {
 	struct CountChangedEvent
@@ -659,7 +714,6 @@ namespace Utilities
 	bool GetAnimationVariableBool(TESObjectREFR* ref, BSFixedString asVariableName);
 	SInt32 GetAnimationVariableInt(TESObjectREFR* ref, BSFixedString asVariableName);
 	float GetAnimationVariableFloat(TESObjectREFR* ref, BSFixedString asVariableName);
-	void GetClipInfo(Actor* actor, float& currentTime, float& duration, std::string& clipName);
 	void SendNotification(std::string asNotificationText);
 	//void ShowMessagebox(std::string asText);
 	void AddItem(TESObjectREFR* target, TESForm* form, SInt32 count, bool bSilent);
@@ -670,7 +724,12 @@ namespace Utilities
 	bool AddRemKeyword(BGSKeywordForm* keywordForm, BGSKeyword* keyword, bool bAdd);
 	UInt32 AddRemFlag(UInt32 flagHolder, UInt32 flag, UInt8 bAdd, UInt8 op = 0);
 	float GetActorValue(tArray<Actor::ActorValueData>* avdata, UInt32 formId);
-
+	void GetClipInfo(Actor* actor, ClipInfo& clipInfo, std::string clipName = "");
+	float GetWaitTimeForEvent(Actor* actor, std::string clipName, std::string eventName);
+	bool IsClipPlaying(Actor* actor, std::string clipName);
+	UInt32 GetCurrentClipState(Actor* actor);
+	float ScanAnimAnnotationsForEvent(uintptr_t anim, std::string animEvent);
+	bool OverwriteClipLocalTime(uintptr_t clipGen, float time);
 
 	class Timer
 	{
@@ -678,15 +737,24 @@ namespace Utilities
 		void start()
 		{
 			countStart = std::chrono::steady_clock::now();
+			g_countStart = g_AITimer->startTime;
 			_IsRunning = true;
 		}
 
-		long long int getElapsed()
+		long long int getRealElapsed()
 		{
 			if (!_IsRunning)
 				return 0;
 			countEnd = std::chrono::steady_clock::now();
 			return std::chrono::duration_cast<std::chrono::milliseconds>(countEnd - countStart).count();
+		}
+
+		float getGameElapsed()
+		{
+			if (!_IsRunning)
+				return  0.f;
+			g_countEnd = g_AITimer->startTime;
+			return (g_countEnd - g_countStart)*1000;
 		}
 
 		long long int stop()
@@ -695,14 +763,22 @@ namespace Utilities
 				return 0;
 			_IsRunning = false;
 			countEnd = std::chrono::steady_clock::now();
+			g_countEnd = g_AITimer->startTime;
 			return std::chrono::duration_cast<std::chrono::milliseconds>(countEnd - countStart).count();
 		}
 
-		long long int getLast()
+		long long int getLastReal()
 		{
 			if (_IsRunning)
 				return 0;
 			return std::chrono::duration_cast<std::chrono::milliseconds>(countEnd - countStart).count();
+		}
+
+		float getLastGame()
+		{
+			if (_IsRunning)
+				return 0.f;
+			return (g_countEnd - g_countStart)*1000;
 		}
 
 		bool IsRunning()
@@ -712,6 +788,7 @@ namespace Utilities
 
 	private:
 		std::chrono::steady_clock::time_point countStart, countEnd;
+		float g_countStart, g_countEnd;
 		bool _IsRunning;
 	};
 }
@@ -872,6 +949,7 @@ typedef void(*_ChangeAnimFlavor)(Actor* target, BGSKeyword* flavorKW);
 typedef void(*_CheckKeywordType)(BGSKeyword* keyword, UInt32 type); //7: AnimArchetype; 13: AnimFlavor
 typedef bool(*_IsInIronSights)(VirtualMachine* vm, Actor* actor);
 typedef bool(*_IsInPowerArmor)(Actor* actor);
+typedef bool(*_IsInDialogue)(PlayerCharacter* player);
 typedef void(*_DrawWeapon)(VirtualMachine* vm, UInt32 stackId, Actor* actor);
 typedef bool(*_FireWeaponInternal)(Actor* actor);
 typedef bool(*_ReloadWeapon)(Actor* actor, const BGSObjectInstance& a_weapon, UInt32 a_equipIndex);                                                                                        // 0EF E9BE00
@@ -900,6 +978,8 @@ extern RelocAddr <uintptr_t> s_ExtraRankVtbl;
 extern RelocAddr <uintptr_t> s_ExtraAmmoVtbl;
 extern RelocAddr <uintptr_t> s_ActorVtbl;
 extern RelocAddr <uintptr_t> s_PlayerVtbl;
+extern RelocAddr <uintptr_t> s_hkbClipGeneratorVtbl;
+extern RelocAddr <uintptr_t> s_hkbStateMachineVtbl;
 extern RelocAddr <_EquipItem> EquipItemInternal;
 extern RelocAddr <_UnEquipItem> UnequipItemInternal;
 extern RelocAddr <_HasPerkInternal> HasPerkInternal;
@@ -925,6 +1005,7 @@ extern RelocAddr <_ChangeAnimFlavor> ChangeAnimFlavor; //1387CA0(vm*,0,actor*,kw
 extern RelocAddr <_CheckKeywordType> CheckKeywordType;
 extern RelocAddr <_IsInIronSights> IsInIronSights;
 extern RelocAddr <_IsInPowerArmor> IsInPowerArmor;
+extern RelocAddr <_IsInDialogue> IsInDialogue;
 extern RelocAddr <_DrawWeapon> DrawWeaponInternal;
 extern RelocAddr <_UseAmmo> FireWeaponInternal;
 extern RelocAddr <_EjectShellCasing> EjectShellCasing;

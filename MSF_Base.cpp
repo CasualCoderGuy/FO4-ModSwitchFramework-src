@@ -304,7 +304,7 @@ namespace MSF_Base
 
 	bool HandlePendingAnimations()
 	{
-		Actor* playerActor = *g_player;
+		PlayerCharacter* playerActor = *g_player;
 		SInt32 state = (*g_playerCamera)->GetCameraStateId((*g_playerCamera)->cameraState);
 		UInt32 weaponActivity = playerActor->actorState.flags & ActorStateFlags0C::mWeaponActivityMask;
 #ifdef DEBUG
@@ -325,21 +325,23 @@ namespace MSF_Base
 			return false;
 		}
 
-		float time, dur;
-		std::string clipName = "";
-		Utilities::GetClipInfo(playerActor, time, dur, clipName);
+		PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)playerActor + 0x698);
+		if (cover->gunBlocked || IsInDialogue(playerActor))
+			return false;
+
+		std::string clipToFind = "";
+		ClipInfo clipInfo;
+		Utilities::GetClipInfo(playerActor, clipInfo, clipToFind);
 		_DEBUG("currClip: %s", clipName.c_str());
 
 		bool reload = weaponActivity == ActorStateFlags0C::kWeaponState_Reloading; //(((*g_player)->actorState.flags >> 14) & 0xF) == 0x4; //weaponActivity == ActorStateFlags0C::kWeaponState_Reloading ||
-		if ((MSF_MainData::modSwitchManager.IsAnimPastCancelPoint() && (clipName.find("WPNReload") != std::string::npos || clipName.find("DynamicIdle") != std::string::npos)) || 
+		if ((MSF_MainData::modSwitchManager.IsAnimPastCancelPoint() && (clipInfo.clipName.find("WPNReload") != std::string::npos || clipInfo.clipName.find("DynamicIdle") != std::string::npos)) ||
 			(reload && (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelReload) || (MSF_MainData::modSwitchManager.GetIsBCRreload() != 0)) || 
 			(!reload && (MSF_MainData::modSwitchManager.GetQueueCount() > 0) && !(MSF_MainData::MCMSettingFlags & MSF_MainData::bAllowCancelModSwitch))))
 		{
 			return false;
 		}
 
-		//if (clipName.find("WPNReload") != std::string::npos || clipName.find("DynamicIdle") != std::string::npos) // more animations to check: 
-		//	return false;
 		return true;
 	}
 
@@ -1693,7 +1695,7 @@ namespace MSF_Base
 		{
 			MSF_MainData::modSwitchManager.SetShouldBlendAnimation(animData->shouldBlendAnim);
 #ifdef DEBUG
-			MSF_Test::FollowAnimationFor(*g_player, 2000);
+			//MSF_Test::FollowAnimationFor(*g_player, 2000);
 #endif
 			Utilities::PlayIdle(*g_player, anim);
 			return true;
@@ -1720,10 +1722,10 @@ namespace MSF_Base
 			MSF_MainData::modSwitchManager.ClearQueue();
 			if (forceCancel)
 			{
-				float time, dur;
-				std::string clipName = "";
-				Utilities::GetClipInfo(*g_player, time, dur, clipName);
-				if (clipName.find("WPNReload") == std::string::npos)
+				std::string clipToFind = "";
+				ClipInfo clipInfo;
+				Utilities::GetClipInfo(*g_player, clipInfo, clipToFind);
+				if (clipInfo.clipName.find("WPNReload") == std::string::npos)
 					return true;
 			}
 			res = animGraphHolder->NotifyAnimationGraphImpl("reloadEnd");
@@ -1737,10 +1739,10 @@ namespace MSF_Base
 			MSF_MainData::modSwitchManager.ClearQueue();
 			if (forceCancel)
 			{
-				float time, dur;
-				std::string clipName = "";
-				Utilities::GetClipInfo(*g_player, time, dur, clipName);
-				if (clipName.find("DynamicIdle") == std::string::npos)
+				std::string clipToFind = "";
+				ClipInfo clipInfo;
+				Utilities::GetClipInfo(*g_player, clipInfo, clipToFind);
+				if (clipInfo.clipName.find("DynamicIdle") == std::string::npos)
 					return true;
 			}
 			res = animGraphHolder->NotifyAnimationGraphImpl("customAnimCancel"); //  IdleStop  UncullWeapons  InitiateStart

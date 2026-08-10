@@ -245,9 +245,9 @@ public:
 
 			if (MSF_MainData::iAutolowerTimeMS)
 			{
-				LowerWeaponTask* lowerTask = new LowerWeaponTask();
-				MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
-				//delayTask(MSF_MainData::iAutolowerTimeMS, true, g_threading->AddTask, lowerTask);
+				//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+				MSF_MainData::lowerTmr.start();
 			}
 		}
 		return kEvent_Continue;

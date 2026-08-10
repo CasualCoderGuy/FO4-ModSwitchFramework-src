@@ -30,6 +30,8 @@ MSF_EventSource<MSF::WidgetUpdate::DisplayData> MSFwidgetDisplayDataUpdateSource
 MSF_EventSource<MSF::WidgetUpdate::QuickkeyData> MSFwidgetQuickkeyDataUpdateSource;
 MSF_EventSource<MSF::WidgetUpdate::ClearQuickkeyMod> MSFwidgetClearQuickkeySource;
 
+GameDelayedFunctionTask* GameDelayedFunctionTask::taskSingleton;
+
 EventResult	BGSOnPlayerUseWorkBenchEventSink::ReceiveEvent(BGSOnPlayerUseWorkBenchEvent* evn, void * dispatcher)
 {
 	return kEvent_Continue;
@@ -53,14 +55,16 @@ EventResult	TESCellFullyLoadedEventSink::ReceiveEvent(TESCellFullyLoadedEvent * 
 EventResult	PipboyLightEventSink::ReceiveEvent(PipboyLightEvent* evn, void* dispatcher)
 {
 	//_DEBUG("Light evn: %p, %p, %p, %p", evn->unk00, evn->unk08, evn->unk10, evn->unk18);
-	Actor* playerActor = *g_player;
+	PlayerCharacter* playerActor = *g_player;
 	bool isDown = (playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP));
-	if (isDown && evn->isOn1 && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDontAutolowerWeaponWithFlashlightOn))
+	PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)playerActor + 0x698);
+	if (isDown && evn->isOn1 && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDontAutolowerWeaponWithFlashlightOn) && !cover->gunBlocked && !IsInDialogue(playerActor))
 		Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
 	else if (!isDown && !evn->isOn1 && MSF_MainData::iAutolowerTimeMS)
 	{
-		LowerWeaponTask* lowerTask = new LowerWeaponTask();
-		MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+		//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		MSF_MainData::lowerTmr.start();
 	}
 	return kEvent_Continue;
 }
@@ -70,16 +74,18 @@ EventResult CombatEvnHandler::ReceiveEvent(TESCombatEvent * evn, void * dispatch
 	//instance midprocess ammo count!
 	if (MSF_MainData::iAutolowerTimeMS)
 	{
-		Actor* playerActor = *g_player;
+		PlayerCharacter* playerActor = *g_player;
 		if (evn->source == playerActor || evn->target == playerActor)
 		{
-			if ((playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)) && evn->state) //== start
+			PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)playerActor + 0x698);
+			if ((playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)) && evn->state && !cover->gunBlocked && !IsInDialogue(playerActor)) //== start
 				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
 			//else if (evn->state == end)
 			//{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 			//}
+			MSF_MainData::lowerTmr.start();
 			_DEBUG("combat state: %08X", evn->state);
 		}
 	}
@@ -313,11 +319,36 @@ void* AttackBlockHandler_Hook(void* handler)
 	return AttackBlockHandler_Original(handler);
 }
 
+#ifdef DEBUG
+bool logClips;
+bool wasLogging;
+#endif
+
+bool AttackInputHandlerUnblock(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d)
+{
+	MSF_MainData::modSwitchManager.SetBlockLoweredFire(false);
+	return AttackInputHandler_Original(PlayerInputHandler, inputCode, r8d);
+}
+
 bool AttackInputHandler_Hook(void* PlayerInputHandler, UInt32 inputCode, UInt32 r8d)
 {
-	//_DEBUG("Attack");
-	//if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bWidgetAlwaysVisible))
-	//	return false;
+	PlayerCharacter* player = *g_player;
+	bool isDown = player->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP);// | ActorStateFlags0C::kWeaponState_Lowered3rdP);
+	PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)player + 0x698);
+	if (MSF_MainData::modSwitchManager.GetBlockLoweredFire())
+		return false;
+	if (isDown && !cover->gunBlocked && !IsInDialogue(player))
+	{
+#ifdef DEBUG
+		logClips = true;
+		wasLogging = false;
+#endif
+		MSF_MainData::modSwitchManager.SetBlockLoweredFire(true);
+		FunctionTask* lowerTask = new FunctionTask(false, Utilities::PlayIdleAction, player, MSF_MainData::ActionGunDown);
+		if (!GameDelayedFunctionTask::CreateTask(100, "WPNIdleGunDown", true, AttackInputHandlerUnblock, PlayerInputHandler, inputCode, r8d))
+			MSF_MainData::modSwitchManager.SetBlockLoweredFire(false);
+		return false;
+	}
 	return AttackInputHandler_Original(PlayerInputHandler, inputCode, r8d);
 }
 
@@ -404,6 +435,20 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	_DEBUG("reloadCheck L: %i, cap: %i, R: %i", loadedAmmo, ammoCap, ammoReserve);
 	if (target != *g_player)
 		return (loadedAmmo < ammoCap && loadedAmmo < ammoReserve);
+	PlayerCharacter* player = *g_player;
+	bool isDown = player->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP);// | ActorStateFlags0C::kWeaponState_Lowered3rdP);
+	PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)player + 0x698);
+	if (MSF_MainData::modSwitchManager.GetBlockLoweredFire())
+		return false;
+	if (isDown && !cover->gunBlocked && !IsInDialogue(player))
+	{
+		MSF_MainData::modSwitchManager.SetBlockLoweredFire(true);
+		FunctionTask* lowerTask = new FunctionTask(false, Utilities::PlayIdleAction, player, MSF_MainData::ActionGunDown);
+		if (!GameDelayedFunctionTask::CreateTask(100, "WPNIdleGunDown", true, Utilities::PlayIdleAction, player, MSF_MainData::ActionReload))
+			MSF_MainData::modSwitchManager.SetBlockLoweredFire(false);
+		return false;
+	}
+
 	if (MSF_MainData::modSwitchManager.GetSetForcedReload())
 		return true;
 	//ExtraWeaponState* extraState = MSF_MainData::weaponStateStore.GetEquipped(target);
@@ -437,9 +482,68 @@ const char* CannotEquipItem_Hook(TESObjectREFR* target, TESForm* item, UInt32 un
 	return type == 2 ? MSF_Localization::GetTranslation(MSF_Localization::Keys::modText) : MSF_Localization::GetTranslation(MSF_Localization::Keys::itemText);
 }
 
-void PlayerUpdateAnimation_Hook(Actor* player, float delta)
+void PlayerUpdateAnimation_Hook(Actor* playerActor, float delta)
 {
-	return UpdateAnimationPlayer_Copied(player, delta);
+	UpdateAnimationPlayer_Copied(playerActor, delta);
+	PlayerCharacter* player = (PlayerCharacter*)playerActor;
+	if (player->IsInCombat())
+		MSF_MainData::lowerTmr.start();
+	bool isDown = player->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP);// | ActorStateFlags0C::kWeaponState_Lowered3rdP);
+	PlayerCoverData* cover = (PlayerCoverData*)((uintptr_t)player + 0x698);
+	if (!cover->gunBlocked && !IsInDialogue(player) && (MSF_MainData::MCMSettingFlags & MSF_MainData::bDontAutolowerWeaponWithFlashlightOn) && player->unkB68[17] != 0)
+		FunctionTask* lowerTask = new FunctionTask(true, Utilities::PlayIdleAction, player, MSF_MainData::ActionGunDown);
+		//Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown); //or task?
+	if (!isDown && MSF_MainData::iAutolowerTimeMS != 0 && MSF_MainData::lowerTmr.getGameElapsed() >= MSF_MainData::iAutolowerTimeMS)
+	{
+		Utilities::PlayIdleAction(player, MSF_MainData::ActionGunDown);
+		_MESSAGE("lowerElapsed");
+		if (!(MSF_MainData::MCMSettingFlags & MSF_MainData::bDontAutolowerWeaponWithFlashlightOn) || player->unkB68[17] == 0)
+		{
+			UInt32 weaponActivity = player->actorState.flags & ActorStateFlags0C::mWeaponActivityMask;
+			//if (!(player->actorState.unk08 & (ActorStateFlags08::kActorState_Bashing | ActorStateFlags08::kActorState_Sprint)) &&
+			//	!(player->actorState.flags & (ActorStateFlags0C::kActorState_FurnitureState | ActorStateFlags0C::kWeaponState_Sheathing)) &&
+			//	weaponActivity != ActorStateFlags0C::kWeaponState_Reloading && weaponActivity != ActorStateFlags0C::kWeaponState_Firing &&
+			//	(player->actorState.flags & ActorStateFlags0C::kWeaponState_Drawn) && !(player->actorState.flags & ActorStateFlags0C::kWeaponState_Draw))
+				///FunctionTask* lowerTask = new FunctionTask(true, Utilities::PlayIdleAction, player, MSF_MainData::ActionGunDown);
+		}
+	}
+	/*if (MSF_MainData::modSwitchManager.GetBlockLoweredFire())
+	{
+		if (!Utilities::IsClipPlaying(*g_player, "WPNIdleGunDown"))
+		{
+			MSF_MainData::modSwitchManager.SetBlockLoweredFire(false);
+			FunctionTask* fireTask = new FunctionTask(false, Utilities::PlayIdleAction, player, MSF_MainData::Acti);
+		}
+	}*/
+	if (GameDelayedFunctionTask::IsRunning())
+	{
+		auto targetAnimName = GameDelayedFunctionTask::GetTargetAnim();
+		bool bStart = false;
+		if (targetAnimName != "")
+		{
+			if (!Utilities::IsClipPlaying(playerActor, targetAnimName))
+			{
+				_MESSAGE("lowerTime, %i", MSF_MainData::iAutolowerTimeMS);
+				GameDelayedFunctionTask::ClearTargetAnim();
+				bStart = true;
+			}
+			else
+				_MESSAGE("foundClip");
+		}
+		GameDelayedFunctionTask::UpdateTimeTick(bStart);
+	}
+	//check AITimer if weapon lower elapsed (log anim event + 0xDFFDDF calls for timer resets) -> AddTask lowerWeap OR Hook 0xCD6876 and playAction directly
+		//check current anim 
+	// when weapon is lowered, block first input (attack and reload), then play lowerWeap action & wait for clip finish by polling (should test dump lowerWeap clip details), then play action from MSF code;; check for manualHold/charging weapon;; set 3rdP lower directly
+	// poll weapon draw anim for MSF draw enabled (+ wait x time by polling AItimer)
+	//-- poll reload anim and custom anim for MSF mod switch blocking (+ wait x time by polling AItimer)
+	// poll custom animations for switchMod, etc. events
+	// burst fire: poll for fire weapon clip & burst support (also annotations), then playaction / playidle / updatedelta(HaBCR) (needs Task?)
+
+	//cancel switch/reload delays?
+	//lower weapon perk
+	//more info on DataRecoveryFailure
+	//itemtags
 }
 
 void ActorUpdateAnimation_Hook(Actor* actor, float delta)
@@ -852,8 +956,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		}
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 		//ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeReload); //BCR!!
 
@@ -869,6 +974,12 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			EndSwitchTask* endTask = new EndSwitchTask(endFlag);
 			delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, g_threading->AddTask, endTask);
 			//delayTask delayEnd(MSF_MainData::iReloadAnimEndEventDelayMS, true, &MSF_Base::EndSwitch, endFlag);
+		}
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
 	else if (!_strcmpi("weaponDraw", name))
@@ -931,8 +1042,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		}
 		if (!bDidAnim && MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
 	//on sheath: MSF_MainData::modSwitchManager.CloseOpenedMenu();
@@ -949,8 +1061,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		ExtraWeaponState::HandleWeaponStateEvents(ExtraWeaponState::kEventTypeFireWeapon);
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 		fire = true;
 		//_DEBUG("Anim: fire");
@@ -1011,8 +1124,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 		}
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
 	//else if (!_strcmpi("Event00", name))
@@ -1055,32 +1169,38 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	{
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 	}
 	else if (!_strcmpi("sightedStateExit", name))
 	{
 		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 		}
 		}
 	else if (!_strcmpi("PASprintStop", name))
 	{
-		if (MSF_MainData::MCMSettingFlags & MSF_MainData::bLowerWeaponAfterSprint)
+		if (MSF_MainData::iAutolowerTimeMS)
 		{
-			Actor* playerActor = *g_player;
-			//if (!(playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)))
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(25, g_threading->AddTask, lowerTask);
-			//delayTask(25, true, g_threading->AddTask, lowerTask);
-		}
-		else if (MSF_MainData::iAutolowerTimeMS)
-		{
-			LowerWeaponTask* lowerTask = new LowerWeaponTask();
-			MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			if (MSF_MainData::MCMSettingFlags & MSF_MainData::bLowerWeaponAfterSprint)
+			{
+				Actor* playerActor = *g_player;
+				//if (!(playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP)))
+				LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				MSF_MainData::modSwitchManager.lowerGunTimer.start(25, g_threading->AddTask, lowerTask);
+				//delayTask(25, true, g_threading->AddTask, lowerTask);
+			}
+			else
+			{
+				MSF_MainData::lowerTmr.start();
+				//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+			}
 		}
 	}
 	else if (!_strcmpi("initiateStart", name))
@@ -1098,8 +1218,9 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			if (playerActor->actorState.flags & (ActorStateFlags0C::kWeaponState_Lowered1stP | ActorStateFlags0C::kWeaponState_Lowered3rdP))
 			{
 				Utilities::PlayIdleAction(playerActor, MSF_MainData::ActionGunDown);
-				LowerWeaponTask* lowerTask = new LowerWeaponTask();
-				MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+				MSF_MainData::lowerTmr.start();
+				//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+				//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
 			}
 		}
 	}
@@ -1107,6 +1228,12 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 	{
 		reloadStart = true;
 		MSF_MainData::modSwitchManager.SetReloadStarted(true);
+		if (MSF_MainData::iAutolowerTimeMS)
+		{
+			MSF_MainData::lowerTmr.start();
+			//LowerWeaponTask* lowerTask = new LowerWeaponTask();
+			//MSF_MainData::modSwitchManager.lowerGunTimer.start(MSF_MainData::iAutolowerTimeMS, g_threading->AddTask, lowerTask);
+		}
 	}
 	else if (!_strcmpi("customAnimStart", name))
 	{
