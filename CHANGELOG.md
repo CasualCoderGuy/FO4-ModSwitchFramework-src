@@ -2,6 +2,9 @@
 v1.2.9
 features:
 - added MSF API for widget data, settings, and quickkey (see MSF_API.h)
+fixes:
+- fixed a bug where instantiation keywords not associated with a mod cycle could cause CTD
+- fixed an issue during global mod switch menu initialization, where multiple mod cycle entries were overwriting eachother
 ---
 v1.2.8
 fixes:

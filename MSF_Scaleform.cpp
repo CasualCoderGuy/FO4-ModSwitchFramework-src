@@ -928,18 +928,23 @@ namespace MSF_Scaleform
 		if (!Utilities::GetParentInstantiationValues(modData, mods->attachParentValue, &instantiationValues))
 			return false;
 
-		menuRoot->CreateArray(dst);
+		if (!dst->IsArray())
+			menuRoot->CreateArray(dst);
+
 		ModData::ModCycle* modCycle = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
 			auto itCycle = mods->modCycleMap.find(value);
-			if (itCycle != mods->modCycleMap.end() && modCycle)
+			if (itCycle != mods->modCycleMap.end())
 			{
-				_MESSAGE("Ambiguity error"); //or combine
-				return false;
+				if (modCycle)
+				{
+					_MESSAGE("Ambiguity error"); //or combine
+					return false;
+				}
+				modCycle = itCycle->second;
 			}
-			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return false;

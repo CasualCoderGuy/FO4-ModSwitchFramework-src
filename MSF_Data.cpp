@@ -2336,15 +2336,10 @@ namespace MSF_Data
 										
 											UInt32 modflags = switchmod["modFlags"].asInt();
 											float spawnChance = switchmod["spawnChance"].asFloat();
-											KeywordValue animFlavor = 0;
+											BGSKeyword* animFlavor = nullptr;
 											str = switchmod["animFlavor"].asString();
 											if (str != "")
-											{
-												BGSKeyword* flavor = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
-												KeywordValue value = Utilities::GetAnimFlavorValueForTypedKeyword(flavor);
-												if (value != -1)
-													animFlavor = value;
-											}
+												animFlavor = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
 											//requirements
 											TESIdleForm* animIdle_1stP = nullptr;
 											TESIdleForm* animIdle_3rdP = nullptr;
@@ -2366,6 +2361,7 @@ namespace MSF_Data
 											modDataMod->mod = mod; 
 											modDataMod->flags = modflags;
 											modDataMod->spawnChance = spawnChance;
+											modDataMod->animFlavor = animFlavor;
 											if (animIdle_1stP || animIdle_3rdP || animIdle_1stP_PA || animIdle_3rdP_PA)
 											{
 												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA, (modflags & ModData::Mod::bShouldNotStopIdle) == 0); //((modflags >> 16) & 1)
@@ -3160,12 +3156,15 @@ namespace MSF_Data
 		{
 			KeywordValue value = *itData;
 			auto itCycle = modData->modCycleMap.find(value);
-			if (itCycle != modData->modCycleMap.end() && modCycle)
+			if (itCycle != modData->modCycleMap.end())
 			{
-				_MESSAGE("Ambiguity error");
-				return false;
+				if (modCycle)
+				{
+					_MESSAGE("Ambiguity error");
+					return false;
+				}
+				modCycle = itCycle->second;
 			}
-			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return false;
@@ -3214,12 +3213,15 @@ namespace MSF_Data
 		{
 			KeywordValue value = *itData;
 			auto itCycle = modData->modCycleMap.find(value);
-			if (itCycle != modData->modCycleMap.end() && modCycle)
+			if (itCycle != modData->modCycleMap.end())
 			{
-				_MESSAGE("Ambiguity error");
-				return nullptr;
+				if (modCycle)
+				{
+					_MESSAGE("Ambiguity error");
+					return nullptr;
+				}
+				modCycle = itCycle->second;
 			}
-			modCycle = itCycle->second;
 		}
 		if (!modCycle)
 			return nullptr;
@@ -3419,6 +3421,7 @@ namespace MSF_Data
 			switchRemove->SwitchFlags = modToRemove->flags & ModData::Mod::mBitTransferMask;
 			if (modToRemove->animData)
 				switchRemove->animData = modToRemove->animData;
+			switchRemove->animFlavor = modToRemove->animFlavor;
 		}
 		if (modToAttach)
 		{
@@ -3458,6 +3461,7 @@ namespace MSF_Data
 			}
 			if (modToAttach->animData)
 				switchAttach->animData = modToAttach->animData;
+			switchAttach->animFlavor = modToAttach->animFlavor;
 		}
 		bool needsCancelAnimDelay = false;
 		if (switchRemove && (!switchRemove->animData || !(MSF_MainData::MCMSettingFlags & MSF_MainData::bCustomAnimEnabled)))

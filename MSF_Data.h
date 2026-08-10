@@ -109,8 +109,8 @@ public:
 		};
 		BGSMod::Attachment::Mod* mod;
 		UInt16 flags;
-		KeywordValue animFlavor;
 		float spawnChance;
+		BGSKeyword* animFlavor;
 		AttachRequirements* attachRequirements;
 		AnimationData* animData;
 	};
@@ -311,7 +311,7 @@ public:
 		ModToRemove = nullptr;
 		LooseModToRemove = nullptr;
 		LooseModToAdd = nullptr;
-		animFlavor = 0;
+		animFlavor = nullptr;
 		animData = nullptr;
 		soundToPlay = nullptr;
 	};
@@ -323,7 +323,7 @@ public:
 		ModToRemove = nullptr;
 		LooseModToRemove = nullptr;
 		LooseModToAdd = nullptr;
-		animFlavor = 0;
+		animFlavor = nullptr;
 		animData = nullptr;
 		soundToPlay = nullptr;
 	}
@@ -354,13 +354,13 @@ public:
 		//bDoSwitchBeforeAnimations
 	};
 	UInt32 SwitchFlags;
-	KeywordValue animFlavor;
 	TESAmmo* targetAmmo;
 	BGSMod::Attachment::Mod* ModToAttach;
 	BGSMod::Attachment::Mod* ModToRemove;
 	TESObjectMISC* LooseModToRemove;
 	TESObjectMISC* LooseModToAdd;
 	AnimationData* animData;
+	BGSKeyword* animFlavor;
 	BGSSoundDescriptorForm* soundToPlay;
 };
 
