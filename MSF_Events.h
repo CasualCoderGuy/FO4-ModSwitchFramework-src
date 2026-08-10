@@ -471,6 +471,122 @@ private:
 	std::function<void()> func;
 };
 
+class GameDelayedFunctionTask : public ITaskDelegate
+{
+public:
+	template <class callable, class... arguments>
+	static bool CreateTask(float delayMS, std::string waitForAnim, bool isUI, callable&& f, arguments&&... args)
+	{
+		if (taskSingleton)
+			return nullptr;
+		GameDelayedFunctionTask* task = new GameDelayedFunctionTask(delayMS, waitForAnim, isUI);
+		if (task)
+			task->func = std::bind(std::forward<callable>(f), std::forward<arguments>(args)...);
+		task->Run();
+		return (task != nullptr);
+	}
+
+	static bool IsRunning()
+	{
+		return (taskSingleton && (taskSingleton->delay != 0 || taskSingleton->targetAnim != ""));
+	}
+
+	static std::string GetTargetAnim()
+	{
+		if (taskSingleton)
+			return taskSingleton->targetAnim;
+		return "";
+	}
+
+	static void ClearTargetAnim()
+	{
+		if (taskSingleton)
+			taskSingleton->targetAnim = "";
+	}
+
+	static void UpdateTimeTick(bool start = false)
+	{
+		if (taskSingleton)
+		{
+			if (start)
+				taskSingleton->gameTimer.start();
+			if (taskSingleton->targetAnim == "")
+			{
+				if (taskSingleton->gameTimer.getGameElapsed() >= taskSingleton->delay)
+				{
+					_MESSAGE("elapsed");
+					GameDelayedFunctionTask* task = taskSingleton;
+					taskSingleton = nullptr;
+					/*if (task->bUI)
+						g_threading->AddUITask(task);
+					else
+						g_threading->AddTask(task);*/
+					task->Run();
+				}
+			}
+		}
+	}
+
+	virtual void Run() final
+	{
+		_MESSAGE("running task");
+		if (func)
+			func();
+	}
+
+private:
+	GameDelayedFunctionTask(float delayMS, std::string waitForAnim, bool isUI)
+	{
+		delay = delayMS;
+		bUI = isUI;
+		targetAnim = waitForAnim;
+		if (waitForAnim == "")
+		{
+			if (delayMS == 0)
+			{
+				/*if (isUI)
+					g_threading->AddUITask(this);
+				else
+					g_threading->AddTask(this);*/
+			}
+			else
+			{
+				gameTimer.start();
+				taskSingleton = this;
+			}
+		}
+		else
+			taskSingleton = this;
+	}
+	static GameDelayedFunctionTask* taskSingleton;
+	Utilities::Timer gameTimer;
+	std::string targetAnim;
+	float delay;
+	bool bUI;
+	std::function<void()> func;
+};
+
+class FunctionTask : public ITaskDelegate
+{
+public:
+	template <class callable, class... arguments>
+	FunctionTask(bool isUI, callable&& f, arguments&&... args)
+	{
+		/*if (isUI)
+			g_threading->AddUITask(this);
+		else
+			g_threading->AddTask(this);*/
+		Run();
+	}
+	virtual void Run() final
+	{
+		if (func)
+			func();
+	}
+private:
+	std::function<void()> func;
+};
+
 class WidgetUpdateTask : public ITaskDelegate
 {
 public:

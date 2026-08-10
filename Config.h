@@ -7,6 +7,7 @@
 //-----------------------
 
 //#define DEBUG "DevMode"
+#define NO_BEHAV_GRAPH_MOD
 
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
