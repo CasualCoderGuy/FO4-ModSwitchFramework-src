@@ -42,6 +42,12 @@ inline void bit_set(T& number, UInt8 n, bool value) {
 	number = (number & ~((T)1 << n)) | ((T)value << n);
 };
 
+template <typename T>
+inline bool unn(T t)
+{
+	return t >= 0;
+}
+
 inline UInt8 msb(UInt64 value)
 {
 	UInt8 r = 0;

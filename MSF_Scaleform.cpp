@@ -118,6 +118,11 @@ void HandleInputEvent(ButtonEvent * inputEvent)
 					MSF_Data::PrintStoredData();
 					break;
 				}
+				if (key == MSF_MainData::PurgeWeaponStateHotkey)
+				{
+					PurgeWeaponStates();
+					break;
+				}
 				KeybindData* keyFn = MSF_Data::GetKeybindDataForKey(keyCode, modifiers);
 				if (!keyFn)
 					break;

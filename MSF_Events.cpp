@@ -419,7 +419,7 @@ bool CheckAmmoCountForReload_Hook(Actor* target, UInt32 loadedAmmo, UInt32 ammoC
 	UInt16 chamberSize = 0;
 	UInt16 flags = 0;
 	MSF_Data::GetChamberData(weapon, Utilities::GetEquippedModData(target), instanceData, &chamberSize, &flags);
-	if ((MSF_Data::InstanceHasTRSupport(instanceData) || flags & ExtraWeaponState::WeaponState::bHasTacticalReload) && MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber && !MSF_MainData::BCRinterfaceHolder.EquippedWeaponHasBCRFlag(target))
+	if ((MSF_Data::InstanceHasTRSupport(instanceData) || (flags & ExtraWeaponState::WeaponState::bHasTacticalReload)) && (MSF_MainData::MCMSettingFlags & MSF_MainData::bEnableTacticalReloadChamber) && !MSF_MainData::BCRinterfaceHolder.EquippedWeaponHasBCRFlag(target))
 	{
 		return (loadedAmmo < (ammoCap+chamberSize) && loadedAmmo < ammoReserve);
 	}

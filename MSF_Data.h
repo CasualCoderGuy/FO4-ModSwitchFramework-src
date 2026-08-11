@@ -736,6 +736,7 @@ public:
 	static UInt64 patchBaseAmmoHotkey;
 	static UInt64 lowerWeaponHotkey;
 	static UInt64 DEBUGprintStoredDataHotkey;
+	static UInt64 PurgeWeaponStateHotkey;
 	static Utilities::Timer lowerTmr;
 	static long long lowerDelay;
 	static BGSSoundDescriptorForm* failSound;

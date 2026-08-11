@@ -96,6 +96,7 @@ UInt64 MSF_MainData::lowerWeaponHotkey = 0;
 UInt64 MSF_MainData::cancelSwitchHotkey = 0;
 UInt64 MSF_MainData::patchBaseAmmoHotkey = 0;
 UInt64 MSF_MainData::DEBUGprintStoredDataHotkey = 0;
+UInt64 MSF_MainData::PurgeWeaponStateHotkey = 0;
 BGSSoundDescriptorForm* MSF_MainData::failSound = nullptr;
 BGSSoundDescriptorForm* MSF_MainData::failSoundQuickkey = nullptr;
 BGSSoundDescriptorForm* MSF_MainData::failSoundMenu = nullptr;
@@ -927,6 +928,8 @@ namespace MSF_Data
 						MSF_MainData::DEBUGprintStoredDataHotkey = key;
 					else if (id == "MSF_PATCH_BASE")
 						MSF_MainData::patchBaseAmmoHotkey = key;
+					else if (id == "MSF_PURGE")
+						MSF_MainData::PurgeWeaponStateHotkey = key;
 					else
 					{
 						auto kbIt = MSF_MainData::keybindIDMap.find(id);
@@ -3679,11 +3682,15 @@ namespace MSF_Data
 				*chamberSize = 0;
 			return true;
 		}
-		if (currChamberData->chamberSize == -1)
+		if (currChamberData->chamberSize <= -1)
 			*chamberSize = weapInstance->ammoCapacity;
 		else
 			*chamberSize = currChamberData->chamberSize;
-		*flags = (*flags & ~ExtraWeaponState::WeaponState::mChamberMask) | currChamberData->flags;
+		*flags = ((currChamberData->flags & ExtraWeaponState::WeaponState::mChamberMask) | (*flags & (ExtraWeaponState::WeaponState::bHasBCR | ~ExtraWeaponState::WeaponState::mChamberMask)));
+		if (MSF_Data::InstanceHasTRSupport(weapInstance))
+			*flags = *flags | ExtraWeaponState::WeaponState::bHasTacticalReload;
+		if (MSF_MainData::BCRinterfaceHolder.InstanceHasBCRSupport(weapInstance))
+			*flags = *flags | ExtraWeaponState::WeaponState::bHasBCR;
 		return true;
 	}
 

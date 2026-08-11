@@ -8,6 +8,8 @@
 
 typedef UInt32 WeaponStateID;
 
+void PurgeWeaponStates();
+
 class DataHolderParentInstance
 {
 public:
@@ -96,9 +98,9 @@ public:
 		{
 			bHasLevel = 0x0100,
 			bActive = 0x0200,
-			bHasTacticalReload = 0x0010,
-			bHasBCR = 0x0020,
-			bChamberLIFO = 0x0040, //otherwise FIFO
+			bHasTacticalReload = 0x0010,	//always refresh from ChamberData | HasTRSupport
+			bHasBCR = 0x0020,				//only addittive: from ChamberData | HasTRSupport | this->flags
+			bChamberLIFO = 0x0040,			//otherwise FIFO; always refresh from ChamberData
 			mChamberMask = 0x00F0,
 			bNotPlayable = 0x0001,
 			bIsFusionCore = 0x0002,
