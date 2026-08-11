@@ -1701,6 +1701,39 @@ namespace MSF_Base
 		return false;
 	}
 
+	bool ApplyAnimFlavor(Actor* actor, ExtraDataList* extraList)
+	{
+		if (!extraList)
+			return false;
+		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+		if (attachedMods)
+		{
+			auto data = attachedMods->data;
+			if (data && data->forms)
+			{
+				BGSKeyword* neededAnimFlavor = nullptr;
+				UInt64 priority = 0;
+				for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
+				{
+					BGSMod::Attachment::Mod* objectMod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(data->forms[i].formId), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+					if (!objectMod)
+						continue;
+					UInt64 currPriority = convertToUnsignedAbs<UInt8>(objectMod->priority);
+					if (currPriority < priority)
+						continue;
+					auto itmoddata = MSF_MainData::animFlavorModMap.find(objectMod);
+					if (itmoddata == MSF_MainData::animFlavorModMap.end())
+						continue;
+					neededAnimFlavor = itmoddata->second;
+					priority = currPriority;
+				}
+				ChangeAnimFlavor(actor, neededAnimFlavor);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	bool CancelAnim(bool bOnlySwitch, bool forceCancel)
 	{
 		//return false;

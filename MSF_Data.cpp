@@ -106,6 +106,7 @@ std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> MSF_MainData::modDat
 std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> MSF_MainData::ammoModMap;
 //std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> MSF_MainData::ammoMap;
 std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> MSF_MainData::modChamberMap;
+std::unordered_map<BGSMod::Attachment::Mod*, BGSKeyword*> MSF_MainData::animFlavorModMap;
 std::unordered_map<TESObjectWEAP*, ChamberData> MSF_MainData::weapChamberMap;
 std::unordered_map<TESObjectMISC*, BGSMod::Attachment::Mod*> MSF_MainData::miscModMap;
 std::unordered_map<KeywordValue, KeybindData*> MSF_MainData::keybindAPMap;
@@ -817,6 +818,8 @@ namespace MSF_Data
 					ModData::Mod* mod = *itData;
 					if (mod->mod)
 						MSF_MainData::modDataMap[mod->mod] = mod;
+					if (mod->animFlavor)
+						MSF_MainData::animFlavorModMap[mod->mod] = mod->animFlavor;
 				}
 			}
 		}
@@ -2339,7 +2342,12 @@ namespace MSF_Data
 											BGSKeyword* animFlavor = nullptr;
 											str = switchmod["animFlavor"].asString();
 											if (str != "")
+											{
 												animFlavor = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+												KeywordValue value = Utilities::GetAnimFlavorValueForTypedKeyword(animFlavor);
+												if (value == -1)
+													animFlavor = nullptr;
+											}
 											//requirements
 											TESIdleForm* animIdle_1stP = nullptr;
 											TESIdleForm* animIdle_3rdP = nullptr;

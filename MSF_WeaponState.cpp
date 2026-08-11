@@ -516,6 +516,7 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		//{
 		//	//attach
 		//}
+		MSF_Base::ApplyAnimFlavor(*g_player, extraDataList);
 	}
 	else
 		this->UpdateWeaponStates(extraDataList, equipData, kEventTypeEquip); //should not reach this

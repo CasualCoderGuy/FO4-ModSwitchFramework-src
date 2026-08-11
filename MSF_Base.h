@@ -34,6 +34,7 @@ namespace MSF_Base
 	bool ReloadWeapon(bool full, bool clearAmmoCount = false, bool forced = true, bool isSwitch = true, bool shouldDelay = false);
 	bool DrawWeapon();
 	bool PlayAnim(AnimationData* animData, bool shouldDelay = false);
+	bool ApplyAnimFlavor(Actor* actor, ExtraDataList* extraList);
 	bool CancelAnim(bool bOnlySwitch = false, bool forceCancel = false);
 	bool PlayFeedbackSound(bool play, UInt8 type, BGSSoundDescriptorForm* success);
 }

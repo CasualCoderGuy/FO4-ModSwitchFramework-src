@@ -765,6 +765,7 @@ public:
 	static std::unordered_map<BGSMod::Attachment::Mod*, AmmoData::AmmoMod*> ammoModMap;
 	//static std::unordered_map<TESAmmo*, AmmoData::AmmoMod*> ammoMap;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ChamberData> modChamberMap;
+	static std::unordered_map<BGSMod::Attachment::Mod*, BGSKeyword*> animFlavorModMap;
 	static std::unordered_map<TESObjectWEAP*, ChamberData> weapChamberMap;
 	static std::unordered_map<TESObjectMISC*, BGSMod::Attachment::Mod*> miscModMap;
 	//static std::unordered_map<BGSMod::Attachment::Mod*, UniqueState> modUniqueStateMap;
