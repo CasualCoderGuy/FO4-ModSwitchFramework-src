@@ -140,7 +140,10 @@ namespace MSF_Base
 			if (targetAmmoCount)
 			{
 				ExtraWeaponState* ws = MSF_MainData::weaponStateStore.GetEquipped(playerActor);
-				currentAmmoCount = Utilities::GetInventoryItemCount((playerActor)->inventoryList, ws->GetCurrentAmmo());
+				if (ws)
+					currentAmmoCount = Utilities::GetInventoryItemCount((playerActor)->inventoryList, ws->GetCurrentAmmo());
+				else if (instance)
+					currentAmmoCount = Utilities::GetInventoryItemCount((playerActor)->inventoryList, instance->ammo);
 			}
 			_DEBUG("toReload BCR");
 			if (!targetAmmoCount || !currentAmmoCount)

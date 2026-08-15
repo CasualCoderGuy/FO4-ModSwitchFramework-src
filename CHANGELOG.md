@@ -5,6 +5,7 @@ features:
 fixes:
 - fixed a bug where instantiation keywords not associated with a mod cycle could cause CTD
 - fixed an issue during global mod switch menu initialization, where multiple mod cycle entries were overwriting eachother
+- fixed a possible CTD caused by missing weapon state entries
 ---
 v1.2.8
 fixes:

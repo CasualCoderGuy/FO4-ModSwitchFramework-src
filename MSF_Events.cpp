@@ -1172,7 +1172,8 @@ UInt8 PlayerAnimationEvent_Hook(void* arg1, BSAnimationGraphEvent* arg2, void** 
 			UInt16 BCRtype = oldLoadedAmmoCount ? ExtraWeaponState::bEventTypeReloadBCR : ExtraWeaponState::bEventTypeReloadFullBCR;
 			MSF_MainData::modSwitchManager.SetIsBCRreload(BCRtype);
 			auto weapState = MSF_MainData::weaponStateStore.GetEquipped(playerActor);
-			weapState->HandleBCRReloadStart();
+			if (weapState)
+				weapState->HandleBCRReloadStart();
 		}
 		else
 			MSF_MainData::modSwitchManager.SetAnimCanBeCancelled(true);
