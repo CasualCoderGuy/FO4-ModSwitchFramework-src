@@ -549,7 +549,8 @@ bool ExtraWeaponState::HandleEquipEvent(ExtraDataList* extraDataList, EquipWeapo
 		//{
 		//	//attach
 		//}
-		MSF_Base::ApplyAnimFlavor(*g_player, extraDataList);
+		_MESSAGE("ApplyAnimFlavor queued");
+		SelfDelayedFunctionTask* flavorTask = new SelfDelayedFunctionTask(200, true, false, MSF_Base::ApplyAnimFlavor, *g_player, extraDataList);
 	}
 	else
 		this->UpdateWeaponStates(extraDataList, equipData, kEventTypeEquip); //should not reach this
