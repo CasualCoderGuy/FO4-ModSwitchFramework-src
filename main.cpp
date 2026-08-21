@@ -256,6 +256,8 @@ public:
 
 void F4SEMessageHandler(F4SEMessagingInterface::Message* msg)
 {
+	if (!MSF_MainData::PluginLoadedCorrectly)
+		return;
 	switch (msg->type)
 	{
 	case F4SEMessagingInterface::kMessage_GameDataReady:
@@ -606,10 +608,8 @@ bool InitPlugin(const F4SEInterface* f4se)
 {
 	gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Fallout4\\F4SE\\ModSwitchFramework.log");
 	_MESSAGE("%s v%s dll loaded...\n", PLUGIN_NAME_SHORT, MSF_VERSION_STRING);
-#if CURRENT_RELEASE_RUNTIME >= MAKE_EXE_VERSION(1, 11, 137) 
-	_MESSAGE("Anniversary Edition (NextGen) version\n");
-#elif defined(NEXTGEN)
-	_MESSAGE("NextGen version\n");
+#if defined(NEXTGEN)
+	_MESSAGE("NextGen / Anniversary Edition version\n");
 #endif
 	_MESSAGE("Runtime version: %08X", f4se->runtimeVersion);
 	_MESSAGE("F4SE version: %08X", f4se->f4seVersion);
@@ -617,6 +617,10 @@ bool InitPlugin(const F4SEInterface* f4se)
 	_MESSAGE("DebugMode enabled!");
 #endif
 	_MESSAGE("Base address: %p", IDDatabase::get().base());//reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
+
+	VersionData::gameVersion = f4se->runtimeVersion;
+	VersionData::f4seVersion = f4se->f4seVersion;
+	VersionData::msfVersion = MSF_VERSION;
 
 #ifndef NEXTGEN
 	// Check game version
@@ -653,6 +657,11 @@ bool InitPlugin(const F4SEInterface* f4se)
 		return false;
 	}
 #endif
+
+	bool addressLibOK = IDDatabase::get().Init();
+
+	if (!addressLibOK)
+		return false;
 
 	g_pluginHandle = f4se->GetPluginHandle();
 	if (!g_localTrampoline.Create(1024 * 64, nullptr)) {
@@ -727,6 +736,8 @@ bool InitPlugin(const F4SEInterface* f4se)
 
 	srand(time(NULL));
 
+	MSF_MainData::PluginLoadedCorrectly = true;
+
 	return true;
 }
 
@@ -742,7 +753,7 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 	return true;
 }
 
-#if CURRENT_RELEASE_RUNTIME > RUNTIME_VERSION_1_10_163 
+#ifdef NEXTGEN
 	__declspec(dllexport) F4SEPluginVersionData F4SEPlugin_Version =
 	{
 		F4SEPluginVersionData::kVersion,

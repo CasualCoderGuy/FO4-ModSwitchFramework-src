@@ -8,9 +8,10 @@ uint32_t CheckHookCopies();
 class IDDatabase
 {
 private:
-	IDDatabase();
+	uint8_t ParseAddressLibrary(std::ifstream& file);
 	uintptr_t _base;
 	std::unordered_map<int, ptrdiff_t> id_database;
+	std::unordered_map<int, ptrdiff_t> id_addrlib;
 
 public:
 	[[nodiscard]] static IDDatabase& get()
@@ -19,13 +20,17 @@ public:
 		return singleton;
 	}
 
+	bool Init();
+
 	[[nodiscard]] ptrdiff_t id2offset(int a_id) const
 	{
 		auto itAddr = id_database.find(a_id);
 		if (itAddr != id_database.end())
 			return itAddr->second;
-		else
-			return 0;
+		auto itLib = id_addrlib.find(a_id);
+		if (itLib != id_addrlib.end())
+			return itLib->second;
+		return 0;
 	}
 
 	[[nodiscard]] ptrdiff_t id2addr(int a_id) const
@@ -33,8 +38,10 @@ public:
 		auto itAddr = id_database.find(a_id);
 		if (itAddr != id_database.end())
 			return _base + itAddr->second;
-		else
-			return 0;
+		auto itLib = id_addrlib.find(a_id);
+		if (itLib != id_addrlib.end())
+			return _base + itLib->second;
+		return 0;
 	}
 
 	[[nodiscard]] uintptr_t base() const
@@ -52,7 +59,7 @@ public:
 #ifndef NEXTGEN
 		_offset(a_offset)
 	{}
-#elif CURRENT_RELEASE_RUNTIME >= MAKE_EXE_VERSION(1, 11, 137) 
+#else
 		_offset(a_offset)
 	{
 		if (a_offset_ng != 0)
@@ -60,9 +67,6 @@ public:
 		if (a_offset_ae != 0)
 			_offset = a_offset_ae;
 	}
-#else
-		_offset((a_offset_ng == 0) ? a_offset : a_offset_ng)
-	{}
 #endif
 
 	constexpr Offset& operator=(std::size_t a_offset) noexcept
@@ -89,7 +93,7 @@ public:
 #ifndef NEXTGEN
 		_id(a_id) 
 	{}
-#elif CURRENT_RELEASE_RUNTIME >= MAKE_EXE_VERSION(1, 11, 137) 
+#else
 		_id(a_id)
 	{
 		if (a_id_ng != 0)
@@ -97,9 +101,6 @@ public:
 		if (a_id_ae != 0)
 			_id = a_id_ae;
 	}
-#else
-		_id((a_id_ng == 0) ? a_id : a_id_ng) 
-	{}
 #endif
 
 
