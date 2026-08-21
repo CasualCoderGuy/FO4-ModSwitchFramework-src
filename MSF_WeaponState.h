@@ -122,8 +122,11 @@ public:
 	friend class StoredExtraWeaponState;
 	bool GetUniqueStateModsToModify(BGSObjectInstanceExtra* attachedMods, std::vector<std::pair<BGSMod::Attachment::Mod*, bool>>* modsToModify, std::pair<WeaponState*, WeaponState*>* stateChange);
 private:
-	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData);
+	ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, ExtraInstanceData* extraInstanceData);
 	WeaponStateID ID;
+	UInt32 baseWeapFormID;
+	UInt32 owner; //ObjectRefHandle or FormID; 0 or -1 is invalid
+	UInt32 stackID;
 	ExtraRank* holder; //ExtraDataList
 	std::map<BGSMod::Attachment::Mod*, WeaponState*> weaponStates;
 	WeaponState* currentState;

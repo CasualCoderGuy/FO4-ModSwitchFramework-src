@@ -595,18 +595,32 @@ namespace MSF_Base
 		BSExtraData* newExtraMods = newList->GetByType(kExtraData_ObjectInstance);
 		BGSObjectInstanceExtra* newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
 
+		TESObjectWEAP::InstanceData* instanceData = nullptr;
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
-		MSF_Base::GetInvalidMods(&invalidMods, newModList, weapBase, mod);
-		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+		while (true)
 		{
-			BGSMod::Attachment::Mod* invalidMod = *itMods;
-			_DEBUG("invalid mod: %08X", invalidMod->formID);
-			unk = 0x00200000;
-			bool success = false;
-			ModifyModDataFunctor modifyModFunctor(invalidMod, 0, false, &success);
-			modifyModFunctor.shouldSplitStacks = false;
-			//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-			AttachRemoveModStack(item, &CheckStackIDFunctor(0), &modifyModFunctor, 0, &unk); //Utilities::GetStackID(item, stack)
+			extraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			if (extraInstanceData)
+				instanceData = (TESObjectWEAP::InstanceData*)extraInstanceData->instanceData;
+			MSF_Base::GetInvalidMods(&invalidMods, newModList, weapBase, mod, instanceData);
+			if (invalidMods.size() == 0)
+				break;
+			for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+			{
+				BGSMod::Attachment::Mod* invalidMod = *itMods;
+				_DEBUG("invalid mod: %08X", invalidMod->formID);
+				unk = 0x00200000;
+				bool success = false;
+				ModifyModDataFunctor modifyModFunctor(invalidMod, 0, false, &success);
+				modifyModFunctor.shouldSplitStacks = false;
+				//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+				AttachRemoveModStack(item, &CheckStackIDFunctor(0), &modifyModFunctor, 0, &unk); //Utilities::GetStackID(item, stack)
+			}
+			newStack = eqItem->stack;
+			newList = newStack->extraData;
+			newExtraMods = newList->GetByType(kExtraData_ObjectInstance);
+			newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
+			invalidMods.clear();
 		}
 		PrintStackData(actor, weapBase);
 
@@ -656,7 +670,7 @@ namespace MSF_Base
 		extraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 		if (!extraInstanceData)
 			return false;
-		TESObjectWEAP::InstanceData* instanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+		instanceData = (TESObjectWEAP::InstanceData*)extraInstanceData->instanceData;
 
 		BGSObjectInstance idStruct;
 		idStruct.object = weapBase;
@@ -904,21 +918,33 @@ namespace MSF_Base
 		if (baseWeap)
 		{
 			PrintStackData((Actor*)owner, (TESObjectWEAP*)extraInstanceData->baseForm);
-			BSExtraData* newExtraMods = newList->GetByType(kExtraData_ObjectInstance);
-			BGSObjectInstanceExtra* newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
 			std::vector<BGSMod::Attachment::Mod*> invalidMods;
-			MSF_Base::GetInvalidMods(&invalidMods, newModList, baseWeap, mod);
-			for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+			while (true)
 			{
-				BGSMod::Attachment::Mod* invalidMod = *itMods;
-				_DEBUG("invalid mod: %08X", invalidMod->formID);
-				unk = 0x00200000;
-				bool success = false;
-				ModifyModDataFunctor modifyModFunctor(invalidMod, 0, false, &success);
-				modifyModFunctor.shouldSplitStacks = false;
-				//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-				AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);
+				newList = stack->extraData;
+				BSExtraData* newExtraMods = newList->GetByType(kExtraData_ObjectInstance);
+				BGSObjectInstanceExtra* newModList = DYNAMIC_CAST(newExtraMods, BSExtraData, BGSObjectInstanceExtra);
+				ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(dataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+				TESObjectWEAP::InstanceData* newInstance = nullptr;
+				if (newExtraInstanceData)
+					newInstance = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+				MSF_Base::GetInvalidMods(&invalidMods, newModList, baseWeap, mod, newInstance);
+				if (invalidMods.size() == 0)
+					break;
+				for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+				{
+					BGSMod::Attachment::Mod* invalidMod = *itMods;
+					_DEBUG("invalid mod: %08X", invalidMod->formID);
+					unk = 0x00200000;
+					bool success = false;
+					ModifyModDataFunctor modifyModFunctor(invalidMod, 0, false, &success);
+					modifyModFunctor.shouldSplitStacks = false;
+					//MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+					AttachRemoveModStack(item, &CheckStackIDFunctor(Utilities::GetStackID(item, stack)), &modifyModFunctor, 0, &unk);
+				}
+				invalidMods.clear();
 			}
+			newList = stack->extraData;
 			std::vector<std::pair<BGSMod::Attachment::Mod*, bool>> stateModsToModify;
 			ExtraWeaponState::HandleModChangeEvent(newList, &stateModsToModify, ExtraWeaponState::kEventTypeModdedSwitch, dataList);
 			PrintStackData((Actor*)owner, (TESObjectWEAP*)extraInstanceData->baseForm);
@@ -1055,7 +1081,7 @@ namespace MSF_Base
 		return false;
 	}
 
-	bool GetInvalidMods(std::vector<BGSMod::Attachment::Mod*>* invalidList, BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod* lastmod)
+	bool GetInvalidMods(std::vector<BGSMod::Attachment::Mod*>* invalidList, BGSObjectInstanceExtra* mods, TESObjectWEAP* baseWeap, BGSMod::Attachment::Mod* lastmod, TESObjectWEAP::InstanceData* instanceData)
 	{
 		if (!invalidList || !mods || !baseWeap)
 			return false;
@@ -1070,35 +1096,37 @@ namespace MSF_Base
 			{
 				//_DEBUG("instOK");
 				auto range = MSF_MainData::instantiationRequirements.equal_range(objectMod);
-				bool bRemove = false;
-				//std::vector<BGSMod::Attachment::Mod*> parentMods;
-				//Utilities::GetParentMods(mods, objectMod, &parentMods);
-				BGSMod::Attachment::Mod* parentMod = Utilities::GetParentMod(mods, objectMod);
+				bool bRemove = true;
+				std::vector<BGSMod::Attachment::Mod*> parentMods;
+				Utilities::GetParentMods(mods, objectMod, &parentMods);
+				//BGSMod::Attachment::Mod* parentMod = Utilities::GetParentMod(mods, objectMod);
 				for (auto it = range.first; it != range.second; ++it)
 				{
-					/*_DEBUG("range");
-					bRemove = true;
+					_DEBUG("range");
+					//bRemove = true;
 					for (std::vector<BGSMod::Attachment::Mod*>::iterator itMod = parentMods.begin(); itMod != parentMods.end(); itMod++)
 					{
 						//_DEBUG("parent");
 						KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&(*itMod)->unkB0);
-						if (instantiationData->GetItemIndex(it->second) >= 0)
+						if (instantiationData->GetItemIndex(it->second.first) >= 0)
 						{
 							//_DEBUG("parentOK");
+							if (it->second.second && !it->second.second->CheckRequirements(mods, instanceData, baseWeap))
+								continue;
 							bRemove = false;
 							break;
 						}
 					}
 					if (bRemove == false)
 						break;
-					*/
+					/*
 					KeywordValueArray* instantiationData = reinterpret_cast<KeywordValueArray*>(&parentMod->unkB0);
 					if (instantiationData->GetItemIndex(it->second) >= 0)
 					{
 						//_DEBUG("parentOK");
 						bRemove = false;
 						break;
-					}
+					}*/
 				}
 				if (bRemove)
 					invalidList->push_back(objectMod);

@@ -1,4 +1,12 @@
 ---
+v1.3.0
+features:
+- added multiple mod cycle support (concatenation) on the same attach point with different instatiation keywords
+- the following mod switch requirements are now parsed and supported: HasOMOD (w/ 'and' logic), HasKYWD (w/ 'and' logic), IsBaseWEAP (w/ 'or' logic); each requirement type can be used with 'not' logic (w/ 'and' logic between them)
+fixes:
+- fixed an issue that could corrupt weapon state entries with erroneous flag and ammo count values, therefore F4SE save files serialized before v1.3.0 are not supported
+- fixed a bug that caused instantiation keyword not to be checked as a requirement
+---
 v1.2.9
 features:
 - added MSF API for widget data, settings, and quickkey (see MSF_API.h)

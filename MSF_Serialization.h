@@ -68,6 +68,9 @@ public:
 private:
 	WeaponStateID ID;
 	UInt32 currentState;
+	UInt32 baseWeapFormID;
+	UInt32 owner; //ObjectRefHandle or FormID; 0 or -1 is invalid
+	UInt32 stackID;
 	//BurstModeManager* burstModeManager;
 	std::map<UInt32, StoredWeaponState> weaponStates;
 };

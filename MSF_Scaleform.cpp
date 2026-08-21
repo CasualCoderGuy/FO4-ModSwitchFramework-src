@@ -413,7 +413,7 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetInt(0);
 			if (args->numArgs != 0) return;
-			args->result->SetUInt(PACKED_F4SE_VERSION);
+			args->result->SetUInt(VersionData::f4seVersion);
 		}
 	};
 
@@ -422,7 +422,7 @@ namespace MSF_Scaleform
 		virtual void Invoke(Args* args) {
 			args->result->SetInt(0);
 			if (args->numArgs != 0) return;
-			args->result->SetUInt(CURRENT_RELEASE_RUNTIME);
+			args->result->SetUInt(VersionData::gameVersion);
 		}
 	};
 
@@ -924,6 +924,7 @@ namespace MSF_Scaleform
 			return false;
 		//BGSObjectInstanceExtra* modData = Utilities::GetEquippedModData(*g_player, 41); 
 		BGSObjectInstanceExtra* modData = Utilities::GetEquippedWeaponModData(*g_player);
+		BGSInventoryItem::Stack* eqStack = Utilities::GetEquippedWeaponStack(*g_player);
 		if (!modData)
 			return false;
 		auto data = modData->data;
@@ -937,16 +938,27 @@ namespace MSF_Scaleform
 			menuRoot->CreateArray(dst);
 
 		ModData::ModCycle* modCycle = nullptr;
+		ModData::ModVector combinedMods;
+		ModData::ModVector* modCycleMods = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
 			auto itCycle = mods->modCycleMap.find(value);
 			if (itCycle != mods->modCycleMap.end())
 			{
+				modCycleMods = &itCycle->second->mods;
 				if (modCycle)
 				{
-					_MESSAGE("Ambiguity error"); //or combine
-					return false;
+					if (modCycle->flags != itCycle->second->flags || modCycle->spawnChanceBase != itCycle->second->spawnChanceBase || modCycle->nullModName != itCycle->second->nullModName || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && modCycle->mods[0] != itCycle->second->mods[0]))
+					{
+						_MESSAGE("Ambiguity error, mod cycles not compatible to concatenate");
+						return false;
+					}
+					_MESSAGE("WARNING: multiple mod cycles detected and will be concatenated. Is this the intent?");
+					if (combinedMods.size() == 0)
+						combinedMods.insert(combinedMods.end(), modCycle->mods.begin(), modCycle->mods.end());
+					combinedMods.insert(combinedMods.end(), itCycle->second->mods.begin() + 1, itCycle->second->mods.end());
+					modCycleMods = &combinedMods;
 				}
 				modCycle = itCycle->second;
 			}
@@ -983,11 +995,10 @@ namespace MSF_Scaleform
 			itemData.apName = apName;
 			itemData.isEquipped = attachedMod == nullptr;
 			bool reqsOK = true;
-			//check requirements
 			itemData.reqsOK = reqsOK;
 			displayData.push_back(itemData);
 		}
-		for (ModData::ModVector::iterator itMod = modCycle->mods.begin(); itMod != modCycle->mods.end(); itMod++) //idx, bShowAll, remove?
+		for (ModData::ModVector::iterator itMod = modCycleMods->begin(); itMod != modCycleMods->end(); itMod++) //idx, bShowAll, remove?
 		{
 			ModData::Mod* currMod = *itMod;
 			DisplayData itemData;
@@ -995,7 +1006,7 @@ namespace MSF_Scaleform
 			itemData.modName = currMod->mod->fullName.name.c_str();
 			itemData.apName = apName;
 			itemData.isEquipped = currMod->mod == attachedMod;
-			bool reqsOK = true;
+			bool reqsOK = MSF_Data::CheckSwitchRequirements(eqStack, currMod, nullptr);
 			if (currMod->mod->flags & ModData::Mod::bRequireLooseMod) //update
 			{
 				TESObjectMISC* looseMod = Utilities::GetLooseMod(currMod->mod);

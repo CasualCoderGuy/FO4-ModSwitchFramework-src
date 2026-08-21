@@ -36,7 +36,7 @@ void PurgeWeaponStates()
 	}
 }
 
-ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData)
+ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData* equipData, ExtraInstanceData* extraInstanceData)
 {
 	//BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
 	//ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(extraDataList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
@@ -55,6 +55,9 @@ ExtraWeaponState::ExtraWeaponState(ExtraDataList* extraDataList, EquipWeaponData
 		this->holder = extraHolder;
 		extraDataList->Add(ExtraDataType::kExtraData_Rank, extraHolder);
 	}
+	baseWeapFormID = extraInstanceData->baseForm->formID;
+	owner = 0;
+	stackID = -1;
 	this->UpdateWeaponStates(extraDataList, equipData, kEventTypeCreate);
 }
 
@@ -64,6 +67,9 @@ ExtraWeaponState::ExtraWeaponState(ExtraRank* extraHolder)
 	extraHolder->rank = this->ID;
 	this->holder = extraHolder;
 	this->currentState = nullptr;
+	baseWeapFormID = 0;
+	owner = 0;
+	stackID = -1;
 }
 
 ExtraWeaponState::WeaponState::WeaponState(UInt16 newflags, UInt16 newammoCapacity, UInt16 newchamberSize, UInt32 newchamberedCount, UInt16 newshotCount, UInt64 newloadedAmmo, TESAmmo* newchamberedAmmo, TESAmmo* newequippedAmmo, std::vector<TESAmmo*>* newBCRammo, std::vector<BGSMod::Attachment::Mod*>* newStateMods) {
@@ -123,9 +129,9 @@ ExtraWeaponState* ExtraWeaponState::Init(ExtraDataList* extraDataList, EquipWeap
 		if (storedState)
 			return storedState;
 		else
-			return new ExtraWeaponState(extraDataList, equipData);
+			return new ExtraWeaponState(extraDataList, equipData, extraInstanceData);
 	}
-	return new ExtraWeaponState(extraDataList, equipData);
+	return new ExtraWeaponState(extraDataList, equipData, extraInstanceData);
 }
 
 ExtraWeaponState* ExtraWeaponState::Clone(ExtraRank* extraHolder, UInt8 changeAmmo)
@@ -952,8 +958,10 @@ bool BCRinterface::Init()
 	_base = reinterpret_cast<uintptr_t>(GetModuleHandle("BulletCountedReload.dll"));
 	_HaBCRmodule = GetModuleHandle("HaBCR.dll");
 	_baseH = reinterpret_cast<uintptr_t>(_HaBCRmodule);
-	if (_base)
+	if (_base && VersionData::gameVersion >= MAKE_EXE_VERSION(1, 11, 221))
 		_MESSAGE("BulletCountedReload.dll found at %p", _base);
+	else if (_base)
+		_MESSAGE("BulletCountedReload.dll is not supported in this game version. Try using HaBCR.dll instead.");
 	else
 		_MESSAGE("BulletCountedReload.dll not found");
 	if (_baseH)

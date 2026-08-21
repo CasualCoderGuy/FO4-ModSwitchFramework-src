@@ -576,24 +576,36 @@ bool AttachModToStack_CallFromGameplay_Hook(BGSInventoryItem* invItem, CheckStac
 		if (!newList)
 			return result;
 		_DEBUG("extraOK");
-		BGSObjectInstanceExtra* moddata = DYNAMIC_CAST(newList->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
-		if (!moddata)
-			return result;
-		_DEBUG("dataOK");
 
 		std::vector<BGSMod::Attachment::Mod*> invalidMods;
-		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
-		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+		while (true)
 		{
-			BGSMod::Attachment::Mod* invalidMod = *itMods;
-			_DEBUG("invalid mod: %08X", invalidMod->formID);
-			UInt32 newunk = unk;
-			bool success = false;
-			ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidMod, slotIndex, false, &success);
-			modifyModFunctor.shouldSplitStacks = false;
-			AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
+			newList = stack->extraData;
+			if (!transferEquippedToSplitStack)
+				newList = dataList;
+			BGSObjectInstanceExtra* moddata = DYNAMIC_CAST(newList->GetByType(ExtraDataType::kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+			ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(newList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			TESObjectWEAP::InstanceData* newInstance = nullptr;
+			if (newExtraInstanceData)
+				newInstance = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod, newInstance);
+			if (invalidMods.size() == 0)
+				break;
+			for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+			{
+				BGSMod::Attachment::Mod* invalidMod = *itMods;
+				_DEBUG("invalid mod: %08X", invalidMod->formID);
+				UInt32 newunk = unk;
+				bool success = false;
+				ModifyModDataFunctor modifyModFunctor = ModifyModDataFunctor(invalidMod, slotIndex, false, &success);
+				modifyModFunctor.shouldSplitStacks = false;
+				AttachModToStack_CallFromGameplay_Copied(invItem, &CheckStackIDFunctor(stackID), &modifyModFunctor, unk_r9d, &newunk);
+			}
+			invalidMods.clear();
 		}
-
+		newList = stack->extraData;
+		if (!transferEquippedToSplitStack)
+			newList = dataList;
 		//ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(extraList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
 		//TESObjectWEAP::InstanceData* newInstanceData = nullptr;
 		//if (newExtraInstanceData)
@@ -675,24 +687,43 @@ bool AttachModToStack_CallFromWorkbenchUI_Hook(BGSInventoryItem* invItem, CheckS
 		BGSMod::Attachment::Mod* attachedMod = applyChangesFunctor->mod;
 		if (attachedMod->targetType != BGSMod::Attachment::Mod::kTargetType_Weapon)
 			return result;
-		BGSObjectInstanceExtra* moddata = applyChangesFunctor->moddata;
-
-		std::vector<BGSMod::Attachment::Mod*> invalidMods;
-		MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod);
-		for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
-		{
-			BGSMod::Attachment::Mod* invalidMod = *itMods;
-			_DEBUG("invalid mod UI: %08X", invalidMod->formID);
-			UInt32 newunk = unk;
-			ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
-			MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
-			AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
-		}
 
 		BGSInventoryItem::Stack* stack = Utilities::GetStack(invItem, stackID);
+		ExtraDataList* extraList = stack->extraData;
+
+		std::vector<BGSMod::Attachment::Mod*> invalidMods;
+		while (true)
+		{
+			TESObjectWEAP::InstanceData* newInstance = nullptr;
+			if (stack)
+			{
+				extraList = stack->extraData;
+				if (extraList)
+				{
+					ExtraInstanceData* newExtraInstanceData = DYNAMIC_CAST(extraList->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+					if (newExtraInstanceData)
+						newInstance = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(newExtraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+				}
+			}
+			BGSObjectInstanceExtra* moddata = applyChangesFunctor->moddata;
+			MSF_Base::GetInvalidMods(&invalidMods, moddata, weapon, attachedMod, newInstance);
+			if (invalidMods.size() == 0)
+				break;
+			for (auto itMods = invalidMods.begin(); itMods != invalidMods.end(); itMods++)
+			{
+				BGSMod::Attachment::Mod* invalidMod = *itMods;
+				_DEBUG("invalid mod UI: %08X", invalidMod->formID);
+				UInt32 newunk = unk;
+				ApplyChangesFunctor removeInvalidModFunctor = ApplyChangesFunctor(applyChangesFunctor->foundObject, applyChangesFunctor->moddata, invalidMod, applyChangesFunctor->ignoreWeapon, true, applyChangesFunctor->equipLocked, applyChangesFunctor->setExtraData);
+				MSF_MainData::modSwitchManager.SetIgnoreDeleteExtraData(true);
+				AttachModToStack_CallFromWorkbenchUI_Copied(invItem, &CheckStackIDFunctor(stackID), &removeInvalidModFunctor, unk_r9d, &newunk);
+			}
+			invalidMods.clear();
+		}
+		
 		if (!stack)
 			return result;
-		ExtraDataList* extraList = stack->extraData;
+
 		if (!extraList)
 			return result;
 		//TESObjectWEAP::InstanceData* instanceData = nullptr;

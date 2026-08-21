@@ -114,6 +114,9 @@ StoredExtraWeaponState::StoredExtraWeaponState(ExtraWeaponState* extraWeaponStat
 	_DEBUG("Saving WeaponState %08X", extraWeaponState->ID);
 	this->ID = extraWeaponState->ID;
 	this->currentState = 0;
+	this->baseWeapFormID = extraWeaponState->baseWeapFormID;
+	this->owner = extraWeaponState->owner;
+	this->stackID = extraWeaponState->stackID;
 	UInt32 idx = 1;
 	for (auto itState = extraWeaponState->weaponStates.begin(); itState != extraWeaponState->weaponStates.end(); itState++)
 	{
@@ -140,16 +143,8 @@ StoredExtraWeaponState::StoredWeaponState::StoredWeaponState(const F4SESerializa
 	Serialization::ReadData(intfc, &this->shotCount);
 	Serialization::ReadData(intfc, &this->loadedAmmo);
 	Serialization::ReadData(intfc, &this->chamberedAmmo);
-	if (MAKE_EXE_VERSION_EX(1, 0, 0, 0) <= version)
-	{
-		Serialization::ReadData(intfc, &this->equippedAmmo);
-		Serialization::ReadData(intfc, &this->chamberedCount);
-	}
-	else
-	{
-		this->equippedAmmo = this->chamberedAmmo;
-		this->chamberedCount = this->chamberSize;
-	}
+	this->equippedAmmo = this->chamberedAmmo;
+	this->chamberedCount = this->chamberSize;
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
 	_DEBUG("Loaded data: v%08X %04X %04X %04X %04X %016X %08X %08X %08X %08X", version, this->flags, this->ammoCapacity, this->chamberSize, this->shotCount, this->loadedAmmo, this->chamberedAmmo, this->equippedAmmo, this->chamberedCount, size);
@@ -240,6 +235,9 @@ bool StoredExtraWeaponState::SaveExtra(const F4SESerializationInterface* intfc, 
 
 	intfc->WriteRecordData(&this->ID, sizeof(this->ID));
 	intfc->WriteRecordData(&this->currentState, sizeof(this->currentState));
+	intfc->WriteRecordData(&this->baseWeapFormID, sizeof(this->baseWeapFormID));
+	intfc->WriteRecordData(&this->owner, sizeof(this->owner));
+	intfc->WriteRecordData(&this->stackID, sizeof(this->stackID));
 	UInt32 size = this->weaponStates.size();
 	intfc->WriteRecordData(&size, sizeof(size));
 	_DEBUG("Saved data: %08X, %08X, %08X", this->ID, this->currentState, size);
@@ -256,6 +254,9 @@ StoredExtraWeaponState::StoredExtraWeaponState(const F4SESerializationInterface*
 {
 	Serialization::ReadData(intfc, &this->ID);
 	Serialization::ReadData(intfc, &this->currentState);
+	Serialization::ReadData(intfc, &this->baseWeapFormID);
+	Serialization::ReadData(intfc, &this->owner);
+	Serialization::ReadData(intfc, &this->stackID);
 	UInt32 size = 0;
 	Serialization::ReadData(intfc, &size);
 	_DEBUG("Loaded data %08X ", this->ID, this->currentState, size);
@@ -270,14 +271,35 @@ StoredExtraWeaponState::StoredExtraWeaponState(const F4SESerializationInterface*
 
 bool StoredExtraWeaponState::Recover(const F4SESerializationInterface* intfc, UInt32 version)
 {
+	UInt32 weapFormID = 0;
+	TESForm* weapForm = nullptr;
+	TESObjectWEAP* weap = nullptr;
+	if (intfc->ResolveFormId(this->baseWeapFormID, &weapFormID))
+	{
+		weapForm = (BGSMod::Attachment::Mod*)LookupFormByID(weapFormID);
+		weap = DYNAMIC_CAST(weapForm, TESForm, TESObjectWEAP);
+	}
+	UInt32 newOwner = this->owner;
+
 	ExtraRank* holder = MSF_MainData::weaponStateStore.GetForLoad(this->ID);
 	if (!holder)
 	{
-		_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found", this->ID);
+		if (!weapFormID)
+			_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found. Missing weapon formID, old formID: %08X", this->ID, this->baseWeapFormID);
+		else if (!weapForm)
+			_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found. Weapon form not found with formID: %08X (old formID: %08X)", this->ID, weapFormID, this->baseWeapFormID);
+		else if (!weap)
+			_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found. Found form is not weapon with formID: %08X (old formID: %08X)", this->ID, weapFormID, this->baseWeapFormID);
+		else
+			_MESSAGE("WARNING: data recovery failure at extra weapon state with ID %08X: weapon state holder not found. Base weapon formID: %08X (old formID: %08X)", this->ID, weapFormID, this->baseWeapFormID);
 		return false;
 	}
+
 	ExtraWeaponState* recoveredExtraWeaponState = new ExtraWeaponState(holder);
 	_DEBUG("Loading ExtraRank %p, %08X", holder, holder->rank);
+	recoveredExtraWeaponState->baseWeapFormID = weapFormID;
+	recoveredExtraWeaponState->owner = newOwner;
+	recoveredExtraWeaponState->stackID = this->stackID;
 	UInt32 idx = 0;
 	for (auto itStates = this->weaponStates.begin(); itStates != this->weaponStates.end(); itStates++)
 	{
@@ -288,7 +310,7 @@ bool StoredExtraWeaponState::Recover(const F4SESerializationInterface* intfc, UI
 			UInt32 newFormID = 0;
 			if (!intfc->ResolveFormId(itStates->first, &newFormID))
 				continue;
-			BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)LookupFormByID(newFormID);
+			BGSMod::Attachment::Mod* mod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(LookupFormByID(newFormID), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
 			if (!mod)
 				continue;
 			recoveredWeaponState = itStates->second.Recover(intfc, version);

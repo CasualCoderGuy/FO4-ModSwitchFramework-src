@@ -97,7 +97,16 @@ public:
 		class AttachRequirements
 		{
 		public:
-			bool CheckRequirements(ExtraDataList* extraData);
+			enum
+			{
+				kType_OMOD = 1,
+				kType_KYWD,
+				kType_WEAP,
+				mTypeMask = 0xFF,
+
+				bOp_Not = 0x100
+			};
+			bool CheckRequirements(BGSObjectInstanceExtra* modList, TESObjectWEAP::InstanceData* instanceData, TESObjectWEAP* baseWeap);
 			struct Requirements
 			{
 				std::vector<TESObjectWEAP*> weapons;
@@ -710,6 +719,7 @@ public:
 class MSF_MainData
 {
 public:
+	static bool PluginLoadedCorrectly;
 	static bool IsInitialized;
 	static bool GameIsLoading;
 	static bool PutYourGunInCompatibility;
@@ -759,7 +769,7 @@ public:
 	static std::vector<HUDScopeData> scopeDisplayData;
 	static std::vector<HUDMuzzleData> muzzleDisplayData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> compatibilityEdits;
-	static std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> instantiationRequirements;
+	static std::unordered_multimap<BGSMod::Attachment::Mod*, std::pair<KeywordValue, ModData::Mod::AttachRequirements*>> instantiationRequirements;
 	static std::unordered_map<BGSMod::Attachment::Mod*, BurstModeData*> burstModeModData;
 	static std::unordered_map<TESObjectWEAP*, BurstModeData*> burstModeWeapData;
 	static std::unordered_map<BGSMod::Attachment::Mod*, ModData::Mod*> modDataMap;

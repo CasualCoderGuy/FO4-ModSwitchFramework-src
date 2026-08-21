@@ -56,6 +56,7 @@ BGSAction* MSF_MainData::ActionReload;
 BGSAction* MSF_MainData::ActionDraw;
 BGSAction* MSF_MainData::ActionGunDown;
 BGSAction* MSF_MainData::ActionRightRelease;
+bool MSF_MainData::PluginLoadedCorrectly = false;
 bool MSF_MainData::GameIsLoading = true;
 bool MSF_MainData::IsInitialized = false;
 bool MSF_MainData::HadEquippedAmmo = false;
@@ -82,7 +83,7 @@ std::unordered_map<Actor*, BurstModeManager*> MSF_MainData::npcBurstManagers;
 
 BCRinterface MSF_MainData::BCRinterfaceHolder;
 std::unordered_map<BGSMod::Attachment::Mod*, ModCompatibilityEdits*> MSF_MainData::compatibilityEdits;
-std::unordered_multimap<BGSMod::Attachment::Mod*, KeywordValue> MSF_MainData::instantiationRequirements;
+std::unordered_multimap<BGSMod::Attachment::Mod*, std::pair<KeywordValue, ModData::Mod::AttachRequirements*>> MSF_MainData::instantiationRequirements;
 ModSwitchManager MSF_MainData::modSwitchManager;
 CustomProjectileFormManager MSF_MainData::projectileManager;
 PlayerInventoryListEventSink MSF_MainData::playerInventoryEventSink;
@@ -461,6 +462,44 @@ void ModSwitchManager::SetQuickkeyUp(KeybindData* input)
 		keyIsDown = false;
 		quickSelectLock.Release();
 	}
+}
+
+bool ModData::Mod::AttachRequirements::CheckRequirements(BGSObjectInstanceExtra* modList, TESObjectWEAP::InstanceData* instanceData, TESObjectWEAP* baseWeap)
+{
+	if (instanceData)
+	{
+		for (auto kw : this->requirements.keywords)
+		{
+			if (!Utilities::HasKeyword(instanceData->keywords, kw))
+				return false;
+		}
+		for (auto kw : this->lackrequirements.keywords)
+		{
+			if (Utilities::HasKeyword(instanceData->keywords, kw))
+				return false;
+		}
+	}
+	if (modList)
+	{
+		for (auto mod : this->requirements.mods)
+		{
+			if (!Utilities::HasObjectMod(modList, mod))
+				return false;
+		}
+		for (auto mod : this->lackrequirements.mods)
+		{
+			if (Utilities::HasObjectMod(modList, mod))
+				return false;
+		}
+	}
+	if (baseWeap)
+	{
+		if (std::find(this->requirements.weapons.begin(), this->requirements.weapons.end(), baseWeap) == this->requirements.weapons.end())
+			return false;
+		if (std::find(this->lackrequirements.weapons.begin(), this->lackrequirements.weapons.end(), baseWeap) != this->lackrequirements.weapons.end())
+			return false;
+	}
+	return true;
 }
 
 namespace MSF_Data
@@ -2368,6 +2407,83 @@ namespace MSF_Data
 											str = switchmod["animIdle_3rdP_PA"].asString();
 											if (str != "")
 												animIdle_3rdP_PA = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESIdleForm);
+											ModData::Mod::AttachRequirements* reqs = new ModData::Mod::AttachRequirements();
+											const Json::Value& reqlist = modCycle["requirements"];
+											if (reqlist.isArray())
+											{
+												for (int i2 = 0; i2 < reqlist.size(); i2++)
+												{
+													const Json::Value& reqentry = reqlist[i];
+													UInt32 reqflags = reqentry["type"].asInt();
+													if ((reqflags & ModData::Mod::AttachRequirements::mTypeMask) == 0)
+													{
+														_MESSAGE("Data warning in %s: requirement type is not specified", fileName.c_str());
+														continue;
+													}
+													std::string rq = reqentry["form"].asString();
+													if (rq == "")
+													{
+														_MESSAGE("Data warning in %s: missing requirement formID", fileName.c_str());
+														continue;
+													}
+													if ((reqflags & ModData::Mod::AttachRequirements::mTypeMask) == ModData::Mod::AttachRequirements::kType_KYWD)
+													{
+														BGSKeyword* kw = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, BGSKeyword);
+														if (!kw)
+														{
+															_MESSAGE("Data warning in %s: keyword requirement provided as '%s' is not a valid formID or not a KYWD form", fileName.c_str(), rq.c_str());
+															continue;
+														}
+														if (std::find(reqs->requirements.keywords.begin(), reqs->requirements.keywords.end(), kw) != reqs->requirements.keywords.end() || std::find(reqs->lackrequirements.keywords.begin(), reqs->lackrequirements.keywords.end(), kw) != reqs->lackrequirements.keywords.end())
+														{
+															_MESSAGE("Data warning in %s: duplicate keyword requirement with formID %08X", fileName.c_str(), kw->formID);
+															continue;
+														}
+														if (reqflags & ModData::Mod::AttachRequirements::bOp_Not)
+															reqs->lackrequirements.keywords.push_back(kw);
+														else
+															reqs->requirements.keywords.push_back(kw);
+													}
+													else if ((reqflags & ModData::Mod::AttachRequirements::mTypeMask) == ModData::Mod::AttachRequirements::kType_OMOD)
+													{
+														BGSMod::Attachment::Mod* rqmod = (BGSMod::Attachment::Mod*)Runtime_DynamicCast(Utilities::GetFormFromIdentifier(str), RTTI_TESForm, RTTI_BGSMod__Attachment__Mod);
+														if (!rqmod)
+														{
+															_MESSAGE("Data warning in %s: OMOD requirement provided as '%s' is not a valid formID or not an OMOD form", fileName.c_str(), rq.c_str());
+															continue;
+														}
+														if (std::find(reqs->requirements.mods.begin(), reqs->requirements.mods.end(), rqmod) != reqs->requirements.mods.end() || std::find(reqs->lackrequirements.mods.begin(), reqs->lackrequirements.mods.end(), rqmod) != reqs->lackrequirements.mods.end())
+														{
+															_MESSAGE("Data warning in %s: duplicate OMOD requirement with formID %08X", fileName.c_str(), rqmod->formID);
+															continue;
+														}
+														if (reqflags & ModData::Mod::AttachRequirements::bOp_Not)
+															reqs->lackrequirements.mods.push_back(rqmod);
+														else
+															reqs->requirements.mods.push_back(rqmod);
+													}
+													else if ((reqflags & ModData::Mod::AttachRequirements::mTypeMask) == ModData::Mod::AttachRequirements::kType_WEAP)
+													{
+														TESObjectWEAP* weap = DYNAMIC_CAST(Utilities::GetFormFromIdentifier(str), TESForm, TESObjectWEAP);
+														if (!weap)
+														{
+															_MESSAGE("Data warning in %s: weapon requirement provided as '%s' is not a valid formID or not a WEAP form", fileName.c_str(), rq.c_str());
+															continue;
+														}
+														if (std::find(reqs->requirements.weapons.begin(), reqs->requirements.weapons.end(), weap) != reqs->requirements.weapons.end() || std::find(reqs->lackrequirements.weapons.begin(), reqs->lackrequirements.weapons.end(), weap) != reqs->lackrequirements.weapons.end())
+														{
+															_MESSAGE("Data warning in %s: duplicate weapon requirement with formID %08X", fileName.c_str(), weap->formID);
+															continue;
+														}
+														if (reqflags & ModData::Mod::AttachRequirements::bOp_Not)
+															reqs->lackrequirements.weapons.push_back(weap);
+														else
+															reqs->requirements.weapons.push_back(weap);
+													}
+													else
+														_MESSAGE("Data warning in %s: ignoring unknown requirement type %i", fileName.c_str(), reqflags& ModData::Mod::AttachRequirements::mTypeMask);
+												}
+											}
 											ModData::Mod* modDataMod = new ModData::Mod();
 											modDataMod->mod = mod; 
 											modDataMod->flags = modflags;
@@ -2378,6 +2494,10 @@ namespace MSF_Data
 												AnimationData* animData = new AnimationData(animIdle_1stP, animIdle_3rdP, animIdle_1stP_PA, animIdle_3rdP_PA, (modflags & ModData::Mod::bShouldNotStopIdle) == 0); //((modflags >> 16) & 1)
 												modDataMod->animData = animData;
 											}
+											if (reqs->requirements.keywords.size() > 0 || reqs->requirements.mods.size() > 0 || reqs->requirements.weapons.size() > 0 || reqs->lackrequirements.keywords.size() > 0 || reqs->lackrequirements.mods.size() > 0 || reqs->lackrequirements.weapons.size() > 0)
+												modDataMod->attachRequirements = reqs;
+											else
+												delete reqs;
 											cycle->mods.push_back(modDataMod);
 										}
 									}
@@ -2387,6 +2507,8 @@ namespace MSF_Data
 										for (ModData::ModVector::iterator itMod = cycle->mods.begin(); itMod != cycle->mods.end(); itMod++)
 										{
 											ModData::Mod* modDataMod = *itMod;
+											if (modDataMod->attachRequirements)
+												delete modDataMod->attachRequirements;
 											delete modDataMod;
 										}
 										delete cycle;
@@ -2394,7 +2516,7 @@ namespace MSF_Data
 									}
 									modData->modCycleMap[ifValue] = cycle;
 									for (ModData::ModVector::iterator itMod = cycle->mods.begin(); itMod != cycle->mods.end(); itMod++)
-										MSF_MainData::instantiationRequirements.insert({ (*itMod)->mod, ifValue });
+										MSF_MainData::instantiationRequirements.insert({ (*itMod)->mod, {ifValue, (*itMod)->attachRequirements} });
 								}
 							}
 							if (modData->modCycleMap.size() < 1)
@@ -3162,17 +3284,28 @@ namespace MSF_Data
 		if (!Utilities::GetParentInstantiationValues(attachedMods, modData->attachParentValue, &instantiationValues))
 			return false;
 
-		ModData::ModCycle* modCycle = nullptr;
+		ModData::ModCycle* modCycle = nullptr; 
+		ModData::ModVector combinedMods;
+		ModData::ModVector* modCycleMods = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
 			auto itCycle = modData->modCycleMap.find(value);
 			if (itCycle != modData->modCycleMap.end())
 			{
+				modCycleMods = &itCycle->second->mods;
 				if (modCycle)
 				{
-					_MESSAGE("Ambiguity error");
-					return false;
+					if (modCycle->flags != itCycle->second->flags || modCycle->spawnChanceBase != itCycle->second->spawnChanceBase || modCycle->nullModName != itCycle->second->nullModName || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && modCycle->mods[0] != itCycle->second->mods[0]))
+					{
+						_MESSAGE("Ambiguity error, mod cycles not compatible to concatenate");
+						return false;
+					}
+					_MESSAGE("WARNING: multiple mod cycles detected and will be concatenated. Is this the intent?");
+					if (combinedMods.size() == 0)
+						combinedMods.insert(combinedMods.end(), modCycle->mods.begin(), modCycle->mods.end());
+					combinedMods.insert(combinedMods.end(), itCycle->second->mods.begin()+1, itCycle->second->mods.end());
+					modCycleMods = &combinedMods;
 				}
 				modCycle = itCycle->second;
 			}
@@ -3180,20 +3313,20 @@ namespace MSF_Data
 		if (!modCycle)
 			return false;
 
-		if (num > modCycle->mods.size() || (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod && num >= modCycle->mods.size()))
+		if (num > modCycleMods->size() || (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod && num >= modCycleMods->size()))
 			return false; //out of range
 		ModData::Mod* modToAttach = nullptr;
 		ModData::Mod* modToRemove = nullptr;
 		if (modCycle->flags & ModData::ModCycle::bCannotHaveNullMod)
-			modToAttach = modCycle->mods[num];
+			modToAttach = (*modCycleMods)[num];
 		else if (num != 0)
-			modToAttach = modCycle->mods[num-1];
+			modToAttach = (*modCycleMods)[num-1];
 
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(attachedMods, modData->attachParentValue);
-		ModData::ModVector::iterator itMod = std::find_if(modCycle->mods.begin(), modCycle->mods.end(), [attachedMod](ModData::Mod* data){
+		ModData::ModVector::iterator itMod = std::find_if(modCycleMods->begin(), modCycleMods->end(), [attachedMod](ModData::Mod* data){
 			return data->mod == attachedMod;
 		});
-		if (itMod != modCycle->mods.end())
+		if (itMod != modCycleMods->end())
 			modToRemove = *itMod;
 
 		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
@@ -3220,33 +3353,44 @@ namespace MSF_Data
 			return nullptr;
 
 		ModData::ModCycle* modCycle = nullptr;
+		ModData::ModVector combinedMods;
+		ModData::ModVector* modCycleMods = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
 			auto itCycle = modData->modCycleMap.find(value);
 			if (itCycle != modData->modCycleMap.end())
 			{
+				modCycleMods = &itCycle->second->mods;
 				if (modCycle)
 				{
-					_MESSAGE("Ambiguity error");
-					return nullptr;
+					if (modCycle->flags != itCycle->second->flags || modCycle->spawnChanceBase != itCycle->second->spawnChanceBase || modCycle->nullModName != itCycle->second->nullModName || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && modCycle->mods[0] != itCycle->second->mods[0]))
+					{
+						_MESSAGE("Ambiguity error, mod cycles not compatible to concatenate");
+						return false;
+					}
+					_MESSAGE("WARNING: multiple mod cycles detected and will be concatenated. Is this the intent?");
+					if (combinedMods.size() == 0)
+						combinedMods.insert(combinedMods.end(), modCycle->mods.begin(), modCycle->mods.end());
+					combinedMods.insert(combinedMods.end(), itCycle->second->mods.begin() + 1, itCycle->second->mods.end());
+					modCycleMods = &combinedMods;
 				}
 				modCycle = itCycle->second;
 			}
 		}
 		if (!modCycle)
 			return nullptr;
-		if (std::find(modCycle->mods.begin(), modCycle->mods.end(), modDataMod) == modCycle->mods.end())
+		if (std::find(modCycleMods->begin(), modCycleMods->end(), modDataMod) == modCycleMods->end())
 			return nullptr;
 		
 		ModData::Mod* modToAttach = modDataMod;
 		ModData::Mod* modToRemove = nullptr;
 
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(attachedMods, modData->attachParentValue);
-		ModData::ModVector::iterator itMod = std::find_if(modCycle->mods.begin(), modCycle->mods.end(), [attachedMod](ModData::Mod* data) {
+		ModData::ModVector::iterator itMod = std::find_if(modCycleMods->begin(), modCycleMods->end(), [attachedMod](ModData::Mod* data) {
 			return data->mod == attachedMod;
 			});
-		if (itMod != modCycle->mods.end())
+		if (itMod != modCycleMods->end())
 			modToRemove = *itMod;
 
 		if (!CheckSwitchRequirements(eqStack, modToAttach, modToRemove))
@@ -3274,6 +3418,8 @@ namespace MSF_Data
 		_DEBUG("if counts: %i / %i", instantiationValues.size(), instantiationValues.capacity());
 
 		ModData::ModCycle* modCycle = nullptr;
+		ModData::ModVector combinedMods;
+		ModData::ModVector* modCycleMods = nullptr;
 		for (std::vector<KeywordValue>::iterator itData = instantiationValues.begin(); itData != instantiationValues.end(); itData++)
 		{
 			KeywordValue value = *itData;
@@ -3281,10 +3427,19 @@ namespace MSF_Data
 			auto itCycle = modData->modCycleMap.find(value);
 			if (itCycle != modData->modCycleMap.end())
 			{
+				modCycleMods = &itCycle->second->mods;
 				if (modCycle)
 				{
-					_MESSAGE("Ambiguity error");
-					return false;
+					if (isQuickkey || modCycle->flags != itCycle->second->flags || modCycle->spawnChanceBase != itCycle->second->spawnChanceBase || modCycle->nullModName != itCycle->second->nullModName || ((modCycle->flags & ModData::ModCycle::bCannotHaveNullMod) && modCycle->mods[0] != itCycle->second->mods[0]))
+					{
+						_MESSAGE("Ambiguity error, mod cycles not compatible to concatenate or quickkey was used");
+						return false;
+					}
+					_MESSAGE("WARNING: multiple mod cycles detected and will be concatenated. Is this the intent?");
+					if (combinedMods.size() == 0)
+						combinedMods.insert(combinedMods.end(), modCycle->mods.begin(), modCycle->mods.end());
+					combinedMods.insert(combinedMods.end(), itCycle->second->mods.begin() + 1, itCycle->second->mods.end());
+					modCycleMods = &combinedMods;
 				}
 				modCycle = itCycle->second;
 			}
@@ -3296,7 +3451,7 @@ namespace MSF_Data
 		ModData::Mod* modToRemove = nullptr;
 		UInt32 attachIdx = -2;
 		BGSMod::Attachment::Mod* attachedMod = Utilities::GetModAtAttachPoint(attachedMods, modData->attachParentValue);
-		ModData::ModVector::iterator itMod = std::find_if(modCycle->mods.begin(), modCycle->mods.end(), [attachedMod](ModData::Mod* data){
+		ModData::ModVector::iterator itMod = std::find_if(modCycleMods->begin(), modCycleMods->end(), [attachedMod](ModData::Mod* data){
 			return data->mod == attachedMod;
 		});
 		//if (itMod == modCycle->mods.end()) ///CCC
@@ -3328,13 +3483,13 @@ namespace MSF_Data
 		//}
 		bool nullMod = !(modCycle->flags & ModData::ModCycle::bCannotHaveNullMod);
 		UInt32 it = 1;
-		if (itMod != modCycle->mods.end())
+		if (itMod != modCycleMods->end())
 		{
 			modToRemove = *itMod;
 			itMod++;
-			if (itMod != modCycle->mods.end())
+			if (itMod != modCycleMods->end())
 			{
-				it = std::distance(modCycle->mods.begin(), itMod);
+				it = std::distance(modCycleMods->begin(), itMod);
 				it += nullMod;
 			}
 			else
@@ -3342,14 +3497,14 @@ namespace MSF_Data
 		}
 		UInt32 itstat = it;
 		itstat += nullMod;
-		for (it; it < itstat + modCycle->mods.size(); it++)
+		for (it; it < itstat + modCycleMods->size(); it++)
 		{
 			_DEBUG("it: %02X", it);
 			UInt32 real = it;
 			real -= nullMod;
 			_DEBUG("real: %02X", real);
-			if (it != 0 && real >= modCycle->mods.size())
-				real -= modCycle->mods.size() + nullMod;
+			if (it != 0 && real >= modCycleMods->size())
+				real -= modCycleMods->size() + nullMod;
 			_DEBUG("real: %02X", real);
 			if (real == -1)
 			{
@@ -3362,7 +3517,7 @@ namespace MSF_Data
 			else 
 			{
 				_DEBUG("else");
-				modToAttach = modCycle->mods[real];
+				modToAttach = (*modCycleMods)[real];
 				if (modToAttach->flags & ModData::Mod::bRequireLooseMod)
 				{
 					TESObjectMISC* looseMod = Utilities::GetLooseMod(modToAttach->mod);
@@ -3386,6 +3541,19 @@ namespace MSF_Data
 
 	bool CheckSwitchRequirements(BGSInventoryItem::Stack* stack, ModData::Mod* modToAttach, ModData::Mod* modToRemove)
 	{
+		if (stack && stack->extraData && modToAttach && modToAttach->attachRequirements)
+		{
+			ExtraInstanceData* extraInstanceData = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_InstanceData), BSExtraData, ExtraInstanceData);
+			BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(stack->extraData->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
+			TESObjectWEAP::InstanceData* currInstanceData = nullptr;
+			TESObjectWEAP* baseWeap = nullptr;
+			if (extraInstanceData)
+			{
+				baseWeap = DYNAMIC_CAST(extraInstanceData->baseForm, TESForm, TESObjectWEAP);
+				currInstanceData = (TESObjectWEAP::InstanceData*)Runtime_DynamicCast(extraInstanceData->instanceData, RTTI_TBO_InstanceData, RTTI_TESObjectWEAP__InstanceData);
+			}
+			return modToAttach->attachRequirements->CheckRequirements(attachedMods, currInstanceData, baseWeap);
+		}
 		return true;
 	}
 
@@ -3712,7 +3880,7 @@ namespace MSF_Data
 				{
 					for (it; it != range.second; ++it)
 					{
-						if (instantiationData->GetItemIndex(it->second) >= 0)
+						if (instantiationData->GetItemIndex(it->second.first) >= 0)
 						{
 							//_DEBUG("parentOK");
 							children->push_back(child);
