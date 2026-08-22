@@ -616,11 +616,10 @@ bool InitPlugin(const F4SEInterface* f4se)
 #ifdef DEBUG
 	_MESSAGE("DebugMode enabled!");
 #endif
-	_MESSAGE("Base address: %p", IDDatabase::get().base());//reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
-
-	VersionData::gameVersion = f4se->runtimeVersion;
+	
+	//VersionData::gameVersion = f4se->runtimeVersion;
 	VersionData::f4seVersion = f4se->f4seVersion;
-	VersionData::msfVersion = MSF_VERSION;
+	//VersionData::msfVersion = MSF_VERSION;
 
 #ifndef NEXTGEN
 	// Check game version
@@ -658,10 +657,73 @@ bool InitPlugin(const F4SEInterface* f4se)
 	}
 #endif
 
-	bool addressLibOK = IDDatabase::get().Init();
+	_MESSAGE("Base address: %p", IDDatabase::get().base());//reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
 
-	if (!addressLibOK)
+	uint8_t addressLibStatus = IDDatabase::get().GetStatus();
+
+	switch (addressLibStatus)
+	{
+	case IDDatabase::kStatus_AddressesLibraryLoaded:
+	{
+		_MESSAGE("MSF addresses could not be loaded for the current game version, defaulted to the Address Library instead.");
+	}
+	break;
+	case IDDatabase::kStatus_MSFAddressesLoaded:
+	{
+		_MESSAGE("MSF Address Library loaded.");
+	}
+	break;
+	case IDDatabase::kStatus_HardcodedInitialization:
+	{
+		_MESSAGE("MSF addresses initialized.");
+	}
+	break;
+	case IDDatabase::kStatus_NoVersionInfo:
+	{
+		_MESSAGE("Fatal Error - Could not read Fallout4.exe version info");
 		return false;
+	}
+	break;
+	case IDDatabase::kStatus_MissingAddressLibraries:
+	{
+		std::string libver = "version-" + std::to_string((VersionData::gameVersion >> 24) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 16) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 4) & 0xFFF) + "-" + std::to_string(VersionData::gameVersion & 0xF) + ".bin";
+		_MESSAGE("Fatal Error - Could not load addresses - Missing Address Library and MSF Address Library %s", libver.c_str());
+		return false;
+	}
+	break;
+	case IDDatabase::kStatus_CorruptAddressLibraries:
+	{
+		_MESSAGE("Fatal Error - Could not load addresses - Address Library  and MSF Address Library could not be read");
+		return false;
+	}
+	break;
+	case IDDatabase::kStatus_MissingAndCorruptAddressLibraries:
+	{
+		std::string libver = "version-" + std::to_string((VersionData::gameVersion >> 24) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 16) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 4) & 0xFFF) + "-" + std::to_string(VersionData::gameVersion & 0xF) + ".bin";
+		_MESSAGE("Fatal Error - Could not load addresses - Missing MSF Address Library %s and could not read Address Library", libver.c_str());
+		return false;
+	}
+	break;
+	case IDDatabase::kStatus_CorruptAndMissingAddressLibraries:
+	{
+		std::string libver = "version-" + std::to_string((VersionData::gameVersion >> 24) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 16) & 0xFF) + "-" + std::to_string((VersionData::gameVersion >> 4) & 0xFFF) + "-" + std::to_string(VersionData::gameVersion & 0xF) + ".bin";
+		_MESSAGE("Fatal Error - Could not load addresses - Missing Address Library %s and could not read MSF Address Library", libver.c_str());
+		return false;
+	}
+	break;
+	case IDDatabase::kStatus_Unknown:
+	{
+		_MESSAGE("Fatal Error - Could not load addresses - IDDatabase not initialized");
+		return false;
+	}
+	break;
+	default:
+	{
+		_MESSAGE("Fatal Error - Could not load addresses - An unknown error occured");
+		return false;
+	}
+		break;
+	}
 
 	g_pluginHandle = f4se->GetPluginHandle();
 	if (!g_localTrampoline.Create(1024 * 64, nullptr)) {
@@ -725,8 +787,8 @@ bool InitPlugin(const F4SEInterface* f4se)
 		return false;
 	}
 
-	Globals::Init();
-	RVAManager::UpdateAddresses(f4se->runtimeVersion);
+	//Globals::Init();
+	//RVAManager::UpdateAddresses(f4se->runtimeVersion);
 	//InitializeOffsets();
 	if (!WriteHooks())
 	{
@@ -737,6 +799,7 @@ bool InitPlugin(const F4SEInterface* f4se)
 	srand(time(NULL));
 
 	MSF_MainData::PluginLoadedCorrectly = true;
+	_MESSAGE("MSF plugin load complete.");
 
 	return true;
 }
@@ -754,20 +817,20 @@ bool F4SEPlugin_Query(const F4SEInterface * f4se, PluginInfo * info)
 }
 
 #ifdef NEXTGEN
-	__declspec(dllexport) F4SEPluginVersionData F4SEPlugin_Version =
-	{
-		F4SEPluginVersionData::kVersion,
+__declspec(dllexport) F4SEPluginVersionData F4SEPlugin_Version =
+{
+	F4SEPluginVersionData::kVersion,
 
-		MSF_VERSION,
-		PLUGIN_NAME_LONG,
-		AUTHOR_NAME,
+	MSF_VERSION,
+	PLUGIN_NAME_LONG,
+	AUTHOR_NAME,
 
-		0,	// not version independent
-		0,	// not version independent
-		{ CURRENT_RELEASE_RUNTIME, 0 },
+	F4SEPluginVersionData::kAddressIndependence_AddressLibrary_1_11_137,// | F4SEPluginVersionData::kAddressIndependence_AddressLibrary_1_10_980 //0,	// not version independent
+	F4SEPluginVersionData::kStructureIndependence_1_11_137Layout,// | F4SEPluginVersionData::kStructureIndependence_1_10_980Layout	// not version independent
+	{ CURRENT_RELEASE_RUNTIME, 0 },
 
-		0,	// works with any version of the script extender
-	};
+	0,	// works with any version of the script extender
+};
 #endif
 
 bool F4SEPlugin_Load(const F4SEInterface *f4se)

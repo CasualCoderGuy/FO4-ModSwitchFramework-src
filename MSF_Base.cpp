@@ -1734,7 +1734,7 @@ namespace MSF_Base
 
 	bool ApplyAnimFlavor(Actor* actor, ExtraDataList* extraList)
 	{
-		_MESSAGE("Applying anim flavor");
+		//_MESSAGE("Applying anim flavor");
 		if (!extraList)
 			return false;
 		BGSObjectInstanceExtra* attachedMods = DYNAMIC_CAST(extraList->GetByType(kExtraData_ObjectInstance), BSExtraData, BGSObjectInstanceExtra);
@@ -1743,7 +1743,7 @@ namespace MSF_Base
 			auto data = attachedMods->data;
 			if (data && data->forms)
 			{
-				_MESSAGE("Anim flavor extra data OK");
+				//_MESSAGE("Anim flavor extra data OK");
 				BGSKeyword* neededAnimFlavor = nullptr;
 				UInt64 priority = 0;
 				for (UInt32 i = 0; i < data->blockSize / sizeof(BGSObjectInstanceExtra::Data::Form); i++)
@@ -1763,7 +1763,7 @@ namespace MSF_Base
 				UInt32 fformId = 0;
 				if (neededAnimFlavor)
 					fformId = neededAnimFlavor->formID;
-				_MESSAGE("Anim flavor to be applied: %08X", fformId);
+				//_MESSAGE("Anim flavor to be applied: %08X", fformId);
 				ChangeAnimFlavor(actor, neededAnimFlavor);
 				return true;
 			}

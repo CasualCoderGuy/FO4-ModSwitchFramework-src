@@ -1,5 +1,6 @@
 #pragma once
 #include <unordered_map>
+#include "Config.h"
 
 uint64_t CheckHooks();
 uint32_t CheckHookTargets();
@@ -8,19 +9,36 @@ uint32_t CheckHookCopies();
 class IDDatabase
 {
 private:
+
 	uint8_t ParseAddressLibrary(std::ifstream& file);
 	uintptr_t _base;
 	std::unordered_map<int, ptrdiff_t> id_database;
 	std::unordered_map<int, ptrdiff_t> id_addrlib;
+	uint8_t iStatus;
 
 public:
-	[[nodiscard]] static IDDatabase& get()
+	enum
 	{
-		static IDDatabase singleton;
-		return singleton;
-	}
+		kStatus_Unknown,
+		kStatus_NoVersionInfo,
+		kStatus_MissingAddressLibraries,
+		kStatus_CorruptAddressLibraries,
+		kStatus_MissingAndCorruptAddressLibraries,
+		kStatus_CorruptAndMissingAddressLibraries,
+		kStatus_HardcodedInitialization,
+		kStatus_MSFAddressesLoaded,
+		kStatus_AddressesLibraryLoaded
+	};
 
-	bool Init();
+	IDDatabase();
+	static IDDatabase& get();
+
+	//bool Init();
+
+	uint8_t GetStatus()
+	{
+		return iStatus;
+	}
 
 	[[nodiscard]] ptrdiff_t id2offset(int a_id) const
 	{
@@ -98,7 +116,7 @@ public:
 	{
 		if (a_id_ng != 0)
 			_id = a_id_ng;
-		if (a_id_ae != 0)
+		if (a_id_ae != 0 && VersionData::gameVersion >= MAKE_EXE_VERSION(1, 11, 137))
 			_id = a_id_ae;
 	}
 #endif
